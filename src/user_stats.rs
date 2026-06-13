@@ -65,6 +65,9 @@ pub struct SteamworksStatsState {
     last_achievements: Vec<SteamworksAchievementInfo>,
     last_achievement_icon: Option<SteamworksAchievementIcon>,
     achievement_icon_callback_count: u64,
+    last_user_stats_received: Option<SteamworksUserStatsReceived>,
+    last_user_stats_stored: Option<SteamworksUserStatsStored>,
+    last_user_achievement_stored: Option<SteamworksUserAchievementStored>,
     last_global_achievement_percentages: Vec<SteamworksAchievementGlobalPercentage>,
     leaderboard_count: usize,
     last_leaderboard_info: Option<SteamworksLeaderboardInfo>,
@@ -100,6 +103,21 @@ impl SteamworksStatsState {
     /// Returns how many achievement icon fetched callbacks this plugin observed.
     pub fn achievement_icon_callback_count(&self) -> u64 {
         self.achievement_icon_callback_count
+    }
+
+    /// Returns the most recent user stats received callback snapshot.
+    pub fn last_user_stats_received(&self) -> Option<&SteamworksUserStatsReceived> {
+        self.last_user_stats_received.as_ref()
+    }
+
+    /// Returns the most recent user stats stored callback snapshot.
+    pub fn last_user_stats_stored(&self) -> Option<&SteamworksUserStatsStored> {
+        self.last_user_stats_stored.as_ref()
+    }
+
+    /// Returns the most recent achievement stored callback snapshot.
+    pub fn last_user_achievement_stored(&self) -> Option<&SteamworksUserAchievementStored> {
+        self.last_user_achievement_stored.as_ref()
     }
 
     /// Returns the most recent global achievement percentage page.
@@ -155,6 +173,15 @@ impl SteamworksStatsState {
                 }
                 self.achievement_icon_callback_count =
                     self.achievement_icon_callback_count.saturating_add(1);
+            }
+            SteamworksStatsOperation::UserStatsReceived { callback } => {
+                self.last_user_stats_received = Some(callback.clone());
+            }
+            SteamworksStatsOperation::UserStatsStored { callback } => {
+                self.last_user_stats_stored = Some(callback.clone());
+            }
+            SteamworksStatsOperation::UserAchievementStored { callback } => {
+                self.last_user_achievement_stored = Some(callback.clone());
             }
             SteamworksStatsOperation::AchievementGlobalPercentagesListed {
                 percentages, ..
@@ -213,6 +240,42 @@ pub struct SteamworksAchievementIcon {
     pub height: u32,
     /// RGBA bytes, four bytes per pixel.
     pub rgba: Vec<u8>,
+}
+
+/// User stats received callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUserStatsReceived {
+    /// User whose stats were received.
+    pub steam_id: steamworks::SteamId,
+    /// Game ID reported by Steam.
+    pub game_id: steamworks::GameId,
+    /// Steam result for the stats request.
+    pub result: Result<(), steamworks::SteamError>,
+}
+
+/// User stats stored callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUserStatsStored {
+    /// Game ID reported by Steam.
+    pub game_id: steamworks::GameId,
+    /// Steam result for the store request.
+    pub result: Result<(), steamworks::SteamError>,
+}
+
+/// User achievement stored callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUserAchievementStored {
+    /// Game ID reported by Steam.
+    pub game_id: steamworks::GameId,
+    /// Steamworks achievement API name.
+    pub achievement_name: String,
+    /// Current progress toward the achievement.
+    pub current_progress: u32,
+    /// Required progress to unlock the achievement.
+    ///
+    /// Steam reports both progress fields as zero when the achievement was
+    /// fully unlocked.
+    pub max_progress: u32,
 }
 
 /// Result of reading a Steam achievement icon through the upstream safe wrapper.
@@ -1049,6 +1112,21 @@ pub enum SteamworksStatsOperation {
         /// Icon read status.
         icon: SteamworksAchievementIconStatus,
     },
+    /// User stats received callback was observed.
+    UserStatsReceived {
+        /// Callback snapshot.
+        callback: SteamworksUserStatsReceived,
+    },
+    /// User stats stored callback was observed.
+    UserStatsStored {
+        /// Callback snapshot.
+        callback: SteamworksUserStatsStored,
+    },
+    /// User achievement stored callback was observed.
+    UserAchievementStored {
+        /// Callback snapshot.
+        callback: SteamworksUserAchievementStored,
+    },
     /// Achievement unlock state and unlock time were read.
     AchievementAndUnlockTimeRead {
         /// Steamworks achievement API name.
@@ -1140,8 +1218,10 @@ pub enum SteamworksStatsOperation {
     },
     /// Changed stats and achievements were submitted for storage.
     ///
-    /// Final server confirmation arrives later through
-    /// [`crate::SteamworksEvent::UserStatsStored`].
+    /// Final server confirmation arrives later through both
+    /// [`crate::SteamworksEvent::UserStatsStored`] and
+    /// [`SteamworksStatsOperation::UserStatsStored`]. Stored achievements may
+    /// also emit [`SteamworksStatsOperation::UserAchievementStored`].
     StatsStoreSubmitted,
     /// All stats were reset locally.
     AllStatsReset {
@@ -1397,11 +1477,17 @@ fn process_stats_commands(
         results.write(result);
     }
 
+    process_stats_steam_events(
+        client.as_deref(),
+        &mut state,
+        &mut io.steam_events,
+        &mut results,
+    );
+
     let Some(client) = client else {
         let error = SteamworksStatsError::ClientUnavailable;
-        state.record_error(error.clone());
-        for _ in io.steam_events.read() {}
         for command in io.commands.drain() {
+            state.record_error(error.clone());
             results.write(SteamworksStatsResult::Err {
                 command,
                 error: error.clone(),
@@ -1409,8 +1495,6 @@ fn process_stats_commands(
         }
         return;
     };
-
-    process_stats_steam_events(&client, &mut state, &mut io.steam_events, &mut results);
 
     if io.settings.request_current_user_stats_on_startup && !state.current_user_stats_requested {
         request_current_user_stats(&client, &mut state, &mut results);
@@ -1471,25 +1555,54 @@ fn request_current_user_stats(
 }
 
 fn process_stats_steam_events(
-    client: &SteamworksClient,
+    client: Option<&SteamworksClient>,
     state: &mut SteamworksStatsState,
     steam_events: &mut MessageReader<SteamworksEvent>,
     results: &mut MessageWriter<SteamworksStatsResult>,
 ) {
     for event in steam_events.read() {
-        let SteamworksEvent::UserAchievementIconFetched(event) = event else {
-            continue;
+        let operation = match event {
+            SteamworksEvent::UserStatsReceived(event) => {
+                SteamworksStatsOperation::UserStatsReceived {
+                    callback: SteamworksUserStatsReceived {
+                        steam_id: event.steam_id,
+                        game_id: event.game_id,
+                        result: event.result,
+                    },
+                }
+            }
+            SteamworksEvent::UserStatsStored(event) => SteamworksStatsOperation::UserStatsStored {
+                callback: SteamworksUserStatsStored {
+                    game_id: event.game_id,
+                    result: event.result,
+                },
+            },
+            SteamworksEvent::UserAchievementStored(event) => {
+                SteamworksStatsOperation::UserAchievementStored {
+                    callback: SteamworksUserAchievementStored {
+                        game_id: event.game_id,
+                        achievement_name: event.achievement_name.clone(),
+                        current_progress: event.current_progress,
+                        max_progress: event.max_progress,
+                    },
+                }
+            }
+            SteamworksEvent::UserAchievementIconFetched(event) => {
+                let icon = client
+                    .map(|client| {
+                        read_achievement_icon(&client.user_stats(), &event.achievement_name)
+                    })
+                    .unwrap_or(SteamworksAchievementIconStatus::PendingOrUnavailable);
+                achievement_icon_fetched_operation(event, icon)
+            }
+            _ => continue,
         };
 
-        let operation = achievement_icon_fetched_operation(
-            event,
-            read_achievement_icon(&client.user_stats(), &event.achievement_name),
-        );
         state.record_operation(&operation);
         tracing::debug!(
             target: "bevy_steamworks",
             operation = ?operation,
-            "processed Steamworks achievement icon fetched callback"
+            "processed Steamworks stats callback"
         );
         results.write(SteamworksStatsResult::Ok(operation));
     }
@@ -2306,6 +2419,105 @@ mod tests {
             state.last_error(),
             Some(&SteamworksStatsError::ClientUnavailable)
         );
+    }
+
+    #[test]
+    fn stats_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let steam_id = steamworks::SteamId::from_raw(42);
+        let game_id = steamworks::GameId::from_raw(480);
+
+        app.add_plugins(SteamworksStatsPlugin::new().request_current_user_stats_on_startup(false));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::UserStatsReceived(
+                steamworks::UserStatsReceived {
+                    steam_id,
+                    game_id,
+                    result: Ok(()),
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::UserStatsStored(
+                steamworks::UserStatsStored {
+                    game_id,
+                    result: Err(steamworks::SteamError::PersistFailed),
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::UserAchievementStored(
+                steamworks::UserAchievementStored {
+                    game_id,
+                    achievement_name: "ACH_WIN".to_owned(),
+                    current_progress: 5,
+                    max_progress: 10,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::UserAchievementIconFetched(
+                steamworks::UserAchievementIconFetched {
+                    game_id,
+                    achievement_name: "ACH_WIN".to_owned(),
+                    achieved: true,
+                    icon_handle: 99,
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksStatsResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        let expected_received = SteamworksUserStatsReceived {
+            steam_id,
+            game_id,
+            result: Ok(()),
+        };
+        let expected_stored = SteamworksUserStatsStored {
+            game_id,
+            result: Err(steamworks::SteamError::PersistFailed),
+        };
+        let expected_achievement = SteamworksUserAchievementStored {
+            game_id,
+            achievement_name: "ACH_WIN".to_owned(),
+            current_progress: 5,
+            max_progress: 10,
+        };
+
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksStatsResult::Ok(SteamworksStatsOperation::UserStatsReceived {
+                    callback: expected_received.clone(),
+                }),
+                SteamworksStatsResult::Ok(SteamworksStatsOperation::UserStatsStored {
+                    callback: expected_stored.clone(),
+                }),
+                SteamworksStatsResult::Ok(SteamworksStatsOperation::UserAchievementStored {
+                    callback: expected_achievement.clone(),
+                }),
+                SteamworksStatsResult::Ok(SteamworksStatsOperation::AchievementIconFetched {
+                    name: "ACH_WIN".to_owned(),
+                    achieved: true,
+                    icon_handle: 99,
+                    icon: SteamworksAchievementIconStatus::PendingOrUnavailable,
+                }),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksStatsState>();
+        assert_eq!(state.last_user_stats_received(), Some(&expected_received));
+        assert_eq!(state.last_user_stats_stored(), Some(&expected_stored));
+        assert_eq!(
+            state.last_user_achievement_stored(),
+            Some(&expected_achievement)
+        );
+        assert_eq!(state.achievement_icon_callback_count(), 1);
+        assert_eq!(state.last_error(), None);
     }
 
     #[test]

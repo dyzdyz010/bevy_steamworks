@@ -909,7 +909,7 @@ fn main() {
 }
 ```
 
-By default, `SteamworksStatsPlugin` requests stats for the current Steam user once the `SteamworksClient` resource exists. Successful stat/achievement writes are coalesced into one `store_stats()` call per frame. `SteamworksStatsResult::Ok(SteamworksStatsOperation::StatsStoreSubmitted)` only means the store request was submitted; final Steam confirmation still arrives through `SteamworksEvent::UserStatsStored`, and unlocked achievements may also emit `SteamworksEvent::UserAchievementStored`.
+By default, `SteamworksStatsPlugin` requests stats for the current Steam user once the `SteamworksClient` resource exists. Successful stat/achievement writes are coalesced into one `store_stats()` call per frame. `SteamworksStatsResult::Ok(SteamworksStatsOperation::StatsStoreSubmitted)` only means the store request was submitted; final Steam confirmation arrives through both `SteamworksEvent::UserStatsStored` and `SteamworksStatsOperation::UserStatsStored`. Stats load callbacks are mirrored as `SteamworksStatsOperation::UserStatsReceived`, and stored achievements are mirrored as `SteamworksStatsOperation::UserAchievementStored`.
 
 Achievement catalog commands can list API names or owned `SteamworksAchievementInfo` snapshots with optional display attributes and current-user unlock state. Catalog reads are paged: `list_achievements(...)` returns the first `STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND` items, and `list_achievements_page(..., offset, limit)` can pull later pages up to `STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND` per command. The upstream safe wrapper still enumerates achievement names internally, so use catalog reads as startup/tooling work instead of sending them every frame.
 
