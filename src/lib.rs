@@ -32,6 +32,7 @@ pub use steamworks::{
 pub mod apps;
 pub mod friends;
 pub mod matchmaking;
+pub mod remote_play;
 pub mod screenshots;
 pub mod user;
 pub mod user_stats;
@@ -39,6 +40,7 @@ pub mod utils;
 pub use apps::*;
 pub use friends::*;
 pub use matchmaking::*;
+pub use remote_play::*;
 pub use screenshots::*;
 pub use user::*;
 pub use user_stats::*;
@@ -59,15 +61,18 @@ pub mod prelude {
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
         SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNotificationPosition,
-        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksScreenshotLibraryError,
-        SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-        SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksScreenshotsState,
-        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
-        SteamworksStatsState, SteamworksSystem, SteamworksUnavailable, SteamworksUserCommand,
-        SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation, SteamworksUserPlugin,
-        SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError,
-        SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksRemotePlayCommand,
+        SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
+        SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
+        SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
+        SteamworksScreenshotLibraryError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
+        SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
+        SteamworksScreenshotsState, SteamworksStatsCommand, SteamworksStatsError,
+        SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
+        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksUnavailable,
+        SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation,
+        SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
+        SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
         SteamworksUtilsResult, SteamworksUtilsState,
     };
     pub use steamworks::*;
@@ -600,6 +605,8 @@ pub enum SteamworksSystem {
     ProcessUtilsCommands,
     /// Processes high-level Steam screenshots commands.
     ProcessScreenshotsCommands,
+    /// Processes high-level Steam Remote Play commands.
+    ProcessRemotePlayCommands,
 }
 
 fn run_steam_callbacks(

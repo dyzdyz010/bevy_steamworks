@@ -313,6 +313,61 @@ $env:BEVY_STEAMWORKS_SCREENSHOT_HEIGHT = "1080"
 cargo run --example screenshots
 ```
 
+## Remote Play
+
+`SteamworksRemotePlayPlugin` adds command/result messages for Steam Remote Play sessions and Remote Play Together invites.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_remote_play(mut remote_play: MessageWriter<SteamworksRemotePlayCommand>) {
+    remote_play.write(SteamworksRemotePlayCommand::ListSessions);
+}
+
+fn read_remote_play(mut results: MessageReader<SteamworksRemotePlayResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn read_remote_play_callbacks(mut events: MessageReader<SteamworksEvent>) {
+    for event in events.read() {
+        match event {
+            SteamworksEvent::RemotePlayConnected(event) => {
+                info!("Remote Play connected: {event:?}");
+            }
+            SteamworksEvent::RemotePlayDisconnected(event) => {
+                info!("Remote Play disconnected: {event:?}");
+            }
+            _ => {}
+        }
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksRemotePlayPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_remote_play)
+        .add_systems(Update, (read_remote_play, read_remote_play_callbacks))
+        .run();
+}
+```
+
+`SteamworksRemotePlayCommand::ListSessions` returns session snapshots with user, client name, form factor, and resolution. The upstream bulk listing API does not expose session IDs, so use `SteamworksEvent::RemotePlayConnected` to capture a `RemotePlaySessionId`, then call `SteamworksRemotePlayCommand::GetSession` for ID-based session reads.
+
+The current upstream Rust wrapper exposes Remote Play Together invites through `steamworks::RemotePlaySession`, but the underlying invite result only confirms whether Steam accepted an invite for the friend. `SteamworksRemotePlayCommand::Invite` therefore treats the session ID as caller-provided context, not proof that Steam created a session-specific invite.
+
+Run the Remote Play example with:
+
+```powershell
+cargo run --example remote_play
+$env:BEVY_STEAMWORKS_REMOTE_PLAY_SESSION = "1"
+$env:BEVY_STEAMWORKS_REMOTE_PLAY_FRIEND = "76561198000000000"
+cargo run --example remote_play
+```
+
 ## App, Ownership, and Launch Parameters
 
 `SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.
