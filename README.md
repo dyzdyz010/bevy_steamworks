@@ -173,6 +173,49 @@ $env:BEVY_STEAMWORKS_CREATE_PRIVATE_LOBBY = "1"
 cargo run --example matchmaking
 ```
 
+## User Identity and Authentication
+
+`SteamworksUserPlugin` adds command/result messages for current-user identity, Steam server connection state, auth session tickets, Web API auth tickets, remote ticket validation sessions, and license checks for authenticated users.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_user(mut user: MessageWriter<SteamworksUserCommand>) {
+    user.write(SteamworksUserCommand::GetCurrentUserInfo);
+    user.write(SteamworksUserCommand::IsLoggedOn);
+}
+
+fn read_user(mut results: MessageReader<SteamworksUserResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksUserPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_user)
+        .add_systems(Update, read_user)
+        .run();
+}
+```
+
+`SteamworksUserCommand::GetAuthenticationSessionTicket` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through `SteamworksEvent::AuthSessionTicketResponse`. `SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse`. Remote ticket invalidation still arrives through `SteamworksEvent::ValidateAuthTicketResponse`.
+
+Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and started sessions in `SteamworksUserState`.
+
+Run the user/auth example with:
+
+```powershell
+cargo run --example user
+$env:BEVY_STEAMWORKS_AUTH_TICKET = "1"
+cargo run --example user
+$env:BEVY_STEAMWORKS_WEBAPI_IDENTITY = "my-service"
+cargo run --example user
+```
+
 ## App, Ownership, and Launch Parameters
 
 `SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.
