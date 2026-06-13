@@ -30,8 +30,10 @@ pub use steamworks::{
 };
 
 pub mod friends;
+pub mod matchmaking;
 pub mod user_stats;
 pub use friends::*;
+pub use matchmaking::*;
 pub use user_stats::*;
 
 /// Common imports for Bevy apps using this crate.
@@ -42,10 +44,13 @@ pub mod prelude {
         SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendsCommand,
         SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
         SteamworksFriendsResult, SteamworksFriendsState, SteamworksInitMode,
-        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksStatsCommand,
-        SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
-        SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem,
-        SteamworksUnavailable,
+        SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
+        SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
+        SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
+        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksOverlayToStoreAction,
+        SteamworksPlugin, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
+        SteamworksStatsState, SteamworksSystem, SteamworksUnavailable,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -567,6 +572,8 @@ pub enum SteamworksSystem {
     ProcessStatsCommands,
     /// Processes high-level Steam friends, Rich Presence, overlay, and invite commands.
     ProcessFriendsCommands,
+    /// Processes high-level Steam matchmaking and lobby commands.
+    ProcessMatchmakingCommands,
 }
 
 fn run_steam_callbacks(

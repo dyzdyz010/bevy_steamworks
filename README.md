@@ -128,6 +128,51 @@ $env:BEVY_STEAMWORKS_RICH_PRESENCE_STATUS = "Testing bevy_steamworks"
 cargo run --example social
 ```
 
+## Matchmaking and Lobbies
+
+`SteamworksMatchmakingPlugin` adds a Bevy-native command/result layer for common lobby workflows: lobby search, create/join/leave, metadata, members, joinability, lobby chat, and lobby game server data.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_lobbies(mut matchmaking: MessageWriter<SteamworksMatchmakingCommand>) {
+    let filter = SteamworksLobbyListFilter::new()
+        .with_distance(DistanceFilter::Default)
+        .with_max_results(10);
+
+    matchmaking.write(SteamworksMatchmakingCommand::request_lobby_list(filter));
+    matchmaking.write(SteamworksMatchmakingCommand::create_lobby(LobbyType::Private, 4));
+}
+
+fn read_matchmaking(mut results: MessageReader<SteamworksMatchmakingResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksMatchmakingPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_lobbies)
+        .add_systems(Update, read_matchmaking)
+        .run();
+}
+```
+
+Async calls such as lobby list requests, lobby creation, and lobby joins first emit a submitted operation, then later emit the Steam call result after `SteamworksSystem::RunCallbacks` pumps Steam callbacks. Steam lobby callbacks such as `LobbyCreated`, `LobbyEnter`, `LobbyChatMsg`, and `LobbyDataUpdate` still arrive through `SteamworksEvent`.
+
+Commands validate lobby keys, strings, lobby size, and chat message size before calling upstream `steamworks` methods, so common invalid inputs become structured `SteamworksMatchmakingError` values instead of panicking in the Steam API wrapper.
+
+Run the matchmaking example with:
+
+```powershell
+cargo run --example matchmaking
+$env:BEVY_STEAMWORKS_CREATE_PRIVATE_LOBBY = "1"
+cargo run --example matchmaking
+```
+
 ## Achievements and Stats
 
 `SteamworksStatsPlugin` adds a Bevy-native command/result layer for common user stats and achievement workflows. It is optional; you can still call the raw `steamworks` API through `SteamworksClient`.
