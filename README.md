@@ -224,6 +224,8 @@ Async calls such as lobby list requests, lobby creation, and lobby joins first e
 
 `SteamworksMatchmakingOperation::LobbyChatMessageReceived` carries the lobby, sender, entry type, and chat entry ID, but it does not copy chat bytes. Steam's chat entry ID is callback-timing-sensitive, so register a lower-level callback through `SteamworksCallbackRegistry` if you need to copy lobby chat bytes immediately and reliably.
 
+`SteamworksMatchmakingState` caches bounded lobby snapshots for latest request contexts, lobby list results, created/joined/left lobbies, metadata reads and mutations, member reads, joinability changes, chat sends and entry reads, lobby game-server reads, and lobby callbacks. Its joined lobby list tracks joins observed by this plugin and explicit leave commands; it is not a strong-consistency source for remote kicks, disconnects, or lobby shutdowns. Query data and chat entry bytes are kept only as last snapshots.
+
 Commands validate lobby keys, strings, lobby size, and chat message size before calling upstream `steamworks` methods, so common invalid inputs become structured `SteamworksMatchmakingError` values instead of panicking in the Steam API wrapper.
 
 Run the matchmaking example with:

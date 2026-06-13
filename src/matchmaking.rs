@@ -63,8 +63,31 @@ impl Plugin for SteamworksMatchmakingPlugin {
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksMatchmakingState {
     last_error: Option<SteamworksMatchmakingError>,
+    last_lobby_list_request: Option<SteamworksLobbyListRequest>,
     last_lobby_list: Vec<steamworks::LobbyId>,
+    last_lobby_create_request: Option<SteamworksLobbyCreateRequest>,
+    last_lobby_join_request: Option<SteamworksMatchmakingLobbyJoinRequest>,
+    last_created_lobby: Option<SteamworksLobbyCreated>,
+    last_joined_lobby: Option<SteamworksLobbyJoined>,
+    last_left_lobby: Option<steamworks::LobbyId>,
     joined_lobbies: Vec<steamworks::LobbyId>,
+    last_lobby_data_count: Option<SteamworksLobbyDataCount>,
+    last_lobby_data: Option<SteamworksLobbyDataValue>,
+    last_lobby_data_entry: Option<SteamworksLobbyDataEntry>,
+    last_all_lobby_data: Option<SteamworksLobbyDataEntries>,
+    last_lobby_data_set: Option<SteamworksLobbyDataMutation>,
+    last_lobby_data_deleted: Option<SteamworksLobbyDataMutation>,
+    last_lobby_member_data_set: Option<SteamworksLobbyDataMutation>,
+    last_lobby_member_data: Option<SteamworksLobbyMemberDataValue>,
+    last_lobby_member_limit: Option<SteamworksLobbyMemberLimit>,
+    last_lobby_owner: Option<SteamworksLobbyOwner>,
+    last_lobby_member_count: Option<SteamworksLobbyMemberCount>,
+    last_lobby_members: Option<SteamworksLobbyMembers>,
+    last_lobby_joinability: Option<SteamworksLobbyJoinability>,
+    last_lobby_chat_message_sent: Option<SteamworksLobbyChatMessageSent>,
+    last_lobby_chat_entry: Option<SteamworksLobbyChatEntry>,
+    last_lobby_game_server_set: Option<SteamworksLobbyGameServerAssignment>,
+    last_lobby_game_server: Option<SteamworksLobbyGameServerLookup>,
     last_lobby_created_callback: Option<SteamworksLobbyCreatedCallback>,
     last_lobby_enter_callback: Option<SteamworksLobbyEnterCallback>,
     last_lobby_chat_message: Option<SteamworksLobbyChatMessage>,
@@ -79,14 +102,129 @@ impl SteamworksMatchmakingState {
         self.last_error.as_ref()
     }
 
+    /// Returns the most recent lobby-list request submitted through this plugin.
+    pub fn last_lobby_list_request(&self) -> Option<&SteamworksLobbyListRequest> {
+        self.last_lobby_list_request.as_ref()
+    }
+
     /// Returns the most recent lobby list received from Steam.
     pub fn last_lobby_list(&self) -> &[steamworks::LobbyId] {
         &self.last_lobby_list
     }
 
+    /// Returns the most recent lobby-create request submitted through this plugin.
+    pub fn last_lobby_create_request(&self) -> Option<&SteamworksLobbyCreateRequest> {
+        self.last_lobby_create_request.as_ref()
+    }
+
+    /// Returns the most recent lobby-join request submitted through this plugin.
+    pub fn last_lobby_join_request(&self) -> Option<&SteamworksMatchmakingLobbyJoinRequest> {
+        self.last_lobby_join_request.as_ref()
+    }
+
+    /// Returns the most recent lobby creation result observed through this plugin.
+    pub fn last_created_lobby(&self) -> Option<&SteamworksLobbyCreated> {
+        self.last_created_lobby.as_ref()
+    }
+
+    /// Returns the most recent lobby join result observed through this plugin.
+    pub fn last_joined_lobby(&self) -> Option<&SteamworksLobbyJoined> {
+        self.last_joined_lobby.as_ref()
+    }
+
+    /// Returns the most recent lobby left through this plugin.
+    pub fn last_left_lobby(&self) -> Option<steamworks::LobbyId> {
+        self.last_left_lobby
+    }
+
     /// Returns lobbies this command layer has observed the local user joining.
     pub fn joined_lobbies(&self) -> &[steamworks::LobbyId] {
         &self.joined_lobbies
+    }
+
+    /// Returns the most recent lobby metadata count read.
+    pub fn last_lobby_data_count(&self) -> Option<&SteamworksLobbyDataCount> {
+        self.last_lobby_data_count.as_ref()
+    }
+
+    /// Returns the most recent lobby metadata value read.
+    pub fn last_lobby_data(&self) -> Option<&SteamworksLobbyDataValue> {
+        self.last_lobby_data.as_ref()
+    }
+
+    /// Returns the most recent lobby metadata entry read by index.
+    pub fn last_lobby_data_entry(&self) -> Option<&SteamworksLobbyDataEntry> {
+        self.last_lobby_data_entry.as_ref()
+    }
+
+    /// Returns the most recent full lobby metadata snapshot read.
+    pub fn last_all_lobby_data(&self) -> Option<&SteamworksLobbyDataEntries> {
+        self.last_all_lobby_data.as_ref()
+    }
+
+    /// Returns the most recent lobby metadata key set.
+    pub fn last_lobby_data_set(&self) -> Option<&SteamworksLobbyDataMutation> {
+        self.last_lobby_data_set.as_ref()
+    }
+
+    /// Returns the most recent lobby metadata key deleted.
+    pub fn last_lobby_data_deleted(&self) -> Option<&SteamworksLobbyDataMutation> {
+        self.last_lobby_data_deleted.as_ref()
+    }
+
+    /// Returns the most recent local-user lobby metadata key set.
+    pub fn last_lobby_member_data_set(&self) -> Option<&SteamworksLobbyDataMutation> {
+        self.last_lobby_member_data_set.as_ref()
+    }
+
+    /// Returns the most recent lobby member metadata value read.
+    pub fn last_lobby_member_data(&self) -> Option<&SteamworksLobbyMemberDataValue> {
+        self.last_lobby_member_data.as_ref()
+    }
+
+    /// Returns the most recent lobby member limit read.
+    pub fn last_lobby_member_limit(&self) -> Option<&SteamworksLobbyMemberLimit> {
+        self.last_lobby_member_limit.as_ref()
+    }
+
+    /// Returns the most recent lobby owner read.
+    pub fn last_lobby_owner(&self) -> Option<&SteamworksLobbyOwner> {
+        self.last_lobby_owner.as_ref()
+    }
+
+    /// Returns the most recent lobby member count read.
+    pub fn last_lobby_member_count(&self) -> Option<&SteamworksLobbyMemberCount> {
+        self.last_lobby_member_count.as_ref()
+    }
+
+    /// Returns the most recent lobby member list read.
+    pub fn last_lobby_members(&self) -> Option<&SteamworksLobbyMembers> {
+        self.last_lobby_members.as_ref()
+    }
+
+    /// Returns the most recent lobby joinability value set.
+    pub fn last_lobby_joinability(&self) -> Option<&SteamworksLobbyJoinability> {
+        self.last_lobby_joinability.as_ref()
+    }
+
+    /// Returns the most recent lobby chat message sent.
+    pub fn last_lobby_chat_message_sent(&self) -> Option<&SteamworksLobbyChatMessageSent> {
+        self.last_lobby_chat_message_sent.as_ref()
+    }
+
+    /// Returns the most recent lobby chat entry bytes read.
+    pub fn last_lobby_chat_entry(&self) -> Option<&SteamworksLobbyChatEntry> {
+        self.last_lobby_chat_entry.as_ref()
+    }
+
+    /// Returns the most recent lobby game-server data submitted.
+    pub fn last_lobby_game_server_set(&self) -> Option<&SteamworksLobbyGameServerAssignment> {
+        self.last_lobby_game_server_set.as_ref()
+    }
+
+    /// Returns the most recent lobby game-server data read.
+    pub fn last_lobby_game_server(&self) -> Option<&SteamworksLobbyGameServerLookup> {
+        self.last_lobby_game_server.as_ref()
     }
 
     /// Returns the most recent lobby created callback snapshot.
@@ -120,17 +258,185 @@ impl SteamworksMatchmakingState {
 
     fn record_operation(&mut self, operation: &SteamworksMatchmakingOperation) {
         match operation {
+            SteamworksMatchmakingOperation::LobbyListRequested { request_id, filter } => {
+                self.last_lobby_list_request = Some(SteamworksLobbyListRequest {
+                    request_id: *request_id,
+                    filter: filter.clone(),
+                });
+            }
             SteamworksMatchmakingOperation::LobbyListReceived { lobbies, .. } => {
                 self.last_lobby_list.clone_from(lobbies);
             }
-            SteamworksMatchmakingOperation::LobbyCreated { lobby, .. }
-            | SteamworksMatchmakingOperation::LobbyJoined { lobby, .. }
-                if !self.joined_lobbies.contains(lobby) =>
-            {
-                self.joined_lobbies.push(*lobby);
+            SteamworksMatchmakingOperation::LobbyCreateRequested {
+                request_id,
+                lobby_type,
+                max_members,
+            } => {
+                self.last_lobby_create_request = Some(SteamworksLobbyCreateRequest {
+                    request_id: *request_id,
+                    lobby_type: *lobby_type,
+                    max_members: *max_members,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyCreated {
+                request_id,
+                lobby_type,
+                max_members,
+                lobby,
+            } => {
+                if !self.joined_lobbies.contains(lobby) {
+                    self.joined_lobbies.push(*lobby);
+                }
+                self.last_created_lobby = Some(SteamworksLobbyCreated {
+                    request_id: *request_id,
+                    lobby_type: *lobby_type,
+                    max_members: *max_members,
+                    lobby: *lobby,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyJoinRequested { request_id, lobby } => {
+                self.last_lobby_join_request = Some(SteamworksMatchmakingLobbyJoinRequest {
+                    request_id: *request_id,
+                    lobby: *lobby,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyJoined {
+                request_id,
+                requested_lobby,
+                lobby,
+            } => {
+                if !self.joined_lobbies.contains(lobby) {
+                    self.joined_lobbies.push(*lobby);
+                }
+                self.last_joined_lobby = Some(SteamworksLobbyJoined {
+                    request_id: *request_id,
+                    requested_lobby: *requested_lobby,
+                    lobby: *lobby,
+                });
             }
             SteamworksMatchmakingOperation::LobbyLeft { lobby } => {
                 self.joined_lobbies.retain(|known| known != lobby);
+                self.last_left_lobby = Some(*lobby);
+            }
+            SteamworksMatchmakingOperation::LobbyDataCountRead { lobby, count } => {
+                self.last_lobby_data_count = Some(SteamworksLobbyDataCount {
+                    lobby: *lobby,
+                    count: *count,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyDataRead { lobby, key, value } => {
+                self.last_lobby_data = Some(SteamworksLobbyDataValue {
+                    lobby: *lobby,
+                    key: key.clone(),
+                    value: value.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyDataByIndexRead {
+                lobby,
+                index,
+                entry,
+            } => {
+                self.last_lobby_data_entry = Some(SteamworksLobbyDataEntry {
+                    lobby: *lobby,
+                    index: *index,
+                    entry: entry.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::AllLobbyDataRead { lobby, entries } => {
+                self.last_all_lobby_data = Some(SteamworksLobbyDataEntries {
+                    lobby: *lobby,
+                    entries: entries.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyDataSet { lobby, key } => {
+                self.last_lobby_data_set = Some(SteamworksLobbyDataMutation {
+                    lobby: *lobby,
+                    key: key.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyDataDeleted { lobby, key } => {
+                self.last_lobby_data_deleted = Some(SteamworksLobbyDataMutation {
+                    lobby: *lobby,
+                    key: key.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyMemberDataSet { lobby, key } => {
+                self.last_lobby_member_data_set = Some(SteamworksLobbyDataMutation {
+                    lobby: *lobby,
+                    key: key.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyMemberDataRead {
+                lobby,
+                user,
+                key,
+                value,
+            } => {
+                self.last_lobby_member_data = Some(SteamworksLobbyMemberDataValue {
+                    lobby: *lobby,
+                    user: *user,
+                    key: key.clone(),
+                    value: value.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyMemberLimitRead { lobby, limit } => {
+                self.last_lobby_member_limit = Some(SteamworksLobbyMemberLimit {
+                    lobby: *lobby,
+                    limit: *limit,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyOwnerRead { lobby, owner } => {
+                self.last_lobby_owner = Some(SteamworksLobbyOwner {
+                    lobby: *lobby,
+                    owner: *owner,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyMemberCountRead { lobby, count } => {
+                self.last_lobby_member_count = Some(SteamworksLobbyMemberCount {
+                    lobby: *lobby,
+                    count: *count,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyMembersListed { lobby, members } => {
+                self.last_lobby_members = Some(SteamworksLobbyMembers {
+                    lobby: *lobby,
+                    members: members.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyJoinableSet { lobby, joinable } => {
+                self.last_lobby_joinability = Some(SteamworksLobbyJoinability {
+                    lobby: *lobby,
+                    joinable: *joinable,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyChatMessageSent { lobby, len } => {
+                self.last_lobby_chat_message_sent = Some(SteamworksLobbyChatMessageSent {
+                    lobby: *lobby,
+                    len: *len,
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyChatEntryRead {
+                lobby,
+                chat_id,
+                data,
+            } => {
+                self.last_lobby_chat_entry = Some(SteamworksLobbyChatEntry {
+                    lobby: *lobby,
+                    chat_id: *chat_id,
+                    data: data.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyGameServerSet { lobby, server } => {
+                self.last_lobby_game_server_set = Some(SteamworksLobbyGameServerAssignment {
+                    lobby: *lobby,
+                    server: server.clone(),
+                });
+            }
+            SteamworksMatchmakingOperation::LobbyGameServerRead { lobby, server } => {
+                self.last_lobby_game_server = Some(SteamworksLobbyGameServerLookup {
+                    lobby: *lobby,
+                    server: server.clone(),
+                });
             }
             SteamworksMatchmakingOperation::LobbyCreateCallbackReceived { callback } => {
                 self.last_lobby_created_callback = Some(callback.clone());
@@ -152,7 +458,6 @@ impl SteamworksMatchmakingState {
             SteamworksMatchmakingOperation::LobbyDataUpdateReceived { update } => {
                 self.last_lobby_data_update = Some(update.clone());
             }
-            _ => {}
         }
     }
 
@@ -365,8 +670,216 @@ pub struct SteamworksLobbyDataUpdate {
     pub success: bool,
 }
 
+/// Submitted lobby-list request context.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyListRequest {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Filters applied to the request.
+    pub filter: SteamworksLobbyListFilter,
+}
+
+/// Submitted lobby-create request context.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyCreateRequest {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Lobby visibility requested.
+    pub lobby_type: steamworks::LobbyType,
+    /// Maximum members requested.
+    pub max_members: u32,
+}
+
+/// Submitted lobby-join request context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksMatchmakingLobbyJoinRequest {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Lobby requested by the command.
+    pub lobby: steamworks::LobbyId,
+}
+
+/// Completed lobby creation context.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyCreated {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Lobby visibility requested.
+    pub lobby_type: steamworks::LobbyType,
+    /// Maximum members requested.
+    pub max_members: u32,
+    /// Created lobby.
+    pub lobby: steamworks::LobbyId,
+}
+
+/// Completed lobby join context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyJoined {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Lobby requested by the command.
+    pub requested_lobby: steamworks::LobbyId,
+    /// Lobby joined according to Steam.
+    pub lobby: steamworks::LobbyId,
+}
+
+/// Lobby metadata count snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataCount {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Metadata entry count.
+    pub count: u32,
+}
+
+/// Lobby metadata value snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataValue {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Metadata key.
+    pub key: String,
+    /// Metadata value, if Steam had one.
+    pub value: Option<String>,
+}
+
+/// Lobby metadata entry snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataEntry {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Metadata entry index.
+    pub index: u32,
+    /// Metadata key/value pair, if Steam had one.
+    pub entry: Option<(String, String)>,
+}
+
+/// Full lobby metadata snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataEntries {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Metadata key/value pairs.
+    pub entries: Vec<(String, String)>,
+}
+
+/// Lobby metadata mutation snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataMutation {
+    /// Lobby mutated.
+    pub lobby: steamworks::LobbyId,
+    /// Metadata key.
+    pub key: String,
+}
+
+/// Lobby member metadata value snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyMemberDataValue {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Member inspected.
+    pub user: steamworks::SteamId,
+    /// Metadata key.
+    pub key: String,
+    /// Metadata value, if Steam had one.
+    pub value: Option<String>,
+}
+
+/// Lobby member limit snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyMemberLimit {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Member limit, if known.
+    pub limit: Option<usize>,
+}
+
+/// Lobby owner snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyOwner {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Owner Steam ID.
+    pub owner: steamworks::SteamId,
+}
+
+/// Lobby member count snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyMemberCount {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Member count.
+    pub count: usize,
+}
+
+/// Lobby member list snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyMembers {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Member Steam IDs.
+    pub members: Vec<steamworks::SteamId>,
+}
+
+/// Lobby joinability mutation snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyJoinability {
+    /// Lobby mutated.
+    pub lobby: steamworks::LobbyId,
+    /// Joinable value submitted.
+    pub joinable: bool,
+}
+
+/// Lobby chat send snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyChatMessageSent {
+    /// Lobby sent into.
+    pub lobby: steamworks::LobbyId,
+    /// Message length in bytes.
+    pub len: usize,
+}
+
+/// Lobby chat entry bytes snapshot.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksLobbyChatEntry {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Chat entry index.
+    pub chat_id: i32,
+    /// Message bytes read from Steam.
+    pub data: Vec<u8>,
+}
+
+impl std::fmt::Debug for SteamworksLobbyChatEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteamworksLobbyChatEntry")
+            .field("lobby", &self.lobby)
+            .field("chat_id", &self.chat_id)
+            .field("data_len", &self.data.len())
+            .finish()
+    }
+}
+
+/// Lobby game-server assignment snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyGameServerAssignment {
+    /// Lobby mutated.
+    pub lobby: steamworks::LobbyId,
+    /// Game-server data submitted.
+    pub server: SteamworksLobbyGameServer,
+}
+
+/// Lobby game-server lookup snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyGameServerLookup {
+    /// Lobby inspected.
+    pub lobby: steamworks::LobbyId,
+    /// Game-server data, if Steam had one.
+    pub server: Option<SteamworksLobbyGameServer>,
+}
+
 /// A high-level command for Steam matchmaking and lobbies.
-#[derive(Clone, Debug, Message, PartialEq)]
+#[derive(Clone, Message, PartialEq)]
 pub enum SteamworksMatchmakingCommand {
     /// Request a lobby list from Steam.
     RequestLobbyList {
@@ -524,6 +1037,120 @@ pub enum SteamworksMatchmakingCommand {
     },
 }
 
+impl std::fmt::Debug for SteamworksMatchmakingCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RequestLobbyList { filter } => f
+                .debug_struct("RequestLobbyList")
+                .field("filter", filter)
+                .finish(),
+            Self::CreateLobby {
+                lobby_type,
+                max_members,
+            } => f
+                .debug_struct("CreateLobby")
+                .field("lobby_type", lobby_type)
+                .field("max_members", max_members)
+                .finish(),
+            Self::JoinLobby { lobby } => f.debug_struct("JoinLobby").field("lobby", lobby).finish(),
+            Self::LeaveLobby { lobby } => {
+                f.debug_struct("LeaveLobby").field("lobby", lobby).finish()
+            }
+            Self::GetLobbyDataCount { lobby } => f
+                .debug_struct("GetLobbyDataCount")
+                .field("lobby", lobby)
+                .finish(),
+            Self::GetLobbyData { lobby, key } => f
+                .debug_struct("GetLobbyData")
+                .field("lobby", lobby)
+                .field("key", key)
+                .finish(),
+            Self::GetLobbyDataByIndex { lobby, index } => f
+                .debug_struct("GetLobbyDataByIndex")
+                .field("lobby", lobby)
+                .field("index", index)
+                .finish(),
+            Self::GetAllLobbyData { lobby } => f
+                .debug_struct("GetAllLobbyData")
+                .field("lobby", lobby)
+                .finish(),
+            Self::SetLobbyData { lobby, key, value } => f
+                .debug_struct("SetLobbyData")
+                .field("lobby", lobby)
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::DeleteLobbyData { lobby, key } => f
+                .debug_struct("DeleteLobbyData")
+                .field("lobby", lobby)
+                .field("key", key)
+                .finish(),
+            Self::SetLobbyMemberData { lobby, key, value } => f
+                .debug_struct("SetLobbyMemberData")
+                .field("lobby", lobby)
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::GetLobbyMemberData { lobby, user, key } => f
+                .debug_struct("GetLobbyMemberData")
+                .field("lobby", lobby)
+                .field("user", user)
+                .field("key", key)
+                .finish(),
+            Self::GetLobbyMemberLimit { lobby } => f
+                .debug_struct("GetLobbyMemberLimit")
+                .field("lobby", lobby)
+                .finish(),
+            Self::GetLobbyOwner { lobby } => f
+                .debug_struct("GetLobbyOwner")
+                .field("lobby", lobby)
+                .finish(),
+            Self::GetLobbyMemberCount { lobby } => f
+                .debug_struct("GetLobbyMemberCount")
+                .field("lobby", lobby)
+                .finish(),
+            Self::ListLobbyMembers { lobby } => f
+                .debug_struct("ListLobbyMembers")
+                .field("lobby", lobby)
+                .finish(),
+            Self::SetLobbyJoinable { lobby, joinable } => f
+                .debug_struct("SetLobbyJoinable")
+                .field("lobby", lobby)
+                .field("joinable", joinable)
+                .finish(),
+            Self::SendLobbyChatMessage { lobby, data } => f
+                .debug_struct("SendLobbyChatMessage")
+                .field("lobby", lobby)
+                .field("data_len", &data.len())
+                .finish(),
+            Self::GetLobbyChatEntry {
+                lobby,
+                chat_id,
+                max_bytes,
+            } => f
+                .debug_struct("GetLobbyChatEntry")
+                .field("lobby", lobby)
+                .field("chat_id", chat_id)
+                .field("max_bytes", max_bytes)
+                .finish(),
+            Self::SetLobbyGameServer {
+                lobby,
+                address,
+                steam_id,
+            } => f
+                .debug_struct("SetLobbyGameServer")
+                .field("lobby", lobby)
+                .field("address", address)
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::GetLobbyGameServer { lobby } => f
+                .debug_struct("GetLobbyGameServer")
+                .field("lobby", lobby)
+                .finish(),
+        }
+    }
+}
+
 impl SteamworksMatchmakingCommand {
     /// Creates a [`SteamworksMatchmakingCommand::RequestLobbyList`] command.
     pub fn request_lobby_list(filter: SteamworksLobbyListFilter) -> Self {
@@ -587,7 +1214,7 @@ impl SteamworksMatchmakingCommand {
 }
 
 /// A successfully submitted Steam matchmaking operation or synchronous read.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum SteamworksMatchmakingOperation {
     /// Lobby list request was submitted.
     LobbyListRequested {
@@ -800,6 +1427,189 @@ pub enum SteamworksMatchmakingOperation {
         /// Callback snapshot.
         update: SteamworksLobbyDataUpdate,
     },
+}
+
+impl std::fmt::Debug for SteamworksMatchmakingOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LobbyListRequested { request_id, filter } => f
+                .debug_struct("LobbyListRequested")
+                .field("request_id", request_id)
+                .field("filter", filter)
+                .finish(),
+            Self::LobbyListReceived {
+                request_id,
+                filter,
+                lobbies,
+            } => f
+                .debug_struct("LobbyListReceived")
+                .field("request_id", request_id)
+                .field("filter", filter)
+                .field("lobbies", lobbies)
+                .finish(),
+            Self::LobbyCreateRequested {
+                request_id,
+                lobby_type,
+                max_members,
+            } => f
+                .debug_struct("LobbyCreateRequested")
+                .field("request_id", request_id)
+                .field("lobby_type", lobby_type)
+                .field("max_members", max_members)
+                .finish(),
+            Self::LobbyCreated {
+                request_id,
+                lobby_type,
+                max_members,
+                lobby,
+            } => f
+                .debug_struct("LobbyCreated")
+                .field("request_id", request_id)
+                .field("lobby_type", lobby_type)
+                .field("max_members", max_members)
+                .field("lobby", lobby)
+                .finish(),
+            Self::LobbyJoinRequested { request_id, lobby } => f
+                .debug_struct("LobbyJoinRequested")
+                .field("request_id", request_id)
+                .field("lobby", lobby)
+                .finish(),
+            Self::LobbyJoined {
+                request_id,
+                requested_lobby,
+                lobby,
+            } => f
+                .debug_struct("LobbyJoined")
+                .field("request_id", request_id)
+                .field("requested_lobby", requested_lobby)
+                .field("lobby", lobby)
+                .finish(),
+            Self::LobbyLeft { lobby } => f.debug_struct("LobbyLeft").field("lobby", lobby).finish(),
+            Self::LobbyDataCountRead { lobby, count } => f
+                .debug_struct("LobbyDataCountRead")
+                .field("lobby", lobby)
+                .field("count", count)
+                .finish(),
+            Self::LobbyDataRead { lobby, key, value } => f
+                .debug_struct("LobbyDataRead")
+                .field("lobby", lobby)
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::LobbyDataByIndexRead {
+                lobby,
+                index,
+                entry,
+            } => f
+                .debug_struct("LobbyDataByIndexRead")
+                .field("lobby", lobby)
+                .field("index", index)
+                .field("entry", entry)
+                .finish(),
+            Self::AllLobbyDataRead { lobby, entries } => f
+                .debug_struct("AllLobbyDataRead")
+                .field("lobby", lobby)
+                .field("entries", entries)
+                .finish(),
+            Self::LobbyDataSet { lobby, key } => f
+                .debug_struct("LobbyDataSet")
+                .field("lobby", lobby)
+                .field("key", key)
+                .finish(),
+            Self::LobbyDataDeleted { lobby, key } => f
+                .debug_struct("LobbyDataDeleted")
+                .field("lobby", lobby)
+                .field("key", key)
+                .finish(),
+            Self::LobbyMemberDataSet { lobby, key } => f
+                .debug_struct("LobbyMemberDataSet")
+                .field("lobby", lobby)
+                .field("key", key)
+                .finish(),
+            Self::LobbyMemberDataRead {
+                lobby,
+                user,
+                key,
+                value,
+            } => f
+                .debug_struct("LobbyMemberDataRead")
+                .field("lobby", lobby)
+                .field("user", user)
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::LobbyMemberLimitRead { lobby, limit } => f
+                .debug_struct("LobbyMemberLimitRead")
+                .field("lobby", lobby)
+                .field("limit", limit)
+                .finish(),
+            Self::LobbyOwnerRead { lobby, owner } => f
+                .debug_struct("LobbyOwnerRead")
+                .field("lobby", lobby)
+                .field("owner", owner)
+                .finish(),
+            Self::LobbyMemberCountRead { lobby, count } => f
+                .debug_struct("LobbyMemberCountRead")
+                .field("lobby", lobby)
+                .field("count", count)
+                .finish(),
+            Self::LobbyMembersListed { lobby, members } => f
+                .debug_struct("LobbyMembersListed")
+                .field("lobby", lobby)
+                .field("members", members)
+                .finish(),
+            Self::LobbyJoinableSet { lobby, joinable } => f
+                .debug_struct("LobbyJoinableSet")
+                .field("lobby", lobby)
+                .field("joinable", joinable)
+                .finish(),
+            Self::LobbyChatMessageSent { lobby, len } => f
+                .debug_struct("LobbyChatMessageSent")
+                .field("lobby", lobby)
+                .field("len", len)
+                .finish(),
+            Self::LobbyChatEntryRead {
+                lobby,
+                chat_id,
+                data,
+            } => f
+                .debug_struct("LobbyChatEntryRead")
+                .field("lobby", lobby)
+                .field("chat_id", chat_id)
+                .field("data_len", &data.len())
+                .finish(),
+            Self::LobbyGameServerSet { lobby, server } => f
+                .debug_struct("LobbyGameServerSet")
+                .field("lobby", lobby)
+                .field("server", server)
+                .finish(),
+            Self::LobbyGameServerRead { lobby, server } => f
+                .debug_struct("LobbyGameServerRead")
+                .field("lobby", lobby)
+                .field("server", server)
+                .finish(),
+            Self::LobbyCreateCallbackReceived { callback } => f
+                .debug_struct("LobbyCreateCallbackReceived")
+                .field("callback", callback)
+                .finish(),
+            Self::LobbyEnterCallbackReceived { callback } => f
+                .debug_struct("LobbyEnterCallbackReceived")
+                .field("callback", callback)
+                .finish(),
+            Self::LobbyChatMessageReceived { message } => f
+                .debug_struct("LobbyChatMessageReceived")
+                .field("message", message)
+                .finish(),
+            Self::LobbyChatUpdateReceived { update } => f
+                .debug_struct("LobbyChatUpdateReceived")
+                .field("update", update)
+                .finish(),
+            Self::LobbyDataUpdateReceived { update } => f
+                .debug_struct("LobbyDataUpdateReceived")
+                .field("update", update)
+                .finish(),
+        }
+    }
 }
 
 /// Result message emitted by [`SteamworksMatchmakingPlugin`].
@@ -1530,6 +2340,33 @@ mod tests {
     }
 
     #[test]
+    fn debug_redacts_lobby_chat_payload_bytes() {
+        let lobby = steamworks::LobbyId::from_raw(1);
+        let command = SteamworksMatchmakingCommand::send_lobby_chat_message(lobby, vec![1, 2, 3]);
+        let operation = SteamworksMatchmakingOperation::LobbyChatEntryRead {
+            lobby,
+            chat_id: 7,
+            data: vec![4, 5, 6],
+        };
+        let entry = SteamworksLobbyChatEntry {
+            lobby,
+            chat_id: 7,
+            data: vec![7, 8, 9],
+        };
+
+        let command_debug = format!("{command:?}");
+        let operation_debug = format!("{operation:?}");
+        let entry_debug = format!("{entry:?}");
+
+        assert!(command_debug.contains("data_len: 3"));
+        assert!(!command_debug.contains("[1, 2, 3]"));
+        assert!(operation_debug.contains("data_len: 3"));
+        assert!(!operation_debug.contains("[4, 5, 6]"));
+        assert!(entry_debug.contains("data_len: 3"));
+        assert!(!entry_debug.contains("[7, 8, 9]"));
+    }
+
+    #[test]
     fn async_success_operations_preserve_request_context() {
         let filter = SteamworksLobbyListFilter::new().with_max_results(2);
         let lobbies = vec![steamworks::LobbyId::from_raw(11)];
@@ -1579,6 +2416,302 @@ mod tests {
                 &mut state,
             ),
             None
+        );
+    }
+
+    #[test]
+    fn state_records_matchmaking_operations_without_unbounded_history() {
+        let mut state = SteamworksMatchmakingState::default();
+        let filter = SteamworksLobbyListFilter::new().with_max_results(2);
+        let first_lobby = steamworks::LobbyId::from_raw(11);
+        let second_lobby = steamworks::LobbyId::from_raw(22);
+        let user = steamworks::SteamId::from_raw(33);
+        let owner = steamworks::SteamId::from_raw(44);
+        let server = SteamworksLobbyGameServer {
+            address: "127.0.0.1:27015".parse().expect("valid socket address"),
+            steam_id: Some(owner),
+        };
+
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyListRequested {
+            request_id: 1,
+            filter: filter.clone(),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyListReceived {
+            request_id: 1,
+            filter: filter.clone(),
+            lobbies: vec![first_lobby, second_lobby],
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyCreateRequested {
+            request_id: 2,
+            lobby_type: steamworks::LobbyType::FriendsOnly,
+            max_members: 4,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyCreated {
+            request_id: 2,
+            lobby_type: steamworks::LobbyType::FriendsOnly,
+            max_members: 4,
+            lobby: first_lobby,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyJoinRequested {
+            request_id: 3,
+            lobby: second_lobby,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyJoined {
+            request_id: 3,
+            requested_lobby: second_lobby,
+            lobby: second_lobby,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyJoined {
+            request_id: 3,
+            requested_lobby: second_lobby,
+            lobby: second_lobby,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyLeft { lobby: first_lobby });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataCountRead {
+            lobby: second_lobby,
+            count: 2,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataRead {
+            lobby: second_lobby,
+            key: "mode".to_owned(),
+            value: Some("dm".to_owned()),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataByIndexRead {
+            lobby: second_lobby,
+            index: 1,
+            entry: Some(("map".to_owned(), "arena".to_owned())),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::AllLobbyDataRead {
+            lobby: second_lobby,
+            entries: vec![
+                ("mode".to_owned(), "dm".to_owned()),
+                ("map".to_owned(), "arena".to_owned()),
+            ],
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataSet {
+            lobby: second_lobby,
+            key: "mode".to_owned(),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataDeleted {
+            lobby: second_lobby,
+            key: "old".to_owned(),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyMemberDataSet {
+            lobby: second_lobby,
+            key: "loadout".to_owned(),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyMemberDataRead {
+            lobby: second_lobby,
+            user,
+            key: "rank".to_owned(),
+            value: Some("gold".to_owned()),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyMemberLimitRead {
+            lobby: second_lobby,
+            limit: Some(8),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyOwnerRead {
+            lobby: second_lobby,
+            owner,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyMemberCountRead {
+            lobby: second_lobby,
+            count: 3,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyMembersListed {
+            lobby: second_lobby,
+            members: vec![user, owner],
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyJoinableSet {
+            lobby: second_lobby,
+            joinable: false,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyChatMessageSent {
+            lobby: second_lobby,
+            len: 5,
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyChatEntryRead {
+            lobby: second_lobby,
+            chat_id: 7,
+            data: vec![1, 2, 3],
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyGameServerSet {
+            lobby: second_lobby,
+            server: server.clone(),
+        });
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyGameServerRead {
+            lobby: second_lobby,
+            server: Some(server.clone()),
+        });
+
+        assert_eq!(
+            state.last_lobby_list_request(),
+            Some(&SteamworksLobbyListRequest {
+                request_id: 1,
+                filter: filter.clone(),
+            })
+        );
+        assert_eq!(state.last_lobby_list(), &[first_lobby, second_lobby]);
+        assert_eq!(
+            state.last_lobby_create_request(),
+            Some(&SteamworksLobbyCreateRequest {
+                request_id: 2,
+                lobby_type: steamworks::LobbyType::FriendsOnly,
+                max_members: 4,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_join_request(),
+            Some(&SteamworksMatchmakingLobbyJoinRequest {
+                request_id: 3,
+                lobby: second_lobby,
+            })
+        );
+        assert_eq!(
+            state.last_created_lobby(),
+            Some(&SteamworksLobbyCreated {
+                request_id: 2,
+                lobby_type: steamworks::LobbyType::FriendsOnly,
+                max_members: 4,
+                lobby: first_lobby,
+            })
+        );
+        assert_eq!(
+            state.last_joined_lobby(),
+            Some(&SteamworksLobbyJoined {
+                request_id: 3,
+                requested_lobby: second_lobby,
+                lobby: second_lobby,
+            })
+        );
+        assert_eq!(state.last_left_lobby(), Some(first_lobby));
+        assert_eq!(state.joined_lobbies(), &[second_lobby]);
+        assert_eq!(
+            state.last_lobby_data_count(),
+            Some(&SteamworksLobbyDataCount {
+                lobby: second_lobby,
+                count: 2,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_data(),
+            Some(&SteamworksLobbyDataValue {
+                lobby: second_lobby,
+                key: "mode".to_owned(),
+                value: Some("dm".to_owned()),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_data_entry(),
+            Some(&SteamworksLobbyDataEntry {
+                lobby: second_lobby,
+                index: 1,
+                entry: Some(("map".to_owned(), "arena".to_owned())),
+            })
+        );
+        assert_eq!(
+            state.last_all_lobby_data(),
+            Some(&SteamworksLobbyDataEntries {
+                lobby: second_lobby,
+                entries: vec![
+                    ("mode".to_owned(), "dm".to_owned()),
+                    ("map".to_owned(), "arena".to_owned()),
+                ],
+            })
+        );
+        assert_eq!(
+            state.last_lobby_data_set(),
+            Some(&SteamworksLobbyDataMutation {
+                lobby: second_lobby,
+                key: "mode".to_owned(),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_data_deleted(),
+            Some(&SteamworksLobbyDataMutation {
+                lobby: second_lobby,
+                key: "old".to_owned(),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_member_data_set(),
+            Some(&SteamworksLobbyDataMutation {
+                lobby: second_lobby,
+                key: "loadout".to_owned(),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_member_data(),
+            Some(&SteamworksLobbyMemberDataValue {
+                lobby: second_lobby,
+                user,
+                key: "rank".to_owned(),
+                value: Some("gold".to_owned()),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_member_limit(),
+            Some(&SteamworksLobbyMemberLimit {
+                lobby: second_lobby,
+                limit: Some(8),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_owner(),
+            Some(&SteamworksLobbyOwner {
+                lobby: second_lobby,
+                owner,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_member_count(),
+            Some(&SteamworksLobbyMemberCount {
+                lobby: second_lobby,
+                count: 3,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_members(),
+            Some(&SteamworksLobbyMembers {
+                lobby: second_lobby,
+                members: vec![user, owner],
+            })
+        );
+        assert_eq!(
+            state.last_lobby_joinability(),
+            Some(&SteamworksLobbyJoinability {
+                lobby: second_lobby,
+                joinable: false,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_chat_message_sent(),
+            Some(&SteamworksLobbyChatMessageSent {
+                lobby: second_lobby,
+                len: 5,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_chat_entry(),
+            Some(&SteamworksLobbyChatEntry {
+                lobby: second_lobby,
+                chat_id: 7,
+                data: vec![1, 2, 3],
+            })
+        );
+        assert_eq!(
+            state.last_lobby_game_server_set(),
+            Some(&SteamworksLobbyGameServerAssignment {
+                lobby: second_lobby,
+                server: server.clone(),
+            })
+        );
+        assert_eq!(
+            state.last_lobby_game_server(),
+            Some(&SteamworksLobbyGameServerLookup {
+                lobby: second_lobby,
+                server: Some(server),
+            })
         );
     }
 
