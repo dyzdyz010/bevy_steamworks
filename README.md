@@ -590,30 +590,20 @@ fn read_screenshots(mut results: MessageReader<SteamworksScreenshotsResult>) {
     }
 }
 
-fn read_screenshot_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        match event {
-            SteamworksEvent::ScreenshotRequested(event) => info!("{event:?}"),
-            SteamworksEvent::ScreenshotReady(event) => info!("{event:?}"),
-            _ => {}
-        }
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
         .add_plugins(SteamworksScreenshotsPlugin::new())
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, request_screenshots)
-        .add_systems(Update, (read_screenshots, read_screenshot_callbacks))
+        .add_systems(Update, read_screenshots)
         .run();
 }
 ```
 
-`SteamworksScreenshotsCommand::AddScreenshotToLibrary` returns a screenshot handle when Steam accepts the request. Final save confirmation still arrives later through `SteamworksEvent::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
+`SteamworksScreenshotsCommand::AddScreenshotToLibrary` returns a screenshot handle when Steam accepts the request. Final save confirmation arrives later through both `SteamworksEvent::ScreenshotReady` and `SteamworksScreenshotsOperation::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
 
-Only call `SteamworksScreenshotsCommand::hook_screenshots(true)` if your game will handle `SteamworksEvent::ScreenshotRequested` by capturing an image and submitting it to Steam; once hooked, Steam no longer handles the screenshot hotkey for you. `AddScreenshotToLibrary` canonicalizes local file paths through the upstream wrapper before submitting, so keep it low-frequency and avoid slow network paths in frame-critical flows.
+Only call `SteamworksScreenshotsCommand::hook_screenshots(true)` if your game will handle `SteamworksScreenshotsOperation::ScreenshotRequested` or `SteamworksEvent::ScreenshotRequested` by capturing an image and submitting it to Steam; once hooked, Steam no longer handles the screenshot hotkey for you. `AddScreenshotToLibrary` canonicalizes local file paths through the upstream wrapper before submitting, so keep it low-frequency and avoid slow network paths in frame-critical flows.
 
 Run the screenshots example with:
 

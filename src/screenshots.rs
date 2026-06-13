@@ -1,26 +1,28 @@
 //! High-level Bevy ECS integration for Steam screenshots.
 //!
 //! This module builds on top of the upstream [`steamworks::screenshots::Screenshots`] API.
-//! It submits screenshot operations through Bevy messages while keeping final
-//! Steam callback confirmation in [`crate::SteamworksEvent`].
+//! It submits screenshot operations through Bevy messages while mirroring final
+//! Steam callback confirmations from [`crate::SteamworksEvent`] into
+//! [`SteamworksScreenshotsResult`].
 
 use std::path::PathBuf;
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam screenshot commands.
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksScreenshotsCommand`] and [`SteamworksScreenshotsResult`] messages
 /// and runs its command processor in [`bevy_app::First`] after Steam callbacks.
+/// It also mirrors screenshot requested/ready callbacks into screenshot results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksScreenshotsPlugin;
 
@@ -34,6 +36,7 @@ impl SteamworksScreenshotsPlugin {
 impl Plugin for SteamworksScreenshotsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksScreenshotsState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksScreenshotsCommand>()
             .add_message::<SteamworksScreenshotsResult>()
             .configure_sets(
@@ -55,6 +58,8 @@ pub struct SteamworksScreenshotsState {
     last_error: Option<SteamworksScreenshotsError>,
     screenshots_hooked: Option<bool>,
     added_screenshots: Vec<steamworks::screenshots::ScreenshotHandle>,
+    screenshot_requested_count: u64,
+    last_screenshot_ready: Option<SteamworksScreenshotReady>,
 }
 
 impl SteamworksScreenshotsState {
@@ -70,10 +75,21 @@ impl SteamworksScreenshotsState {
 
     /// Returns screenshot handles successfully submitted through this command layer.
     ///
-    /// Final save confirmation arrives later through
-    /// [`crate::SteamworksEvent::ScreenshotReady`].
+    /// Final save confirmation arrives later through both
+    /// [`crate::SteamworksEvent::ScreenshotReady`] and
+    /// [`SteamworksScreenshotsOperation::ScreenshotReady`].
     pub fn added_screenshots(&self) -> &[steamworks::screenshots::ScreenshotHandle] {
         &self.added_screenshots
+    }
+
+    /// Returns how many screenshot requested callbacks this plugin observed.
+    pub fn screenshot_requested_count(&self) -> u64 {
+        self.screenshot_requested_count
+    }
+
+    /// Returns the most recent screenshot ready callback snapshot.
+    pub fn last_screenshot_ready(&self) -> Option<&SteamworksScreenshotReady> {
+        self.last_screenshot_ready.as_ref()
     }
 
     fn record_error(&mut self, error: SteamworksScreenshotsError) {
@@ -91,9 +107,23 @@ impl SteamworksScreenshotsState {
             {
                 self.added_screenshots.push(*handle);
             }
+            SteamworksScreenshotsOperation::ScreenshotRequested { count } => {
+                self.screenshot_requested_count = *count;
+            }
+            SteamworksScreenshotsOperation::ScreenshotReady { ready } => {
+                self.last_screenshot_ready = Some(ready.clone());
+            }
             _ => {}
         }
     }
+}
+
+/// Screenshot ready callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksScreenshotReady {
+    /// Screenshot handle, or the error reported by Steam.
+    pub local_handle:
+        Result<steamworks::screenshots::ScreenshotHandle, SteamworksScreenshotReadyError>,
 }
 
 /// A high-level command for Steam screenshot workflows.
@@ -102,7 +132,8 @@ pub enum SteamworksScreenshotsCommand {
     /// Set whether this app handles Steam screenshot requests itself.
     ///
     /// When enabled, Steam emits [`crate::SteamworksEvent::ScreenshotRequested`]
-    /// and the game is expected to capture and submit a screenshot.
+    /// and [`SteamworksScreenshotsOperation::ScreenshotRequested`], and the game
+    /// is expected to capture and submit a screenshot.
     HookScreenshots {
         /// Whether screenshots should be hooked by the app.
         hook: bool,
@@ -112,14 +143,17 @@ pub enum SteamworksScreenshotsCommand {
     /// Trigger a Steam screenshot.
     ///
     /// Depending on hook state, Steam may emit
-    /// [`crate::SteamworksEvent::ScreenshotRequested`] and later
-    /// [`crate::SteamworksEvent::ScreenshotReady`].
+    /// [`crate::SteamworksEvent::ScreenshotRequested`] /
+    /// [`SteamworksScreenshotsOperation::ScreenshotRequested`] and later
+    /// [`crate::SteamworksEvent::ScreenshotReady`] /
+    /// [`SteamworksScreenshotsOperation::ScreenshotReady`].
     TriggerScreenshot,
     /// Add an existing screenshot image file to the user's Steam screenshot library.
     ///
     /// This submits the request and returns a handle immediately if Steam accepts
-    /// it. Final save confirmation arrives later through
-    /// [`crate::SteamworksEvent::ScreenshotReady`].
+    /// it. Final save confirmation arrives later through both
+    /// [`crate::SteamworksEvent::ScreenshotReady`] and
+    /// [`SteamworksScreenshotsOperation::ScreenshotReady`].
     ///
     /// The upstream wrapper canonicalizes the provided paths before submitting
     /// them to Steam, so use local paths and keep this command low-frequency.
@@ -174,8 +208,9 @@ pub enum SteamworksScreenshotsOperation {
     ScreenshotTriggered,
     /// A screenshot library add request was accepted by Steam.
     ///
-    /// Final save confirmation arrives later through
-    /// [`crate::SteamworksEvent::ScreenshotReady`].
+    /// Final save confirmation arrives later through both
+    /// [`crate::SteamworksEvent::ScreenshotReady`] and
+    /// [`SteamworksScreenshotsOperation::ScreenshotReady`].
     ScreenshotLibraryAddSubmitted {
         /// Steam screenshot handle.
         handle: steamworks::screenshots::ScreenshotHandle,
@@ -188,12 +223,22 @@ pub enum SteamworksScreenshotsOperation {
         /// Screenshot height in pixels.
         height: i32,
     },
+    /// Steam requested a screenshot from this app.
+    ScreenshotRequested {
+        /// Total number of screenshot request callbacks observed by this plugin.
+        count: u64,
+    },
+    /// Steam reported a screenshot ready result.
+    ScreenshotReady {
+        /// Callback snapshot.
+        ready: SteamworksScreenshotReady,
+    },
 }
 
 /// Result message emitted by [`SteamworksScreenshotsPlugin`].
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksScreenshotsResult {
-    /// The command was submitted to Steamworks or a value was read.
+    /// The command or observed callback was processed successfully.
     Ok(SteamworksScreenshotsOperation),
     /// The command failed synchronously.
     Err {
@@ -256,16 +301,40 @@ impl From<steamworks::screenshots::ScreenshotLibraryAddError> for SteamworksScre
     }
 }
 
+/// Cloneable, comparable mirror of upstream
+/// [`steamworks::screenshots::ScreenshotReadyError`].
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+pub enum SteamworksScreenshotReadyError {
+    /// The screenshot could not be loaded or parsed.
+    #[error("the screenshot could not be loaded or parsed")]
+    Fail,
+    /// The screenshot could not be saved to disk.
+    #[error("the screenshot could not be saved to disk")]
+    IoFailure,
+}
+
+impl From<steamworks::screenshots::ScreenshotReadyError> for SteamworksScreenshotReadyError {
+    fn from(error: steamworks::screenshots::ScreenshotReadyError) -> Self {
+        match error {
+            steamworks::screenshots::ScreenshotReadyError::Fail => Self::Fail,
+            steamworks::screenshots::ScreenshotReadyError::IoFailure => Self::IoFailure,
+        }
+    }
+}
+
 fn process_screenshots_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksScreenshotsState>,
     mut commands: ResMut<Messages<SteamworksScreenshotsCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksScreenshotsResult>,
 ) {
+    process_screenshots_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksScreenshotsError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -302,6 +371,38 @@ fn process_screenshots_commands(
                 results.write(SteamworksScreenshotsResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_screenshots_steam_events(
+    state: &mut SteamworksScreenshotsState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksScreenshotsResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::ScreenshotRequested(_) => {
+                SteamworksScreenshotsOperation::ScreenshotRequested {
+                    count: state.screenshot_requested_count.saturating_add(1),
+                }
+            }
+            SteamworksEvent::ScreenshotReady(event) => {
+                SteamworksScreenshotsOperation::ScreenshotReady {
+                    ready: SteamworksScreenshotReady {
+                        local_handle: event.local_handle.clone().map_err(Into::into),
+                    },
+                }
+            }
+            _ => continue,
+        };
+
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks screenshots callback"
+        );
+        results.write(SteamworksScreenshotsResult::Ok(operation));
     }
 }
 
@@ -377,6 +478,7 @@ mod tests {
         assert!(app
             .world()
             .contains_resource::<SteamworksScreenshotsState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksScreenshotsCommand>>());
@@ -448,5 +550,91 @@ mod tests {
             ),
             SteamworksScreenshotLibraryError::InvalidPath
         );
+    }
+
+    #[test]
+    fn screenshot_ready_errors_are_cloneable_and_comparable() {
+        assert_eq!(
+            SteamworksScreenshotReadyError::from(
+                steamworks::screenshots::ScreenshotReadyError::Fail
+            ),
+            SteamworksScreenshotReadyError::Fail
+        );
+        assert_eq!(
+            SteamworksScreenshotReadyError::from(
+                steamworks::screenshots::ScreenshotReadyError::IoFailure
+            ),
+            SteamworksScreenshotReadyError::IoFailure
+        );
+    }
+
+    #[test]
+    fn screenshot_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let handle = 7;
+
+        app.add_plugins(SteamworksScreenshotsPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ScreenshotRequested(
+                steamworks::screenshots::ScreenshotRequested,
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ScreenshotRequested(
+                steamworks::screenshots::ScreenshotRequested,
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ScreenshotReady(
+                steamworks::screenshots::ScreenshotReady {
+                    local_handle: Ok(handle),
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ScreenshotReady(
+                steamworks::screenshots::ScreenshotReady {
+                    local_handle: Err(steamworks::screenshots::ScreenshotReadyError::IoFailure),
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksScreenshotsResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksScreenshotsResult::Ok(
+                    SteamworksScreenshotsOperation::ScreenshotRequested { count: 1 },
+                ),
+                SteamworksScreenshotsResult::Ok(
+                    SteamworksScreenshotsOperation::ScreenshotRequested { count: 2 },
+                ),
+                SteamworksScreenshotsResult::Ok(SteamworksScreenshotsOperation::ScreenshotReady {
+                    ready: SteamworksScreenshotReady {
+                        local_handle: Ok(handle),
+                    },
+                },),
+                SteamworksScreenshotsResult::Ok(SteamworksScreenshotsOperation::ScreenshotReady {
+                    ready: SteamworksScreenshotReady {
+                        local_handle: Err(SteamworksScreenshotReadyError::IoFailure),
+                    },
+                },),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksScreenshotsState>();
+        assert_eq!(state.screenshot_requested_count(), 2);
+        assert_eq!(
+            state.last_screenshot_ready(),
+            Some(&SteamworksScreenshotReady {
+                local_handle: Err(SteamworksScreenshotReadyError::IoFailure),
+            })
+        );
+        assert_eq!(state.last_error(), None);
     }
 }

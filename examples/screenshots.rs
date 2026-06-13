@@ -53,20 +53,6 @@ fn log_screenshot_results(mut results: MessageReader<SteamworksScreenshotsResult
     }
 }
 
-fn log_screenshot_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        match event {
-            SteamworksEvent::ScreenshotRequested(event) => {
-                println!("ScreenshotRequested: {event:?}");
-            }
-            SteamworksEvent::ScreenshotReady(event) => {
-                println!("ScreenshotReady: {event:?}");
-            }
-            _ => {}
-        }
-    }
-}
-
 fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: MessageWriter<AppExit>) {
     if frames.0 == 0 {
         exit.write(AppExit::Success);
@@ -89,13 +75,6 @@ fn main() {
         .add_plugins(SteamworksScreenshotsPlugin::new())
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))
         .add_systems(Startup, request_screenshots)
-        .add_systems(
-            Update,
-            (
-                log_screenshot_results,
-                log_screenshot_callbacks,
-                exit_after_a_short_run,
-            ),
-        )
+        .add_systems(Update, (log_screenshot_results, exit_after_a_short_run))
         .run();
 }
