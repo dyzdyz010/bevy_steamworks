@@ -258,6 +258,52 @@ $env:BEVY_STEAMWORKS_OVERLAY_BOTTOM_RIGHT = "1"
 cargo run --example utils
 ```
 
+## Steam Input
+
+`SteamworksInputPlugin` adds command/result messages for Steam Input initialization, controller listing, action set/action handle lookup, action data reads, motion data, action origin presentation strings, and the binding panel.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_input(mut input: MessageWriter<SteamworksInputCommand>) {
+    input.write(SteamworksInputCommand::init(false));
+    input.write(SteamworksInputCommand::RunFrame);
+    input.write(SteamworksInputCommand::ListControllers);
+    input.write(SteamworksInputCommand::get_action_set_handle("gameplay"));
+    input.write(SteamworksInputCommand::get_digital_action_handle("jump"));
+}
+
+fn read_input(mut results: MessageReader<SteamworksInputResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksInputPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_input)
+        .add_systems(Update, read_input)
+        .run();
+}
+```
+
+The plugin uses stable wrapper types such as `SteamworksInputHandle`, `SteamworksInputActionSetHandle`, `SteamworksInputDigitalActionHandle`, and `SteamworksInputAnalogActionHandle` instead of exposing raw `steamworks_sys` types. String inputs are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksInputError::InvalidString` instead of panicking in a C string conversion. Steam Input handle lookups return `SteamworksInputError::InvalidHandleReturned` when Steam returns the zero invalid handle.
+
+Steam Input is synchronized by `SteamAPI_RunCallbacks` when initialized with `SteamworksInputCommand::init(false)`, which matches the default callback pump in `SteamworksSystem::RunCallbacks`. Input commands run after `RunCallbacks`; if you initialize and read input in the same frame, send `SteamworksInputCommand::RunFrame` between `Init` and the read commands, or wait until a later frame. If you initialize with `init(true)`, explicitly send `RunFrame` before reads each frame.
+
+Run the Steam Input example with:
+
+```powershell
+cargo run --example input
+$env:BEVY_STEAMWORKS_INPUT_MANIFEST = "C:\path\to\game_actions.vdf"
+$env:BEVY_STEAMWORKS_INPUT_ACTION_SET = "gameplay"
+$env:BEVY_STEAMWORKS_INPUT_DIGITAL_ACTION = "jump"
+cargo run --example input
+```
+
 ## Screenshots
 
 `SteamworksScreenshotsPlugin` adds command/result messages for Steam screenshot workflows: hook screenshot hotkeys, read hook state, trigger a screenshot, and add an existing image file to the user's Steam screenshot library.

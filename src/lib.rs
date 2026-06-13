@@ -31,6 +31,7 @@ pub use steamworks::{
 
 pub mod apps;
 pub mod friends;
+pub mod input;
 pub mod matchmaking;
 pub mod remote_play;
 pub mod screenshots;
@@ -40,6 +41,7 @@ pub mod user_stats;
 pub mod utils;
 pub use apps::*;
 pub use friends::*;
+pub use input::*;
 pub use matchmaking::*;
 pub use remote_play::*;
 pub use screenshots::*;
@@ -59,6 +61,16 @@ pub mod prelude {
         SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendsCommand,
         SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
         SteamworksFriendsResult, SteamworksFriendsState, SteamworksInitMode,
+        SteamworksInputActionOrigin, SteamworksInputActionOriginInfo,
+        SteamworksInputActionSetHandle, SteamworksInputAnalogActionData,
+        SteamworksInputAnalogActionHandle, SteamworksInputAnalogActionSnapshot,
+        SteamworksInputCommand, SteamworksInputControllerInfo, SteamworksInputDigitalActionData,
+        SteamworksInputDigitalActionHandle, SteamworksInputDigitalActionSnapshot,
+        SteamworksInputError, SteamworksInputHandle, SteamworksInputMotionData,
+        SteamworksInputMotionSnapshot, SteamworksInputNamedActionSetHandle,
+        SteamworksInputNamedAnalogActionHandle, SteamworksInputNamedDigitalActionHandle,
+        SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
+        SteamworksInputSourceMode, SteamworksInputState, SteamworksInputType,
         SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
@@ -615,6 +627,8 @@ pub enum SteamworksSystem {
     ProcessRemotePlayCommands,
     /// Processes high-level Steam Timeline commands.
     ProcessTimelineCommands,
+    /// Processes high-level Steam Input commands.
+    ProcessInputCommands,
 }
 
 fn run_steam_callbacks(
