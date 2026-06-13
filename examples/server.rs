@@ -10,6 +10,7 @@ struct FramesRemaining(u32);
 fn log_server_state(
     server: Option<Res<SteamworksServer>>,
     unavailable: Option<Res<SteamworksServerUnavailable>>,
+    mut commands: MessageWriter<SteamworksServerCommand>,
 ) {
     if let Some(unavailable) = unavailable {
         eprintln!("Steam Game Server unavailable: {}", &*unavailable);
@@ -18,6 +19,22 @@ fn log_server_state(
 
     if let Some(server) = server {
         println!("Steam Game Server ID: {:?}", server.steam_id());
+        commands.write(SteamworksServerCommand::set_product("480"));
+        commands.write(SteamworksServerCommand::set_game_description("Spacewar"));
+        commands.write(SteamworksServerCommand::set_dedicated_server(true));
+        commands.write(SteamworksServerCommand::set_server_name(
+            "bevy_steamworks example",
+        ));
+        commands.write(SteamworksServerCommand::set_max_players(16));
+        commands.write(SteamworksServerCommand::set_bot_player_count(0));
+        commands.write(SteamworksServerCommand::LogOnAnonymous);
+        commands.write(SteamworksServerCommand::set_advertise_server_active(true));
+    }
+}
+
+fn log_server_results(mut results: MessageReader<SteamworksServerResult>) {
+    for result in results.read() {
+        println!("{result:?}");
     }
 }
 
@@ -64,6 +81,13 @@ fn main() {
         )
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))
         .add_systems(Startup, log_server_state)
-        .add_systems(Update, (log_server_callbacks, exit_after_a_short_run))
+        .add_systems(
+            Update,
+            (
+                log_server_results,
+                log_server_callbacks,
+                exit_after_a_short_run,
+            ),
+        )
         .run();
 }

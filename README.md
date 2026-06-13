@@ -90,12 +90,28 @@ You can also register typed callbacks through the underlying `steamworks::Client
 
 ## Dedicated Game Servers
 
-`SteamworksServerPlugin` initializes the upstream `steamworks::Server`, inserts `SteamworksServer` as a Bevy resource, and pumps Steam Game Server callbacks into the shared `SteamworksEvent` message stream. Dedicated server initialization is separate from `SteamworksPlugin`; use one lifecycle for the process unless you have a specific reason to initialize both.
+`SteamworksServerPlugin` initializes the upstream `steamworks::Server`, inserts `SteamworksServer` as a Bevy resource, registers `SteamworksServerCommand` / `SteamworksServerResult`, and pumps Steam Game Server callbacks into the shared `SteamworksEvent` message stream. Dedicated server initialization is separate from `SteamworksPlugin`; use one lifecycle for the process unless you have a specific reason to initialize both.
 
 ```rust,no_run
 # use std::net::Ipv4Addr;
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
+fn configure_server(mut server: MessageWriter<SteamworksServerCommand>) {
+    server.write(SteamworksServerCommand::set_product("480"));
+    server.write(SteamworksServerCommand::set_game_description("Spacewar"));
+    server.write(SteamworksServerCommand::set_dedicated_server(true));
+    server.write(SteamworksServerCommand::set_server_name("Spacewar Arena"));
+    server.write(SteamworksServerCommand::set_max_players(16));
+    server.write(SteamworksServerCommand::LogOnAnonymous);
+    server.write(SteamworksServerCommand::set_advertise_server_active(true));
+}
+
+fn read_server(mut results: MessageReader<SteamworksServerResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
 fn read_server_callbacks(mut events: MessageReader<SteamworksEvent>) {
     for event in events.read() {
         if let SteamworksEvent::GSClientApprove(event) = event {
@@ -117,12 +133,13 @@ fn main() {
             .log_and_continue(),
         )
         .add_plugins(DefaultPlugins)
-        .add_systems(Update, read_server_callbacks)
+        .add_systems(Startup, configure_server)
+        .add_systems(Update, (read_server, read_server_callbacks))
         .run();
 }
 ```
 
-The server plugin registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` through `SteamworksEvent`. Use the `SteamworksServer` resource to call upstream safe server APIs such as logon, metadata, auth tickets, and server-browser packet helpers while higher-level command wrappers are expanded.
+The server command layer covers server identity reads, anonymous logon, metadata, advertisement flags, auth tickets, remote auth sessions, key/value rules, and shared-query incoming packet forwarding. It validates strings, game tag lengths, and documented pre-logon-only metadata before calling upstream `steamworks`, so common C string conversion panics and logon-order mistakes become `SteamworksServerError` values. The server plugin also registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors auth ticket, validation, connection, `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` callbacks through both `SteamworksEvent` and `SteamworksServerResult`. Use the `SteamworksServer` resource directly for upstream safe APIs not yet wrapped by commands, such as draining shared-query outgoing packets.
 
 Run the dedicated server example with:
 
