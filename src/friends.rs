@@ -7,19 +7,20 @@
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam friends, Rich Presence, overlay, and invite commands.
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksFriendsCommand`] and [`SteamworksFriendsResult`] messages and
-/// runs its command processor in [`bevy_app::First`] after Steam callbacks.
+/// runs its command processor in [`bevy_app::First`] after Steam callbacks. It
+/// also mirrors common friends, overlay, and invite callbacks into friends results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksFriendsPlugin;
 
@@ -33,6 +34,7 @@ impl SteamworksFriendsPlugin {
 impl Plugin for SteamworksFriendsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksFriendsState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksFriendsCommand>()
             .add_message::<SteamworksFriendsResult>()
             .configure_sets(
@@ -55,6 +57,10 @@ pub struct SteamworksFriendsState {
     last_persona_name: Option<String>,
     friends: Vec<SteamworksFriendInfo>,
     coplay_friends: Vec<SteamworksCoplayFriendInfo>,
+    overlay_active: Option<bool>,
+    last_persona_state_change: Option<SteamworksPersonaStateChange>,
+    last_lobby_join_request: Option<SteamworksLobbyJoinRequest>,
+    last_rich_presence_join_request: Option<SteamworksRichPresenceJoinRequest>,
 }
 
 impl SteamworksFriendsState {
@@ -78,6 +84,26 @@ impl SteamworksFriendsState {
         &self.coplay_friends
     }
 
+    /// Returns the most recent Steam overlay active state reported by callback.
+    pub fn overlay_active(&self) -> Option<bool> {
+        self.overlay_active
+    }
+
+    /// Returns the most recent persona state change callback snapshot.
+    pub fn last_persona_state_change(&self) -> Option<&SteamworksPersonaStateChange> {
+        self.last_persona_state_change.as_ref()
+    }
+
+    /// Returns the most recent lobby join request callback snapshot.
+    pub fn last_lobby_join_request(&self) -> Option<&SteamworksLobbyJoinRequest> {
+        self.last_lobby_join_request.as_ref()
+    }
+
+    /// Returns the most recent Rich Presence join request callback snapshot.
+    pub fn last_rich_presence_join_request(&self) -> Option<&SteamworksRichPresenceJoinRequest> {
+        self.last_rich_presence_join_request.as_ref()
+    }
+
     fn record_error(&mut self, error: SteamworksFriendsError) {
         self.last_error = Some(error);
     }
@@ -92,6 +118,18 @@ impl SteamworksFriendsState {
             }
             SteamworksFriendsOperation::CoplayFriendsListed { friends } => {
                 self.coplay_friends.clone_from(friends);
+            }
+            SteamworksFriendsOperation::GameOverlayActivationChanged { active } => {
+                self.overlay_active = Some(*active);
+            }
+            SteamworksFriendsOperation::PersonaStateChanged { change } => {
+                self.last_persona_state_change = Some(change.clone());
+            }
+            SteamworksFriendsOperation::GameLobbyJoinRequested { request } => {
+                self.last_lobby_join_request = Some(request.clone());
+            }
+            SteamworksFriendsOperation::GameRichPresenceJoinRequested { request } => {
+                self.last_rich_presence_join_request = Some(request.clone());
             }
             _ => {}
         }
@@ -137,6 +175,33 @@ pub struct SteamworksFriendGameInfo {
     pub query_port: u16,
     /// Lobby ID the friend is in, when one is reported by Steam.
     pub lobby: steamworks::LobbyId,
+}
+
+/// Persona state change callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksPersonaStateChange {
+    /// Steam user whose persona state changed.
+    pub steam_id: steamworks::SteamId,
+    /// Changed persona fields reported by Steam.
+    pub flags: steamworks::PersonaChange,
+}
+
+/// Lobby join request callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyJoinRequest {
+    /// Lobby Steam ID to join.
+    pub lobby: steamworks::LobbyId,
+    /// Friend that triggered the request.
+    pub friend_steam_id: steamworks::SteamId,
+}
+
+/// Rich Presence join request callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksRichPresenceJoinRequest {
+    /// Friend that triggered the request, or an invalid Steam ID for non-friend sources.
+    pub friend_steam_id: steamworks::SteamId,
+    /// Connect string supplied through Rich Presence.
+    pub connect: String,
 }
 
 impl From<steamworks::FriendGame> for SteamworksFriendGameInfo {
@@ -535,12 +600,32 @@ pub enum SteamworksFriendsOperation {
         /// Avatar bytes, or `None` when Steam has no image available yet.
         avatar: Option<SteamworksAvatar>,
     },
+    /// Steam overlay activation state changed.
+    GameOverlayActivationChanged {
+        /// Whether the Steam overlay is active.
+        active: bool,
+    },
+    /// A persona state change callback was observed.
+    PersonaStateChanged {
+        /// Callback snapshot.
+        change: SteamworksPersonaStateChange,
+    },
+    /// A lobby join request callback was observed.
+    GameLobbyJoinRequested {
+        /// Callback snapshot.
+        request: SteamworksLobbyJoinRequest,
+    },
+    /// A Rich Presence join request callback was observed.
+    GameRichPresenceJoinRequested {
+        /// Callback snapshot.
+        request: SteamworksRichPresenceJoinRequest,
+    },
 }
 
 /// Result message emitted by [`SteamworksFriendsPlugin`].
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksFriendsResult {
-    /// The command was submitted to Steamworks or a value was read.
+    /// The command or observed callback was processed successfully.
     Ok(SteamworksFriendsOperation),
     /// The command failed synchronously.
     Err {
@@ -585,12 +670,15 @@ fn process_friends_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksFriendsState>,
     mut commands: ResMut<Messages<SteamworksFriendsCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksFriendsResult>,
 ) {
+    process_friends_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksFriendsError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             results.write(SteamworksFriendsResult::Err {
                 command,
                 error: error.clone(),
@@ -621,6 +709,55 @@ fn process_friends_commands(
                 results.write(SteamworksFriendsResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_friends_steam_events(
+    state: &mut SteamworksFriendsState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksFriendsResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::GameOverlayActivated(event) => {
+                SteamworksFriendsOperation::GameOverlayActivationChanged {
+                    active: event.active,
+                }
+            }
+            SteamworksEvent::PersonaStateChange(event) => {
+                SteamworksFriendsOperation::PersonaStateChanged {
+                    change: SteamworksPersonaStateChange {
+                        steam_id: event.steam_id,
+                        flags: event.flags,
+                    },
+                }
+            }
+            SteamworksEvent::GameLobbyJoinRequested(event) => {
+                SteamworksFriendsOperation::GameLobbyJoinRequested {
+                    request: SteamworksLobbyJoinRequest {
+                        lobby: event.lobby_steam_id,
+                        friend_steam_id: event.friend_steam_id,
+                    },
+                }
+            }
+            SteamworksEvent::GameRichPresenceJoinRequested(event) => {
+                SteamworksFriendsOperation::GameRichPresenceJoinRequested {
+                    request: SteamworksRichPresenceJoinRequest {
+                        friend_steam_id: event.friend_steam_id,
+                        connect: event.connect.clone(),
+                    },
+                }
+            }
+            _ => continue,
+        };
+
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks friends callback"
+        );
+        results.write(SteamworksFriendsResult::Ok(operation));
     }
 }
 
@@ -846,6 +983,7 @@ mod tests {
         app.add_plugins(SteamworksFriendsPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksFriendsState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksFriendsCommand>>());
@@ -906,5 +1044,105 @@ mod tests {
             validate_command_strings(&command),
             Err(SteamworksFriendsError::InvalidString { field: "connect" })
         );
+    }
+
+    #[test]
+    fn friends_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let user = steamworks::SteamId::from_raw(1);
+        let friend = steamworks::SteamId::from_raw(2);
+        let lobby = steamworks::LobbyId::from_raw(3);
+        let flags = steamworks::PersonaChange::NAME | steamworks::PersonaChange::AVATAR;
+
+        app.add_plugins(SteamworksFriendsPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::GameOverlayActivated(
+                steamworks::GameOverlayActivated { active: true },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::PersonaStateChange(
+                steamworks::PersonaStateChange {
+                    steam_id: user,
+                    flags,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::GameLobbyJoinRequested(
+                steamworks::GameLobbyJoinRequested {
+                    lobby_steam_id: lobby,
+                    friend_steam_id: friend,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::GameRichPresenceJoinRequested(
+                steamworks::GameRichPresenceJoinRequested {
+                    friend_steam_id: friend,
+                    connect: "join=abc".to_owned(),
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksFriendsResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksFriendsResult::Ok(
+                    SteamworksFriendsOperation::GameOverlayActivationChanged { active: true },
+                ),
+                SteamworksFriendsResult::Ok(SteamworksFriendsOperation::PersonaStateChanged {
+                    change: SteamworksPersonaStateChange {
+                        steam_id: user,
+                        flags,
+                    },
+                },),
+                SteamworksFriendsResult::Ok(SteamworksFriendsOperation::GameLobbyJoinRequested {
+                    request: SteamworksLobbyJoinRequest {
+                        lobby,
+                        friend_steam_id: friend,
+                    },
+                },),
+                SteamworksFriendsResult::Ok(
+                    SteamworksFriendsOperation::GameRichPresenceJoinRequested {
+                        request: SteamworksRichPresenceJoinRequest {
+                            friend_steam_id: friend,
+                            connect: "join=abc".to_owned(),
+                        },
+                    },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksFriendsState>();
+        assert_eq!(state.overlay_active(), Some(true));
+        assert_eq!(
+            state.last_persona_state_change(),
+            Some(&SteamworksPersonaStateChange {
+                steam_id: user,
+                flags,
+            })
+        );
+        assert_eq!(
+            state.last_lobby_join_request(),
+            Some(&SteamworksLobbyJoinRequest {
+                lobby,
+                friend_steam_id: friend,
+            })
+        );
+        assert_eq!(
+            state.last_rich_presence_join_request(),
+            Some(&SteamworksRichPresenceJoinRequest {
+                friend_steam_id: friend,
+                connect: "join=abc".to_owned(),
+            })
+        );
+        assert_eq!(state.last_error(), None);
     }
 }

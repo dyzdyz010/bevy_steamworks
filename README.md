@@ -118,7 +118,7 @@ fn main() {
 }
 ```
 
-Commands validate strings before calling upstream `steamworks` methods, so interior NUL bytes are reported as `SteamworksFriendsError::InvalidString` instead of panicking inside a Steam C string conversion. Friend list results use snapshot types such as `SteamworksFriendInfo`, which are safe to store in ECS resources or messages.
+Commands validate strings before calling upstream `steamworks` methods, so interior NUL bytes are reported as `SteamworksFriendsError::InvalidString` instead of panicking inside a Steam C string conversion. Friend list results use snapshot types such as `SteamworksFriendInfo`, which are safe to store in ECS resources or messages. Overlay activation, persona state changes, lobby join requests, and Rich Presence join requests are still available through `SteamworksEvent`, and are also mirrored as `SteamworksFriendsResult` messages for module-local systems.
 
 Run the social example with:
 
