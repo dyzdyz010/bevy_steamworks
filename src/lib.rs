@@ -33,6 +33,7 @@ pub mod apps;
 pub mod friends;
 pub mod input;
 pub mod matchmaking;
+pub mod networking_messages;
 pub mod remote_play;
 pub mod remote_storage;
 pub mod screenshots;
@@ -44,6 +45,7 @@ pub use apps::*;
 pub use friends::*;
 pub use input::*;
 pub use matchmaking::*;
+pub use networking_messages::*;
 pub use remote_play::*;
 pub use remote_storage::*;
 pub use screenshots::*;
@@ -76,10 +78,15 @@ pub mod prelude {
         SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
-        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNotificationPosition,
-        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksRemotePlayCommand,
-        SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
-        SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
+        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNetworkingMessage,
+        SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesConnectionInfo,
+        SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
+        SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesRealtimeInfo,
+        SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesSessionRequestInfo,
+        SteamworksNetworkingMessagesState, SteamworksNetworkingPeer,
+        SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksPlugin,
+        SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
+        SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
         SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
         SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageCommand,
         SteamworksRemoteStorageError, SteamworksRemoteStorageFileInfo,
@@ -99,7 +106,7 @@ pub mod prelude {
         SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
         SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
         SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
-        SteamworksUtilsState,
+        SteamworksUtilsState, STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -639,6 +646,8 @@ pub enum SteamworksSystem {
     ProcessTimelineCommands,
     /// Processes high-level Steam Input commands.
     ProcessInputCommands,
+    /// Processes high-level Steam Networking Messages commands.
+    ProcessNetworkingMessagesCommands,
 }
 
 fn run_steam_callbacks(

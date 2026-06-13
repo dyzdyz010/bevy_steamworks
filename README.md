@@ -304,6 +304,56 @@ $env:BEVY_STEAMWORKS_INPUT_DIGITAL_ACTION = "jump"
 cargo run --example input
 ```
 
+## Networking Messages
+
+`SteamworksNetworkingMessagesPlugin` adds command/result messages for Steam's UDP-like P2P message API: send payloads to Steam IDs, IP endpoints, local host, or prebuilt `NetworkingIdentity` values; receive owned message snapshots by channel; read session connection state; and handle session request/failure callbacks.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn send_ping(mut messages: MessageWriter<SteamworksNetworkingMessagesCommand>) {
+    messages.write(SteamworksNetworkingMessagesCommand::send_message_to_steam_id(
+        SteamId::from_raw(76561198000000000),
+        steamworks::networking_types::SendFlags::RELIABLE_NO_NAGLE,
+        0,
+        b"ping".to_vec(),
+    ));
+}
+
+fn receive_messages(mut messages: MessageWriter<SteamworksNetworkingMessagesCommand>) {
+    messages.write(SteamworksNetworkingMessagesCommand::receive_messages(0, 32));
+}
+
+fn read_networking_results(mut results: MessageReader<SteamworksNetworkingMessagesResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksNetworkingMessagesPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, send_ping)
+        .add_systems(Update, (receive_messages, read_networking_results))
+        .run();
+}
+```
+
+Session requests are accepted by default because the upstream safe API only allows accepting or rejecting while the Steam callback is running; it cannot defer the decision to a later ECS frame. Use `SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false)` or `SteamworksNetworkingMessagesCommand::set_auto_accept_session_requests(false)` to reject future incoming requests. The policy command is pre-read before `SteamworksSystem::RunCallbacks`, then processed normally later so you still receive a result message. Every session request and session failure is emitted as a `SteamworksNetworkingMessagesResult`.
+
+Received messages are copied into `SteamworksNetworkingMessage { data: Vec<u8>, .. }`, so they can safely be stored in Bevy resources after Steam releases the original message handle. Channel values are validated before the upstream API call to avoid signed integer wrapping, and one receive command is capped by `STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE` to prevent unbounded frame-loop allocation.
+
+Run the Networking Messages example with:
+
+```powershell
+cargo run --example networking_messages
+$env:BEVY_STEAMWORKS_NETWORKING_PEER = "76561198000000000"
+$env:BEVY_STEAMWORKS_NETWORKING_MESSAGE = "hello"
+cargo run --example networking_messages
+```
+
 ## Screenshots
 
 `SteamworksScreenshotsPlugin` adds command/result messages for Steam screenshot workflows: hook screenshot hotkeys, read hook state, trigger a screenshot, and add an existing image file to the user's Steam screenshot library.
