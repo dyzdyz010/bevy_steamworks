@@ -1,24 +1,25 @@
 //! High-level Bevy ECS integration for Steam utility queries and overlay helpers.
 //!
 //! This module builds on top of the upstream [`steamworks::Utils`] API. It keeps
-//! common utility calls in Bevy messages and leaves Steam callback delivery in
-//! [`crate::SteamworksEvent`].
+//! common utility calls in Bevy messages while mirroring text-input dismissal
+//! callbacks from [`crate::SteamworksEvent`] into [`SteamworksUtilsResult`].
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam utility commands.
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksUtilsCommand`] and [`SteamworksUtilsResult`] messages and runs
-/// its command processor in [`bevy_app::First`] after Steam callbacks.
+/// its command processor in [`bevy_app::First`] after Steam callbacks. It also
+/// mirrors gamepad text input dismissal callbacks into utils results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksUtilsPlugin;
 
@@ -32,6 +33,7 @@ impl SteamworksUtilsPlugin {
 impl Plugin for SteamworksUtilsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksUtilsState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksUtilsCommand>()
             .add_message::<SteamworksUtilsResult>()
             .configure_sets(
@@ -53,6 +55,8 @@ pub struct SteamworksUtilsState {
     last_error: Option<SteamworksUtilsError>,
     current_info: Option<SteamworksUtilsInfo>,
     overlay_notification_position: Option<SteamworksNotificationPosition>,
+    last_gamepad_text_input_dismissed: Option<SteamworksGamepadTextInputDismissed>,
+    last_floating_gamepad_text_input_dismissed: Option<SteamworksFloatingGamepadTextInputDismissed>,
 }
 
 impl SteamworksUtilsState {
@@ -71,6 +75,20 @@ impl SteamworksUtilsState {
         self.overlay_notification_position
     }
 
+    /// Returns the most recent gamepad text input dismissal callback snapshot.
+    pub fn last_gamepad_text_input_dismissed(
+        &self,
+    ) -> Option<&SteamworksGamepadTextInputDismissed> {
+        self.last_gamepad_text_input_dismissed.as_ref()
+    }
+
+    /// Returns the most recent floating gamepad text input dismissal callback snapshot.
+    pub fn last_floating_gamepad_text_input_dismissed(
+        &self,
+    ) -> Option<&SteamworksFloatingGamepadTextInputDismissed> {
+        self.last_floating_gamepad_text_input_dismissed.as_ref()
+    }
+
     fn record_error(&mut self, error: SteamworksUtilsError) {
         self.last_error = Some(error);
     }
@@ -82,6 +100,12 @@ impl SteamworksUtilsState {
             }
             SteamworksUtilsOperation::OverlayNotificationPositionSet { position } => {
                 self.overlay_notification_position = Some(*position);
+            }
+            SteamworksUtilsOperation::GamepadTextInputDismissed { dismissed } => {
+                self.last_gamepad_text_input_dismissed = Some(dismissed.clone());
+            }
+            SteamworksUtilsOperation::FloatingGamepadTextInputDismissed { dismissed } => {
+                self.last_floating_gamepad_text_input_dismissed = Some(*dismissed);
             }
             _ => {}
         }
@@ -130,6 +154,20 @@ impl SteamworksNotificationPosition {
         }
     }
 }
+
+/// Gamepad text input dismissal callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksGamepadTextInputDismissed {
+    /// Submitted text length reported by Steam, or `None` when the input was cancelled.
+    ///
+    /// The submitted text itself must be read inside Steam's original callback timing
+    /// through the upstream `steamworks::Utils` helper.
+    pub submitted_text_len: Option<u32>,
+}
+
+/// Floating gamepad text input dismissal callback snapshot.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SteamworksFloatingGamepadTextInputDismissed;
 
 /// A high-level command for Steam utility queries and overlay helpers.
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
@@ -212,6 +250,16 @@ pub enum SteamworksUtilsOperation {
         /// Position submitted to Steam.
         position: SteamworksNotificationPosition,
     },
+    /// A gamepad text input dismissal callback was observed.
+    GamepadTextInputDismissed {
+        /// Callback snapshot.
+        dismissed: SteamworksGamepadTextInputDismissed,
+    },
+    /// A floating gamepad text input dismissal callback was observed.
+    FloatingGamepadTextInputDismissed {
+        /// Callback snapshot.
+        dismissed: SteamworksFloatingGamepadTextInputDismissed,
+    },
 }
 
 /// Result message emitted by [`SteamworksUtilsPlugin`].
@@ -240,12 +288,15 @@ fn process_utils_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksUtilsState>,
     mut commands: ResMut<Messages<SteamworksUtilsCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksUtilsResult>,
 ) {
+    process_utils_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksUtilsError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -282,6 +333,38 @@ fn process_utils_commands(
                 results.write(SteamworksUtilsResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_utils_steam_events(
+    state: &mut SteamworksUtilsState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksUtilsResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::GamepadTextInputDismissed(event) => {
+                SteamworksUtilsOperation::GamepadTextInputDismissed {
+                    dismissed: SteamworksGamepadTextInputDismissed {
+                        submitted_text_len: event.submitted_text_len,
+                    },
+                }
+            }
+            SteamworksEvent::FloatingGamepadTextInputDismissed(_) => {
+                SteamworksUtilsOperation::FloatingGamepadTextInputDismissed {
+                    dismissed: SteamworksFloatingGamepadTextInputDismissed,
+                }
+            }
+            _ => continue,
+        };
+
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks utils callback"
+        );
+        results.write(SteamworksUtilsResult::Ok(operation));
     }
 }
 
@@ -361,6 +444,7 @@ mod tests {
         app.add_plugins(SteamworksUtilsPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksUtilsState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksUtilsCommand>>());
@@ -398,6 +482,71 @@ mod tests {
             state.last_error(),
             Some(&SteamworksUtilsError::ClientUnavailable)
         );
+    }
+
+    #[test]
+    fn text_input_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+
+        app.add_plugins(SteamworksUtilsPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::GamepadTextInputDismissed(
+                steamworks::GamepadTextInputDismissed {
+                    submitted_text_len: Some(12),
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::GamepadTextInputDismissed(
+                steamworks::GamepadTextInputDismissed {
+                    submitted_text_len: None,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::FloatingGamepadTextInputDismissed(
+                steamworks::FloatingGamepadTextInputDismissed,
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksUtilsResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        let submitted = SteamworksGamepadTextInputDismissed {
+            submitted_text_len: Some(12),
+        };
+        let cancelled = SteamworksGamepadTextInputDismissed {
+            submitted_text_len: None,
+        };
+        let floating = SteamworksFloatingGamepadTextInputDismissed;
+
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputDismissed {
+                    dismissed: submitted,
+                }),
+                SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputDismissed {
+                    dismissed: cancelled.clone(),
+                }),
+                SteamworksUtilsResult::Ok(
+                    SteamworksUtilsOperation::FloatingGamepadTextInputDismissed {
+                        dismissed: floating,
+                    },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksUtilsState>();
+        assert_eq!(state.last_gamepad_text_input_dismissed(), Some(&cancelled));
+        assert_eq!(
+            state.last_floating_gamepad_text_input_dismissed(),
+            Some(&floating)
+        );
+        assert_eq!(state.last_error(), None);
     }
 
     #[test]

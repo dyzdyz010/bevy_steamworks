@@ -265,7 +265,7 @@ cargo run --example user
 
 ## Utilities and Overlay Helpers
 
-`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, and overlay notification position.
+`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, overlay notification position, and gamepad text input dismissal callbacks.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -295,7 +295,7 @@ fn main() {
 }
 ```
 
-Gamepad text input callbacks are still available through `SteamworksEvent::GamepadTextInputDismissed` and `SteamworksEvent::FloatingGamepadTextInputDismissed`. For now, use the raw `steamworks::Utils` methods through `SteamworksClient` for text input flows that must read submitted text inside Steam's callback timing. Be aware that the upstream text input helpers register their own typed callbacks, so avoid also registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`.
+Gamepad text input dismissal callbacks arrive through both `SteamworksEvent` and `SteamworksUtilsOperation::{GamepadTextInputDismissed, FloatingGamepadTextInputDismissed}`. `GamepadTextInputDismissed` includes Steam's submitted text length when the user submitted text, but the text itself must still be read inside Steam's original callback timing through the raw `steamworks::Utils` helper. Be aware that the upstream text input helpers register their own typed callbacks, so avoid also registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`.
 
 Run the utils example with:
 
