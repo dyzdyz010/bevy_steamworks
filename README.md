@@ -258,6 +258,61 @@ $env:BEVY_STEAMWORKS_OVERLAY_BOTTOM_RIGHT = "1"
 cargo run --example utils
 ```
 
+## Screenshots
+
+`SteamworksScreenshotsPlugin` adds command/result messages for Steam screenshot workflows: hook screenshot hotkeys, read hook state, trigger a screenshot, and add an existing image file to the user's Steam screenshot library.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_screenshots(mut screenshots: MessageWriter<SteamworksScreenshotsCommand>) {
+    screenshots.write(SteamworksScreenshotsCommand::IsScreenshotsHooked);
+}
+
+fn read_screenshots(mut results: MessageReader<SteamworksScreenshotsResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn read_screenshot_callbacks(mut events: MessageReader<SteamworksEvent>) {
+    for event in events.read() {
+        match event {
+            SteamworksEvent::ScreenshotRequested(event) => info!("{event:?}"),
+            SteamworksEvent::ScreenshotReady(event) => info!("{event:?}"),
+            _ => {}
+        }
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksScreenshotsPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_screenshots)
+        .add_systems(Update, (read_screenshots, read_screenshot_callbacks))
+        .run();
+}
+```
+
+`SteamworksScreenshotsCommand::AddScreenshotToLibrary` returns a screenshot handle when Steam accepts the request. Final save confirmation still arrives later through `SteamworksEvent::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
+
+Only call `SteamworksScreenshotsCommand::hook_screenshots(true)` if your game will handle `SteamworksEvent::ScreenshotRequested` by capturing an image and submitting it to Steam; once hooked, Steam no longer handles the screenshot hotkey for you. `AddScreenshotToLibrary` canonicalizes local file paths through the upstream wrapper before submitting, so keep it low-frequency and avoid slow network paths in frame-critical flows.
+
+Run the screenshots example with:
+
+```powershell
+cargo run --example screenshots
+$env:BEVY_STEAMWORKS_HOOK_SCREENSHOTS = "1"
+$env:BEVY_STEAMWORKS_TRIGGER_SCREENSHOT = "1"
+cargo run --example screenshots
+$env:BEVY_STEAMWORKS_SCREENSHOT_FILE = "C:\absolute\path\to\screenshot.png"
+$env:BEVY_STEAMWORKS_SCREENSHOT_WIDTH = "1920"
+$env:BEVY_STEAMWORKS_SCREENSHOT_HEIGHT = "1080"
+cargo run --example screenshots
+```
+
 ## App, Ownership, and Launch Parameters
 
 `SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.

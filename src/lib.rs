@@ -32,12 +32,14 @@ pub use steamworks::{
 pub mod apps;
 pub mod friends;
 pub mod matchmaking;
+pub mod screenshots;
 pub mod user;
 pub mod user_stats;
 pub mod utils;
 pub use apps::*;
 pub use friends::*;
 pub use matchmaking::*;
+pub use screenshots::*;
 pub use user::*;
 pub use user_stats::*;
 pub use utils::*;
@@ -57,14 +59,16 @@ pub mod prelude {
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
         SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNotificationPosition,
-        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksStatsCommand,
-        SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
-        SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem,
-        SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
-        SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
-        SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
-        SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
-        SteamworksUtilsState,
+        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksScreenshotLibraryError,
+        SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+        SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksScreenshotsState,
+        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
+        SteamworksStatsState, SteamworksSystem, SteamworksUnavailable, SteamworksUserCommand,
+        SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation, SteamworksUserPlugin,
+        SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError,
+        SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+        SteamworksUtilsResult, SteamworksUtilsState,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -594,6 +598,8 @@ pub enum SteamworksSystem {
     ProcessUserCommands,
     /// Processes high-level Steam utility commands.
     ProcessUtilsCommands,
+    /// Processes high-level Steam screenshots commands.
+    ProcessScreenshotsCommands,
 }
 
 fn run_steam_callbacks(
