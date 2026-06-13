@@ -1,0 +1,20 @@
+[package]
+name = "bevy_steamworks"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+description = "A lightweight Bevy plugin for integrating Steamworks SDK via steamworks-rs."
+license = "MIT OR Apache-2.0"
+keywords = ["bevy", "gamedev", "steam", "steamworks"]
+categories = ["game-development"]
+
+[features]
+default = []
+serde = ["steamworks/serde"]
+
+[dependencies]
+bevy_app = { version = "0.18", default-features = false }
+bevy_ecs = { version = "0.18", default-features = false }
+steamworks = { version = "0.13.1", default-features = false }
+thiserror = "2.0"
+tracing = "0.1"
