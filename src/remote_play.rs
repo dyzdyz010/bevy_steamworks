@@ -57,6 +57,8 @@ pub struct SteamworksRemotePlayState {
     sessions: Vec<SteamworksRemotePlaySessionSnapshot>,
     known_sessions: Vec<SteamworksRemotePlaySessionInfo>,
     observed_connected_sessions: Vec<steamworks::RemotePlaySessionId>,
+    last_submitted_invite: Option<SteamworksRemotePlayInvite>,
+    submitted_invite_count: u64,
 }
 
 impl SteamworksRemotePlayState {
@@ -80,6 +82,16 @@ impl SteamworksRemotePlayState {
         &self.known_sessions
     }
 
+    /// Returns one ID-based session snapshot read through the plugin.
+    pub fn known_session(
+        &self,
+        session: steamworks::RemotePlaySessionId,
+    ) -> Option<&SteamworksRemotePlaySessionInfo> {
+        self.known_sessions
+            .iter()
+            .find(|known| known.session == session)
+    }
+
     /// Returns session IDs observed as connected and not yet disconnected.
     ///
     /// This list is callback-driven and only reflects sessions observed while
@@ -87,6 +99,21 @@ impl SteamworksRemotePlayState {
     /// for a fresh bulk snapshot from Steam.
     pub fn observed_connected_sessions(&self) -> &[steamworks::RemotePlaySessionId] {
         &self.observed_connected_sessions
+    }
+
+    /// Returns whether a session has been observed as connected and not yet disconnected.
+    pub fn is_session_observed_connected(&self, session: steamworks::RemotePlaySessionId) -> bool {
+        self.observed_connected_sessions.contains(&session)
+    }
+
+    /// Returns the most recent Remote Play Together invite submitted through this command layer.
+    pub fn last_submitted_invite(&self) -> Option<SteamworksRemotePlayInvite> {
+        self.last_submitted_invite
+    }
+
+    /// Returns how many Remote Play Together invites this plugin successfully submitted.
+    pub fn submitted_invite_count(&self) -> u64 {
+        self.submitted_invite_count
     }
 
     fn record_error(&mut self, error: SteamworksRemotePlayError) {
@@ -109,10 +136,17 @@ impl SteamworksRemotePlayState {
                     self.known_sessions.push(session.clone());
                 }
             }
-            SteamworksRemotePlayOperation::SessionConnected { session }
-                if !self.observed_connected_sessions.contains(session) =>
-            {
-                self.observed_connected_sessions.push(*session);
+            SteamworksRemotePlayOperation::InviteSubmitted { session, friend } => {
+                self.last_submitted_invite = Some(SteamworksRemotePlayInvite {
+                    session: *session,
+                    friend: *friend,
+                });
+                self.submitted_invite_count = self.submitted_invite_count.saturating_add(1);
+            }
+            SteamworksRemotePlayOperation::SessionConnected { session } => {
+                if !self.observed_connected_sessions.contains(session) {
+                    self.observed_connected_sessions.push(*session);
+                }
             }
             SteamworksRemotePlayOperation::SessionDisconnected { session } => {
                 self.observed_connected_sessions
@@ -120,7 +154,6 @@ impl SteamworksRemotePlayState {
                 self.known_sessions
                     .retain(|known| known.session != *session);
             }
-            _ => {}
         }
     }
 }
@@ -157,6 +190,15 @@ pub struct SteamworksRemotePlaySessionInfo {
     pub client_form_factor: Option<steamworks::SteamDeviceFormFactor>,
     /// Client resolution, or `None` if the session has expired.
     pub client_resolution: Option<(u32, u32)>,
+}
+
+/// Remote Play Together invite accepted by Steam.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksRemotePlayInvite {
+    /// Session context supplied by the caller.
+    pub session: steamworks::RemotePlaySessionId,
+    /// Friend Steam ID invited.
+    pub friend: steamworks::SteamId,
 }
 
 /// A high-level command for Steam Remote Play workflows.
@@ -460,6 +502,85 @@ mod tests {
             SteamworksRemotePlayCommand::invite(session, friend),
             SteamworksRemotePlayCommand::Invite { session, friend }
         );
+    }
+
+    #[test]
+    fn state_records_remote_play_operations() {
+        let mut state = SteamworksRemotePlayState::default();
+        let first_session = steamworks::RemotePlaySessionId::from_raw(1);
+        let second_session = steamworks::RemotePlaySessionId::from_raw(2);
+        let friend = steamworks::SteamId::from_raw(42);
+        let first_info = SteamworksRemotePlaySessionInfo {
+            session: first_session,
+            user: steamworks::SteamId::from_raw(100),
+            client_name: Some("Deck".to_owned()),
+            client_form_factor: None,
+            client_resolution: Some((1280, 800)),
+        };
+        let updated_info = SteamworksRemotePlaySessionInfo {
+            client_name: Some("Living Room".to_owned()),
+            client_resolution: Some((1920, 1080)),
+            ..first_info.clone()
+        };
+        let listed_session = SteamworksRemotePlaySessionSnapshot {
+            user: steamworks::SteamId::from_raw(200),
+            client_name: Some("Laptop".to_owned()),
+            client_form_factor: None,
+            client_resolution: None,
+        };
+
+        state.record_operation(&SteamworksRemotePlayOperation::SessionsListed {
+            sessions: vec![listed_session.clone()],
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionRead {
+            session: first_info,
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionRead {
+            session: updated_info.clone(),
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionConnected {
+            session: first_session,
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionConnected {
+            session: first_session,
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionConnected {
+            session: second_session,
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::InviteSubmitted {
+            session: first_session,
+            friend,
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::InviteSubmitted {
+            session: second_session,
+            friend,
+        });
+
+        assert_eq!(state.sessions(), &[listed_session]);
+        assert_eq!(state.known_sessions(), std::slice::from_ref(&updated_info));
+        assert_eq!(state.known_session(first_session), Some(&updated_info));
+        assert!(state.known_session(second_session).is_none());
+        assert_eq!(
+            state.observed_connected_sessions(),
+            &[first_session, second_session]
+        );
+        assert!(state.is_session_observed_connected(first_session));
+        assert_eq!(
+            state.last_submitted_invite(),
+            Some(SteamworksRemotePlayInvite {
+                session: second_session,
+                friend,
+            })
+        );
+        assert_eq!(state.submitted_invite_count(), 2);
+
+        state.record_operation(&SteamworksRemotePlayOperation::SessionDisconnected {
+            session: first_session,
+        });
+
+        assert_eq!(state.observed_connected_sessions(), &[second_session]);
+        assert!(!state.is_session_observed_connected(first_session));
+        assert!(state.known_session(first_session).is_none());
     }
 
     #[test]
