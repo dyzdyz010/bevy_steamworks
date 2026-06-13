@@ -844,7 +844,7 @@ cargo run --example apps
 
 ## Achievements and Stats
 
-`SteamworksStatsPlugin` adds a Bevy-native command/result layer for common user stats and achievement workflows. It is optional; you can still call the raw `steamworks` API through `SteamworksClient`.
+`SteamworksStatsPlugin` adds a Bevy-native command/result layer for common user stats, achievement, and leaderboard workflows. It is optional; you can still call the raw `steamworks` API through `SteamworksClient`.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -873,6 +873,8 @@ fn main() {
 
 By default, `SteamworksStatsPlugin` requests stats for the current Steam user once the `SteamworksClient` resource exists. Successful stat/achievement writes are coalesced into one `store_stats()` call per frame. `SteamworksStatsResult::Ok(SteamworksStatsOperation::StatsStoreSubmitted)` only means the store request was submitted; final Steam confirmation still arrives through `SteamworksEvent::UserStatsStored`, and unlocked achievements may also emit `SteamworksEvent::UserAchievementStored`.
 
+Leaderboard find and find-or-create commands are asynchronous. Successful results insert the upstream leaderboard handle into the plugin and return a `SteamworksLeaderboardId`; later info reads, score uploads, entry downloads, and forget commands use that stable ID. Global downloads use absolute rank ranges, user-relative downloads accept signed offsets around the current user, and friends downloads do not take a range. Ranged downloads are capped per command to keep frame work bounded.
+
 For read-only tools or examples, disable automatic storage:
 
 ```rust,no_run
@@ -880,12 +882,16 @@ For read-only tools or examples, disable automatic storage:
 SteamworksStatsPlugin::new().auto_store(false);
 ```
 
-Run the read-only stats example with:
+Run the stats example with:
 
 ```powershell
 cargo run --example stats
 $env:BEVY_STEAMWORKS_STAT_I32 = "your_stat_api_name"
 $env:BEVY_STEAMWORKS_ACHIEVEMENT = "your_achievement_api_name"
+cargo run --example stats
+$env:BEVY_STEAMWORKS_LEADERBOARD = "your_leaderboard_api_name"
+$env:BEVY_STEAMWORKS_LEADERBOARD_CREATE = "1"
+$env:BEVY_STEAMWORKS_LEADERBOARD_SCORE = "100"
 cargo run --example stats
 ```
 

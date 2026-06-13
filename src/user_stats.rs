@@ -4,7 +4,10 @@
 //! Games can keep using the raw Steamworks API through [`SteamworksClient`],
 //! while this plugin provides a message-driven layer for common Bevy workflows.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
@@ -15,6 +18,12 @@ use bevy_ecs::{
 use thiserror::Error;
 
 use crate::{SteamworksClient, SteamworksSystem};
+
+/// Maximum leaderboard detail integers accepted by one command.
+pub const STEAMWORKS_LEADERBOARD_MAX_DETAILS: usize = 64;
+
+/// Maximum leaderboard entries requested by one download command.
+pub const STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND: usize = 1000;
 
 /// Settings used by [`SteamworksStatsPlugin`].
 #[derive(Clone, Debug, Resource)]
@@ -46,6 +55,9 @@ pub struct SteamworksStatsState {
     current_user_stats_requested: bool,
     pending_store: bool,
     last_error: Option<SteamworksStatsError>,
+    leaderboard_count: usize,
+    last_leaderboard_info: Option<SteamworksLeaderboardInfo>,
+    last_leaderboard_entries: Vec<SteamworksLeaderboardEntry>,
 }
 
 impl SteamworksStatsState {
@@ -59,14 +71,222 @@ impl SteamworksStatsState {
         self.pending_store
     }
 
-    /// Returns the most recent synchronous error observed by the stats plugin.
+    /// Returns the most recent command or asynchronous callback error observed by the stats plugin.
     pub fn last_error(&self) -> Option<&SteamworksStatsError> {
         self.last_error.as_ref()
+    }
+
+    /// Returns the number of leaderboard handles currently owned by this plugin.
+    pub fn leaderboard_count(&self) -> usize {
+        self.leaderboard_count
+    }
+
+    /// Returns the most recent leaderboard info read through this plugin.
+    pub fn last_leaderboard_info(&self) -> Option<&SteamworksLeaderboardInfo> {
+        self.last_leaderboard_info.as_ref()
+    }
+
+    /// Returns the most recent downloaded leaderboard entries.
+    pub fn last_leaderboard_entries(&self) -> &[SteamworksLeaderboardEntry] {
+        &self.last_leaderboard_entries
     }
 
     fn record_error(&mut self, error: SteamworksStatsError) {
         self.last_error = Some(error);
     }
+
+    fn sync_leaderboard_count(&mut self, leaderboards: &SteamworksStatsLeaderboardHandles) {
+        self.leaderboard_count = leaderboards.len();
+    }
+
+    fn record_operation(&mut self, operation: &SteamworksStatsOperation) {
+        match operation {
+            SteamworksStatsOperation::LeaderboardInfoRead { info } => {
+                self.last_leaderboard_info = Some(info.clone());
+            }
+            SteamworksStatsOperation::LeaderboardEntriesDownloaded { entries, .. } => {
+                self.last_leaderboard_entries.clone_from(entries);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Opaque ID for a leaderboard handle owned by [`SteamworksStatsPlugin`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SteamworksLeaderboardId(u64);
+
+impl SteamworksLeaderboardId {
+    /// Creates an ID from a raw integer.
+    pub fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the raw integer backing this plugin-owned ID.
+    pub fn raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// Snapshot of a Steam leaderboard handle known to this plugin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLeaderboardInfo {
+    /// Plugin-owned leaderboard ID.
+    pub leaderboard: SteamworksLeaderboardId,
+    /// Name reported by Steam.
+    pub name: String,
+    /// Display type reported by Steam, if the handle is valid.
+    pub display_type: Option<SteamworksLeaderboardDisplayType>,
+    /// Sort method reported by Steam, if the handle is valid.
+    pub sort_method: Option<SteamworksLeaderboardSortMethod>,
+    /// Total number of entries reported by Steam.
+    pub entry_count: i32,
+}
+
+/// Leaderboard data request scope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksLeaderboardDataRequest {
+    /// Global leaderboard entries by absolute rank range.
+    Global {
+        /// Inclusive start rank. Steam ranks are one-based for global requests.
+        start: i32,
+        /// Inclusive end rank.
+        end: i32,
+    },
+    /// Entries around the current user, using signed offsets from the current user's rank.
+    GlobalAroundUser {
+        /// Inclusive start offset, such as `-2`.
+        start: i32,
+        /// Inclusive end offset, such as `2`.
+        end: i32,
+    },
+    /// Entries for the current user's friends.
+    Friends,
+}
+
+impl From<SteamworksLeaderboardDataRequest> for steamworks::LeaderboardDataRequest {
+    fn from(value: SteamworksLeaderboardDataRequest) -> Self {
+        match value {
+            SteamworksLeaderboardDataRequest::Global { .. } => Self::Global,
+            SteamworksLeaderboardDataRequest::GlobalAroundUser { .. } => Self::GlobalAroundUser,
+            SteamworksLeaderboardDataRequest::Friends => Self::Friends,
+        }
+    }
+}
+
+impl SteamworksLeaderboardDataRequest {
+    fn upstream_range(self) -> (usize, usize) {
+        match self {
+            SteamworksLeaderboardDataRequest::Global { start, end }
+            | SteamworksLeaderboardDataRequest::GlobalAroundUser { start, end } => (
+                leaderboard_bound_to_upstream_usize(start),
+                leaderboard_bound_to_upstream_usize(end),
+            ),
+            SteamworksLeaderboardDataRequest::Friends => (0, 0),
+        }
+    }
+}
+
+/// Leaderboard score upload behavior.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksLeaderboardUploadScoreMethod {
+    /// Keep the user's best existing score.
+    KeepBest,
+    /// Force Steam to update the score.
+    ForceUpdate,
+}
+
+impl From<SteamworksLeaderboardUploadScoreMethod> for steamworks::UploadScoreMethod {
+    fn from(value: SteamworksLeaderboardUploadScoreMethod) -> Self {
+        match value {
+            SteamworksLeaderboardUploadScoreMethod::KeepBest => Self::KeepBest,
+            SteamworksLeaderboardUploadScoreMethod::ForceUpdate => Self::ForceUpdate,
+        }
+    }
+}
+
+/// Leaderboard sort direction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksLeaderboardSortMethod {
+    /// Lower scores rank first.
+    Ascending,
+    /// Higher scores rank first.
+    Descending,
+}
+
+impl From<SteamworksLeaderboardSortMethod> for steamworks::LeaderboardSortMethod {
+    fn from(value: SteamworksLeaderboardSortMethod) -> Self {
+        match value {
+            SteamworksLeaderboardSortMethod::Ascending => Self::Ascending,
+            SteamworksLeaderboardSortMethod::Descending => Self::Descending,
+        }
+    }
+}
+
+impl From<steamworks::LeaderboardSortMethod> for SteamworksLeaderboardSortMethod {
+    fn from(value: steamworks::LeaderboardSortMethod) -> Self {
+        match value {
+            steamworks::LeaderboardSortMethod::Ascending => Self::Ascending,
+            steamworks::LeaderboardSortMethod::Descending => Self::Descending,
+        }
+    }
+}
+
+/// Leaderboard display format.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksLeaderboardDisplayType {
+    /// Display scores as plain numbers.
+    Numeric,
+    /// Display scores as seconds.
+    TimeSeconds,
+    /// Display scores as milliseconds.
+    TimeMilliSeconds,
+}
+
+impl From<SteamworksLeaderboardDisplayType> for steamworks::LeaderboardDisplayType {
+    fn from(value: SteamworksLeaderboardDisplayType) -> Self {
+        match value {
+            SteamworksLeaderboardDisplayType::Numeric => Self::Numeric,
+            SteamworksLeaderboardDisplayType::TimeSeconds => Self::TimeSeconds,
+            SteamworksLeaderboardDisplayType::TimeMilliSeconds => Self::TimeMilliSeconds,
+        }
+    }
+}
+
+impl From<steamworks::LeaderboardDisplayType> for SteamworksLeaderboardDisplayType {
+    fn from(value: steamworks::LeaderboardDisplayType) -> Self {
+        match value {
+            steamworks::LeaderboardDisplayType::Numeric => Self::Numeric,
+            steamworks::LeaderboardDisplayType::TimeSeconds => Self::TimeSeconds,
+            steamworks::LeaderboardDisplayType::TimeMilliSeconds => Self::TimeMilliSeconds,
+        }
+    }
+}
+
+/// Snapshot of one downloaded leaderboard entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLeaderboardEntry {
+    /// Steam user that owns this entry.
+    pub user: steamworks::SteamId,
+    /// Global rank returned by Steam.
+    pub global_rank: i32,
+    /// Score returned by Steam.
+    pub score: i32,
+    /// Optional details returned by Steam.
+    pub details: Vec<i32>,
+}
+
+/// Snapshot of a leaderboard score upload result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLeaderboardScoreUploaded {
+    /// Score submitted or retained by Steam.
+    pub score: i32,
+    /// Whether Steam changed the score.
+    pub was_changed: bool,
+    /// New global rank.
+    pub global_rank_new: i32,
+    /// Previous global rank.
+    pub global_rank_previous: i32,
 }
 
 #[derive(Clone, Debug, Default, Resource)]
@@ -88,6 +308,85 @@ impl SteamworksStatsAsyncResults {
             .expect("Steamworks stats async result mutex was poisoned")
             .drain(..)
             .collect()
+    }
+}
+
+#[derive(Clone, Debug, Default, Resource)]
+struct SteamworksStatsLeaderboardHandles {
+    storage: Arc<Mutex<SteamworksStatsLeaderboardHandleStorage>>,
+}
+
+impl SteamworksStatsLeaderboardHandles {
+    fn insert(&self, leaderboard: steamworks::Leaderboard) -> SteamworksLeaderboardId {
+        self.storage
+            .lock()
+            .expect("Steamworks leaderboard handle storage mutex was poisoned")
+            .insert(leaderboard)
+    }
+
+    fn get(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
+        self.storage
+            .lock()
+            .expect("Steamworks leaderboard handle storage mutex was poisoned")
+            .get(id)
+    }
+
+    fn remove(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
+        self.storage
+            .lock()
+            .expect("Steamworks leaderboard handle storage mutex was poisoned")
+            .remove(id)
+    }
+
+    fn len(&self) -> usize {
+        self.storage
+            .lock()
+            .expect("Steamworks leaderboard handle storage mutex was poisoned")
+            .len()
+    }
+}
+
+#[derive(Debug)]
+struct SteamworksStatsLeaderboardHandleStorage {
+    next_id: u64,
+    handles: HashMap<SteamworksLeaderboardId, steamworks::Leaderboard>,
+}
+
+impl Default for SteamworksStatsLeaderboardHandleStorage {
+    fn default() -> Self {
+        Self {
+            next_id: 1,
+            handles: HashMap::default(),
+        }
+    }
+}
+
+impl SteamworksStatsLeaderboardHandleStorage {
+    fn insert(&mut self, leaderboard: steamworks::Leaderboard) -> SteamworksLeaderboardId {
+        if let Some((id, _)) = self
+            .handles
+            .iter()
+            .find(|(_, known)| known.raw() == leaderboard.raw())
+        {
+            return *id;
+        }
+
+        let id = SteamworksLeaderboardId(self.next_id);
+        self.next_id = self.next_id.saturating_add(1).max(1);
+        self.handles.insert(id, leaderboard);
+        id
+    }
+
+    fn get(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
+        self.handles.get(&id).cloned()
+    }
+
+    fn remove(&mut self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
+        self.handles.remove(&id)
+    }
+
+    fn len(&self) -> usize {
+        self.handles.len()
     }
 }
 
@@ -197,6 +496,50 @@ pub enum SteamworksStatsCommand {
         /// Whether to store the reset immediately if it succeeds.
         store_after_reset: bool,
     },
+    /// Find an existing leaderboard by API name.
+    FindLeaderboard {
+        /// Steamworks leaderboard API name.
+        name: String,
+    },
+    /// Find or create a leaderboard by API name.
+    FindOrCreateLeaderboard {
+        /// Steamworks leaderboard API name.
+        name: String,
+        /// Sort method used if Steam creates the leaderboard.
+        sort_method: SteamworksLeaderboardSortMethod,
+        /// Display type used if Steam creates the leaderboard.
+        display_type: SteamworksLeaderboardDisplayType,
+    },
+    /// Read metadata for a known leaderboard.
+    GetLeaderboardInfo {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+    },
+    /// Upload a score to a known leaderboard.
+    UploadLeaderboardScore {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Upload behavior.
+        method: SteamworksLeaderboardUploadScoreMethod,
+        /// Score to submit.
+        score: i32,
+        /// Optional detail integers.
+        details: Vec<i32>,
+    },
+    /// Download entries from a known leaderboard.
+    DownloadLeaderboardEntries {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Entry scope to download.
+        request: SteamworksLeaderboardDataRequest,
+        /// Maximum detail integers to read per entry.
+        max_details: usize,
+    },
+    /// Forget a leaderboard handle owned by the plugin.
+    ForgetLeaderboard {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+    },
 }
 
 impl SteamworksStatsCommand {
@@ -304,6 +647,102 @@ impl SteamworksStatsCommand {
             achievements_too,
             store_after_reset,
         }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::FindLeaderboard`] command.
+    pub fn find_leaderboard(name: impl Into<String>) -> Self {
+        Self::FindLeaderboard { name: name.into() }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::FindOrCreateLeaderboard`] command.
+    pub fn find_or_create_leaderboard(
+        name: impl Into<String>,
+        sort_method: SteamworksLeaderboardSortMethod,
+        display_type: SteamworksLeaderboardDisplayType,
+    ) -> Self {
+        Self::FindOrCreateLeaderboard {
+            name: name.into(),
+            sort_method,
+            display_type,
+        }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::GetLeaderboardInfo`] command.
+    pub fn get_leaderboard_info(leaderboard: SteamworksLeaderboardId) -> Self {
+        Self::GetLeaderboardInfo { leaderboard }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::UploadLeaderboardScore`] command.
+    pub fn upload_leaderboard_score(
+        leaderboard: SteamworksLeaderboardId,
+        method: SteamworksLeaderboardUploadScoreMethod,
+        score: i32,
+        details: impl Into<Vec<i32>>,
+    ) -> Self {
+        Self::UploadLeaderboardScore {
+            leaderboard,
+            method,
+            score,
+            details: details.into(),
+        }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::DownloadLeaderboardEntries`] command.
+    pub fn download_leaderboard_entries(
+        leaderboard: SteamworksLeaderboardId,
+        request: SteamworksLeaderboardDataRequest,
+        max_details: usize,
+    ) -> Self {
+        Self::DownloadLeaderboardEntries {
+            leaderboard,
+            request,
+            max_details,
+        }
+    }
+
+    /// Creates a global [`SteamworksStatsCommand::DownloadLeaderboardEntries`] command.
+    pub fn download_global_leaderboard_entries(
+        leaderboard: SteamworksLeaderboardId,
+        start: i32,
+        end: i32,
+        max_details: usize,
+    ) -> Self {
+        Self::download_leaderboard_entries(
+            leaderboard,
+            SteamworksLeaderboardDataRequest::Global { start, end },
+            max_details,
+        )
+    }
+
+    /// Creates a user-relative [`SteamworksStatsCommand::DownloadLeaderboardEntries`] command.
+    pub fn download_leaderboard_entries_around_user(
+        leaderboard: SteamworksLeaderboardId,
+        start: i32,
+        end: i32,
+        max_details: usize,
+    ) -> Self {
+        Self::download_leaderboard_entries(
+            leaderboard,
+            SteamworksLeaderboardDataRequest::GlobalAroundUser { start, end },
+            max_details,
+        )
+    }
+
+    /// Creates a friends [`SteamworksStatsCommand::DownloadLeaderboardEntries`] command.
+    pub fn download_friends_leaderboard_entries(
+        leaderboard: SteamworksLeaderboardId,
+        max_details: usize,
+    ) -> Self {
+        Self::download_leaderboard_entries(
+            leaderboard,
+            SteamworksLeaderboardDataRequest::Friends,
+            max_details,
+        )
+    }
+
+    /// Creates a [`SteamworksStatsCommand::ForgetLeaderboard`] command.
+    pub fn forget_leaderboard(leaderboard: SteamworksLeaderboardId) -> Self {
+        Self::ForgetLeaderboard { leaderboard }
     }
 }
 
@@ -445,6 +884,74 @@ pub enum SteamworksStatsOperation {
         /// Whether achievements were also reset.
         achievements_too: bool,
     },
+    /// Leaderboard lookup was submitted to Steam.
+    LeaderboardFindSubmitted {
+        /// Steamworks leaderboard API name.
+        name: String,
+    },
+    /// Leaderboard lookup completed.
+    LeaderboardFindCompleted {
+        /// Steamworks leaderboard API name.
+        name: String,
+        /// Plugin-owned leaderboard ID, or `None` if Steam did not find it.
+        leaderboard: Option<SteamworksLeaderboardId>,
+    },
+    /// Leaderboard find-or-create was submitted to Steam.
+    LeaderboardFindOrCreateSubmitted {
+        /// Steamworks leaderboard API name.
+        name: String,
+        /// Requested sort method.
+        sort_method: SteamworksLeaderboardSortMethod,
+        /// Requested display type.
+        display_type: SteamworksLeaderboardDisplayType,
+    },
+    /// Leaderboard find-or-create completed.
+    LeaderboardFindOrCreateCompleted {
+        /// Steamworks leaderboard API name.
+        name: String,
+        /// Plugin-owned leaderboard ID, or `None` if Steam did not return one.
+        leaderboard: Option<SteamworksLeaderboardId>,
+    },
+    /// Leaderboard metadata was read.
+    LeaderboardInfoRead {
+        /// Leaderboard info snapshot.
+        info: SteamworksLeaderboardInfo,
+    },
+    /// Leaderboard score upload was submitted to Steam.
+    LeaderboardScoreUploadSubmitted {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Submitted score.
+        score: i32,
+    },
+    /// Leaderboard score upload completed.
+    LeaderboardScoreUploaded {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Upload result, or `None` if Steam reported no update.
+        upload: Option<SteamworksLeaderboardScoreUploaded>,
+    },
+    /// Leaderboard entry download was submitted to Steam.
+    LeaderboardEntriesDownloadSubmitted {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Requested entry scope.
+        request: SteamworksLeaderboardDataRequest,
+        /// Maximum detail integers requested per entry.
+        max_details: usize,
+    },
+    /// Leaderboard entries were downloaded.
+    LeaderboardEntriesDownloaded {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+        /// Downloaded entries.
+        entries: Vec<SteamworksLeaderboardEntry>,
+    },
+    /// A leaderboard handle was forgotten by the plugin.
+    LeaderboardForgotten {
+        /// Plugin-owned leaderboard ID.
+        leaderboard: SteamworksLeaderboardId,
+    },
 }
 
 /// Result message emitted by [`SteamworksStatsPlugin`].
@@ -452,7 +959,7 @@ pub enum SteamworksStatsOperation {
 pub enum SteamworksStatsResult {
     /// The command was submitted to Steamworks or a value was read.
     Ok(SteamworksStatsOperation),
-    /// The command failed synchronously.
+    /// The command failed synchronously or an asynchronous callback failed.
     Err {
         /// Command that failed.
         command: SteamworksStatsCommand,
@@ -461,7 +968,7 @@ pub enum SteamworksStatsResult {
     },
 }
 
-/// Synchronous errors from [`SteamworksStatsPlugin`].
+/// Command and asynchronous callback errors from [`SteamworksStatsPlugin`].
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum SteamworksStatsError {
     /// No [`SteamworksClient`] resource exists.
@@ -481,6 +988,42 @@ pub enum SteamworksStatsError {
         /// Steamworks error.
         source: steamworks::SteamError,
     },
+    /// A leaderboard ID is not owned by this plugin.
+    #[error("Steamworks leaderboard {id:?} was not found")]
+    LeaderboardNotFound {
+        /// Missing leaderboard ID.
+        id: SteamworksLeaderboardId,
+    },
+    /// A string passed to Steam contains an interior NUL byte.
+    #[error("Steamworks stats command field {field} contains an interior NUL byte")]
+    InvalidString {
+        /// Field that contained the invalid string.
+        field: &'static str,
+    },
+    /// Leaderboard details exceed the per-command cap.
+    #[error("Steamworks leaderboard details length {requested} exceeds max {max_supported}")]
+    TooManyLeaderboardDetails {
+        /// Requested detail count.
+        requested: usize,
+        /// Maximum accepted detail count.
+        max_supported: usize,
+    },
+    /// Leaderboard download range is invalid.
+    #[error("Steamworks leaderboard download range {start}..={end} is invalid")]
+    InvalidLeaderboardRange {
+        /// Inclusive start index.
+        start: i32,
+        /// Inclusive end index.
+        end: i32,
+    },
+    /// Leaderboard download range exceeds the per-command cap.
+    #[error("Steamworks leaderboard download entry count {requested} exceeds max {max_supported}")]
+    TooManyLeaderboardEntries {
+        /// Requested entry count.
+        requested: usize,
+        /// Maximum accepted entry count.
+        max_supported: usize,
+    },
 }
 
 impl SteamworksStatsError {
@@ -490,6 +1033,10 @@ impl SteamworksStatsError {
 
     fn steam_error(operation: &'static str, source: steamworks::SteamError) -> Self {
         Self::SteamError { operation, source }
+    }
+
+    fn invalid_string(field: &'static str) -> Self {
+        Self::InvalidString { field }
     }
 }
 
@@ -532,6 +1079,7 @@ impl Plugin for SteamworksStatsPlugin {
         app.insert_resource(self.settings.clone())
             .init_resource::<SteamworksStatsState>()
             .init_resource::<SteamworksStatsAsyncResults>()
+            .init_resource::<SteamworksStatsLeaderboardHandles>()
             .add_message::<SteamworksStatsCommand>()
             .add_message::<SteamworksStatsResult>()
             .configure_sets(
@@ -552,12 +1100,20 @@ fn process_stats_commands(
     settings: Res<SteamworksStatsSettings>,
     mut state: ResMut<SteamworksStatsState>,
     async_results: Res<SteamworksStatsAsyncResults>,
+    leaderboards: Res<SteamworksStatsLeaderboardHandles>,
     mut commands: ResMut<Messages<SteamworksStatsCommand>>,
     mut results: MessageWriter<SteamworksStatsResult>,
 ) {
     for result in async_results.drain() {
-        if let SteamworksStatsResult::Err { error, .. } = &result {
-            state.record_error(error.clone());
+        match &result {
+            SteamworksStatsResult::Ok(operation) => {
+                state.record_operation(operation);
+                state.sync_leaderboard_count(&leaderboards);
+            }
+            SteamworksStatsResult::Err { error, .. } => {
+                state.record_error(error.clone());
+                state.sync_leaderboard_count(&leaderboards);
+            }
         }
         results.write(result);
     }
@@ -584,6 +1140,7 @@ fn process_stats_commands(
             command,
             &settings,
             &async_results,
+            &leaderboards,
             &mut state,
             &mut results,
         );
@@ -636,10 +1193,11 @@ fn handle_stats_command(
     command: SteamworksStatsCommand,
     settings: &SteamworksStatsSettings,
     async_results: &SteamworksStatsAsyncResults,
+    leaderboards: &SteamworksStatsLeaderboardHandles,
     state: &mut SteamworksStatsState,
     results: &mut MessageWriter<SteamworksStatsResult>,
 ) {
-    let result = match command.clone() {
+    let result = validate_stats_command(&command).and_then(|()| match command.clone() {
         SteamworksStatsCommand::RequestCurrentUserStats => {
             let steam_id = client.user().steam_id();
             client.user_stats().request_user_stats(steam_id.raw());
@@ -820,13 +1378,193 @@ fn handle_stats_command(
                 SteamworksStatsOperation::AllStatsReset { achievements_too }
             })
             .map_err(|()| SteamworksStatsError::operation_failed("reset_all_stats")),
-    };
+        SteamworksStatsCommand::FindLeaderboard { name } => {
+            let async_results = async_results.clone();
+            let leaderboards = leaderboards.clone();
+            let command_name = name.clone();
+            client.user_stats().find_leaderboard(&name, move |result| {
+                let result = match result {
+                    Ok(leaderboard) => {
+                        let leaderboard =
+                            leaderboard.map(|leaderboard| leaderboards.insert(leaderboard));
+                        SteamworksStatsResult::Ok(
+                            SteamworksStatsOperation::LeaderboardFindCompleted {
+                                name: command_name,
+                                leaderboard,
+                            },
+                        )
+                    }
+                    Err(source) => SteamworksStatsResult::Err {
+                        command: SteamworksStatsCommand::FindLeaderboard { name: command_name },
+                        error: SteamworksStatsError::steam_error("find_leaderboard", source),
+                    },
+                };
+                async_results.push(result);
+            });
+            Ok(SteamworksStatsOperation::LeaderboardFindSubmitted { name })
+        }
+        SteamworksStatsCommand::FindOrCreateLeaderboard {
+            name,
+            sort_method,
+            display_type,
+        } => {
+            let async_results = async_results.clone();
+            let leaderboards = leaderboards.clone();
+            let command_name = name.clone();
+            client.user_stats().find_or_create_leaderboard(
+                &name,
+                sort_method.into(),
+                display_type.into(),
+                move |result| {
+                    let result = match result {
+                        Ok(leaderboard) => {
+                            let leaderboard =
+                                leaderboard.map(|leaderboard| leaderboards.insert(leaderboard));
+                            SteamworksStatsResult::Ok(
+                                SteamworksStatsOperation::LeaderboardFindOrCreateCompleted {
+                                    name: command_name,
+                                    leaderboard,
+                                },
+                            )
+                        }
+                        Err(source) => SteamworksStatsResult::Err {
+                            command: SteamworksStatsCommand::FindOrCreateLeaderboard {
+                                name: command_name,
+                                sort_method,
+                                display_type,
+                            },
+                            error: SteamworksStatsError::steam_error(
+                                "find_or_create_leaderboard",
+                                source,
+                            ),
+                        },
+                    };
+                    async_results.push(result);
+                },
+            );
+            Ok(SteamworksStatsOperation::LeaderboardFindOrCreateSubmitted {
+                name,
+                sort_method,
+                display_type,
+            })
+        }
+        SteamworksStatsCommand::GetLeaderboardInfo { leaderboard } => {
+            let leaderboard_handle = leaderboards
+                .get(leaderboard)
+                .ok_or(SteamworksStatsError::LeaderboardNotFound { id: leaderboard })?;
+            Ok(SteamworksStatsOperation::LeaderboardInfoRead {
+                info: snapshot_leaderboard_info(
+                    &client.user_stats(),
+                    leaderboard,
+                    &leaderboard_handle,
+                ),
+            })
+        }
+        SteamworksStatsCommand::UploadLeaderboardScore {
+            leaderboard,
+            method,
+            score,
+            details,
+        } => {
+            let leaderboard_handle = leaderboards
+                .get(leaderboard)
+                .ok_or(SteamworksStatsError::LeaderboardNotFound { id: leaderboard })?;
+            let async_results = async_results.clone();
+            let command_details = details.clone();
+            client.user_stats().upload_leaderboard_score(
+                &leaderboard_handle,
+                method.into(),
+                score,
+                &details,
+                move |result| {
+                    let result = match result {
+                        Ok(upload) => SteamworksStatsResult::Ok(
+                            SteamworksStatsOperation::LeaderboardScoreUploaded {
+                                leaderboard,
+                                upload: upload.map(snapshot_leaderboard_score_uploaded),
+                            },
+                        ),
+                        Err(source) => SteamworksStatsResult::Err {
+                            command: SteamworksStatsCommand::UploadLeaderboardScore {
+                                leaderboard,
+                                method,
+                                score,
+                                details: command_details,
+                            },
+                            error: SteamworksStatsError::steam_error(
+                                "upload_leaderboard_score",
+                                source,
+                            ),
+                        },
+                    };
+                    async_results.push(result);
+                },
+            );
+            Ok(SteamworksStatsOperation::LeaderboardScoreUploadSubmitted { leaderboard, score })
+        }
+        SteamworksStatsCommand::DownloadLeaderboardEntries {
+            leaderboard,
+            request,
+            max_details,
+        } => {
+            let leaderboard_handle = leaderboards
+                .get(leaderboard)
+                .ok_or(SteamworksStatsError::LeaderboardNotFound { id: leaderboard })?;
+            let async_results = async_results.clone();
+            let (start, end) = request.upstream_range();
+            client.user_stats().download_leaderboard_entries(
+                &leaderboard_handle,
+                request.into(),
+                start,
+                end,
+                max_details,
+                move |result| {
+                    let result = match result {
+                        Ok(entries) => SteamworksStatsResult::Ok(
+                            SteamworksStatsOperation::LeaderboardEntriesDownloaded {
+                                leaderboard,
+                                entries: entries
+                                    .into_iter()
+                                    .map(snapshot_leaderboard_entry)
+                                    .collect(),
+                            },
+                        ),
+                        Err(source) => SteamworksStatsResult::Err {
+                            command: SteamworksStatsCommand::DownloadLeaderboardEntries {
+                                leaderboard,
+                                request,
+                                max_details,
+                            },
+                            error: SteamworksStatsError::steam_error(
+                                "download_leaderboard_entries",
+                                source,
+                            ),
+                        },
+                    };
+                    async_results.push(result);
+                },
+            );
+            Ok(
+                SteamworksStatsOperation::LeaderboardEntriesDownloadSubmitted {
+                    leaderboard,
+                    request,
+                    max_details,
+                },
+            )
+        }
+        SteamworksStatsCommand::ForgetLeaderboard { leaderboard } => leaderboards
+            .remove(leaderboard)
+            .map(|_| SteamworksStatsOperation::LeaderboardForgotten { leaderboard })
+            .ok_or(SteamworksStatsError::LeaderboardNotFound { id: leaderboard }),
+    });
 
     match result {
         Ok(operation) => {
             if settings.auto_store && operation_requires_store(&operation) {
                 state.pending_store = true;
             }
+            state.record_operation(&operation);
+            state.sync_leaderboard_count(leaderboards);
             tracing::debug!(
                 target: "bevy_steamworks",
                 operation = ?operation,
@@ -836,6 +1574,7 @@ fn handle_stats_command(
         }
         Err(error) => {
             state.record_error(error.clone());
+            state.sync_leaderboard_count(leaderboards);
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -858,6 +1597,146 @@ fn operation_requires_store(operation: &SteamworksStatsOperation) -> bool {
     )
 }
 
+fn snapshot_leaderboard_info(
+    stats: &steamworks::UserStats,
+    leaderboard: SteamworksLeaderboardId,
+    leaderboard_handle: &steamworks::Leaderboard,
+) -> SteamworksLeaderboardInfo {
+    SteamworksLeaderboardInfo {
+        leaderboard,
+        name: stats.get_leaderboard_name(leaderboard_handle),
+        display_type: stats
+            .get_leaderboard_display_type(leaderboard_handle)
+            .map(Into::into),
+        sort_method: stats
+            .get_leaderboard_sort_method(leaderboard_handle)
+            .map(Into::into),
+        entry_count: stats.get_leaderboard_entry_count(leaderboard_handle),
+    }
+}
+
+fn snapshot_leaderboard_entry(entry: steamworks::LeaderboardEntry) -> SteamworksLeaderboardEntry {
+    SteamworksLeaderboardEntry {
+        user: entry.user,
+        global_rank: entry.global_rank,
+        score: entry.score,
+        details: entry.details,
+    }
+}
+
+fn snapshot_leaderboard_score_uploaded(
+    upload: steamworks::LeaderboardScoreUploaded,
+) -> SteamworksLeaderboardScoreUploaded {
+    SteamworksLeaderboardScoreUploaded {
+        score: upload.score,
+        was_changed: upload.was_changed,
+        global_rank_new: upload.global_rank_new,
+        global_rank_previous: upload.global_rank_previous,
+    }
+}
+
+fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), SteamworksStatsError> {
+    match command {
+        SteamworksStatsCommand::GetStatI32 { name }
+        | SteamworksStatsCommand::SetStatI32 { name, .. }
+        | SteamworksStatsCommand::GetStatF32 { name }
+        | SteamworksStatsCommand::SetStatF32 { name, .. }
+        | SteamworksStatsCommand::GetAchievement { name }
+        | SteamworksStatsCommand::UnlockAchievement { name }
+        | SteamworksStatsCommand::ClearAchievement { name }
+        | SteamworksStatsCommand::GetAchievementAndUnlockTime { name }
+        | SteamworksStatsCommand::GetAchievementAchievedPercent { name }
+        | SteamworksStatsCommand::GetGlobalStatI64 { name }
+        | SteamworksStatsCommand::GetGlobalStatF64 { name }
+        | SteamworksStatsCommand::GetGlobalStatHistoryI64 { name, .. }
+        | SteamworksStatsCommand::GetGlobalStatHistoryF64 { name, .. }
+        | SteamworksStatsCommand::FindLeaderboard { name }
+        | SteamworksStatsCommand::FindOrCreateLeaderboard { name, .. } => {
+            validate_no_nul("name", name)
+        }
+        SteamworksStatsCommand::GetAchievementDisplayAttribute { name, key } => {
+            validate_no_nul("name", name)?;
+            validate_no_nul("key", key)
+        }
+        SteamworksStatsCommand::UploadLeaderboardScore { details, .. } => {
+            validate_leaderboard_details_len(details.len())
+        }
+        SteamworksStatsCommand::DownloadLeaderboardEntries {
+            request,
+            max_details,
+            ..
+        } => {
+            validate_leaderboard_details_len(*max_details)?;
+            validate_leaderboard_data_request(*request)
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_no_nul(field: &'static str, value: &str) -> Result<(), SteamworksStatsError> {
+    if value.as_bytes().contains(&0) {
+        Err(SteamworksStatsError::invalid_string(field))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_leaderboard_details_len(len: usize) -> Result<(), SteamworksStatsError> {
+    if len > STEAMWORKS_LEADERBOARD_MAX_DETAILS {
+        Err(SteamworksStatsError::TooManyLeaderboardDetails {
+            requested: len,
+            max_supported: STEAMWORKS_LEADERBOARD_MAX_DETAILS,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_leaderboard_data_request(
+    request: SteamworksLeaderboardDataRequest,
+) -> Result<(), SteamworksStatsError> {
+    match request {
+        SteamworksLeaderboardDataRequest::Global { start, end } => {
+            if start < 1 || start > end {
+                return Err(SteamworksStatsError::InvalidLeaderboardRange { start, end });
+            }
+            validate_leaderboard_requested_entries(start, end)
+        }
+        SteamworksLeaderboardDataRequest::GlobalAroundUser { start, end } => {
+            if start > end {
+                return Err(SteamworksStatsError::InvalidLeaderboardRange { start, end });
+            }
+            validate_leaderboard_requested_entries(start, end)
+        }
+        SteamworksLeaderboardDataRequest::Friends => Ok(()),
+    }
+}
+
+fn validate_leaderboard_requested_entries(
+    start: i32,
+    end: i32,
+) -> Result<(), SteamworksStatsError> {
+    let requested = i64::from(end) - i64::from(start) + 1;
+    let requested = usize::try_from(requested)
+        .map_err(|_| SteamworksStatsError::InvalidLeaderboardRange { start, end })?;
+    if requested > STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND {
+        return Err(SteamworksStatsError::TooManyLeaderboardEntries {
+            requested,
+            max_supported: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
+        });
+    }
+
+    Ok(())
+}
+
+fn leaderboard_bound_to_upstream_usize(bound: i32) -> usize {
+    // The upstream safe wrapper accepts `usize`, but Steam's
+    // DownloadLeaderboardEntries API interprets these bounds as signed i32.
+    // Passing the i32 bit pattern through usize lets the wrapper cast it back
+    // to Steam's signed type without leaving the safe `steamworks` API.
+    bound as usize
+}
+
 #[cfg(test)]
 mod tests {
     use bevy_app::App;
@@ -873,6 +1752,9 @@ mod tests {
 
         assert!(app.world().contains_resource::<SteamworksStatsSettings>());
         assert!(app.world().contains_resource::<SteamworksStatsState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksStatsLeaderboardHandles>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksStatsCommand>>());
@@ -934,5 +1816,180 @@ mod tests {
         assert!(!operation_requires_store(
             &SteamworksStatsOperation::StatsStoreSubmitted
         ));
+    }
+
+    #[test]
+    fn leaderboard_commands_preserve_inputs() {
+        let leaderboard = SteamworksLeaderboardId::from_raw(7);
+        assert_eq!(SteamworksLeaderboardId::from_raw(7).raw(), 7);
+
+        assert_eq!(
+            SteamworksStatsCommand::find_leaderboard("daily_score"),
+            SteamworksStatsCommand::FindLeaderboard {
+                name: "daily_score".to_owned(),
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::find_or_create_leaderboard(
+                "daily_score",
+                SteamworksLeaderboardSortMethod::Descending,
+                SteamworksLeaderboardDisplayType::Numeric,
+            ),
+            SteamworksStatsCommand::FindOrCreateLeaderboard {
+                name: "daily_score".to_owned(),
+                sort_method: SteamworksLeaderboardSortMethod::Descending,
+                display_type: SteamworksLeaderboardDisplayType::Numeric,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::get_leaderboard_info(leaderboard),
+            SteamworksStatsCommand::GetLeaderboardInfo { leaderboard }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::upload_leaderboard_score(
+                leaderboard,
+                SteamworksLeaderboardUploadScoreMethod::KeepBest,
+                10,
+                vec![1, 2],
+            ),
+            SteamworksStatsCommand::UploadLeaderboardScore {
+                leaderboard,
+                method: SteamworksLeaderboardUploadScoreMethod::KeepBest,
+                score: 10,
+                details: vec![1, 2],
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::download_leaderboard_entries(
+                leaderboard,
+                SteamworksLeaderboardDataRequest::Global { start: 1, end: 10 },
+                4,
+            ),
+            SteamworksStatsCommand::DownloadLeaderboardEntries {
+                leaderboard,
+                request: SteamworksLeaderboardDataRequest::Global { start: 1, end: 10 },
+                max_details: 4,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::download_leaderboard_entries_around_user(leaderboard, -2, 2, 0,),
+            SteamworksStatsCommand::DownloadLeaderboardEntries {
+                leaderboard,
+                request: SteamworksLeaderboardDataRequest::GlobalAroundUser { start: -2, end: 2 },
+                max_details: 0,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::download_friends_leaderboard_entries(leaderboard, 0),
+            SteamworksStatsCommand::DownloadLeaderboardEntries {
+                leaderboard,
+                request: SteamworksLeaderboardDataRequest::Friends,
+                max_details: 0,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::forget_leaderboard(leaderboard),
+            SteamworksStatsCommand::ForgetLeaderboard { leaderboard }
+        );
+    }
+
+    #[test]
+    fn leaderboard_validation_rejects_invalid_inputs() {
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::find_leaderboard("bad\0name")),
+            Err(SteamworksStatsError::InvalidString { field: "name" })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::get_achievement_display_attribute(
+                "ACH_WIN", "bad\0key",
+            )),
+            Err(SteamworksStatsError::InvalidString { field: "key" })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::upload_leaderboard_score(
+                SteamworksLeaderboardId::from_raw(1),
+                SteamworksLeaderboardUploadScoreMethod::ForceUpdate,
+                5,
+                vec![0; STEAMWORKS_LEADERBOARD_MAX_DETAILS + 1],
+            )),
+            Err(SteamworksStatsError::TooManyLeaderboardDetails {
+                requested: STEAMWORKS_LEADERBOARD_MAX_DETAILS + 1,
+                max_supported: STEAMWORKS_LEADERBOARD_MAX_DETAILS,
+            })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::download_leaderboard_entries(
+                SteamworksLeaderboardId::from_raw(1),
+                SteamworksLeaderboardDataRequest::Global { start: 10, end: 5 },
+                0,
+            )),
+            Err(SteamworksStatsError::InvalidLeaderboardRange { start: 10, end: 5 })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::download_leaderboard_entries(
+                SteamworksLeaderboardId::from_raw(1),
+                SteamworksLeaderboardDataRequest::GlobalAroundUser { start: -2, end: 2 },
+                0,
+            )),
+            Ok(())
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::download_leaderboard_entries(
+                SteamworksLeaderboardId::from_raw(1),
+                SteamworksLeaderboardDataRequest::Global {
+                    start: 0,
+                    end: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND as i32,
+                },
+                0,
+            )),
+            Err(SteamworksStatsError::InvalidLeaderboardRange {
+                start: 0,
+                end: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND as i32,
+            })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::download_leaderboard_entries(
+                SteamworksLeaderboardId::from_raw(1),
+                SteamworksLeaderboardDataRequest::GlobalAroundUser {
+                    start: -(STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND as i32),
+                    end: 0,
+                },
+                0,
+            )),
+            Err(SteamworksStatsError::TooManyLeaderboardEntries {
+                requested: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND + 1,
+                max_supported: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
+            })
+        );
+    }
+
+    #[test]
+    fn leaderboard_state_records_latest_info_and_entries() {
+        let mut state = SteamworksStatsState::default();
+        let leaderboard = SteamworksLeaderboardId::from_raw(3);
+        let info = SteamworksLeaderboardInfo {
+            leaderboard,
+            name: "daily_score".to_owned(),
+            display_type: Some(SteamworksLeaderboardDisplayType::Numeric),
+            sort_method: Some(SteamworksLeaderboardSortMethod::Descending),
+            entry_count: 42,
+        };
+        let entry = SteamworksLeaderboardEntry {
+            user: steamworks::SteamId::from_raw(123),
+            global_rank: 1,
+            score: 9000,
+            details: vec![7, 8],
+        };
+
+        state.record_operation(&SteamworksStatsOperation::LeaderboardInfoRead {
+            info: info.clone(),
+        });
+        state.record_operation(&SteamworksStatsOperation::LeaderboardEntriesDownloaded {
+            leaderboard,
+            entries: vec![entry.clone()],
+        });
+
+        assert_eq!(state.last_leaderboard_info(), Some(&info));
+        assert_eq!(state.last_leaderboard_entries(), &[entry]);
     }
 }
