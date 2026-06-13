@@ -54,6 +54,13 @@ impl Plugin for SteamworksUtilsPlugin {
 pub struct SteamworksUtilsState {
     last_error: Option<SteamworksUtilsError>,
     current_info: Option<SteamworksUtilsInfo>,
+    app_id: Option<steamworks::AppId>,
+    ip_country: Option<String>,
+    overlay_enabled: Option<bool>,
+    ui_language: Option<String>,
+    server_real_time: Option<u32>,
+    steam_in_big_picture_mode: Option<bool>,
+    steam_running_on_steam_deck: Option<bool>,
     overlay_notification_position: Option<SteamworksNotificationPosition>,
     last_gamepad_text_input_dismissed: Option<SteamworksGamepadTextInputDismissed>,
     last_floating_gamepad_text_input_dismissed: Option<SteamworksFloatingGamepadTextInputDismissed>,
@@ -68,6 +75,41 @@ impl SteamworksUtilsState {
     /// Returns the most recent utility snapshot read through the plugin.
     pub fn current_info(&self) -> Option<&SteamworksUtilsInfo> {
         self.current_info.as_ref()
+    }
+
+    /// Returns the most recent Steam app ID read through this plugin.
+    pub fn app_id(&self) -> Option<steamworks::AppId> {
+        self.app_id
+    }
+
+    /// Returns the most recent Steam IP country code read through this plugin.
+    pub fn ip_country(&self) -> Option<&str> {
+        self.ip_country.as_deref()
+    }
+
+    /// Returns the most recent Steam overlay enabled state read through this plugin.
+    pub fn overlay_enabled(&self) -> Option<bool> {
+        self.overlay_enabled
+    }
+
+    /// Returns the most recent Steam UI language read through this plugin.
+    pub fn ui_language(&self) -> Option<&str> {
+        self.ui_language.as_deref()
+    }
+
+    /// Returns the most recent Steam server real time read through this plugin.
+    pub fn server_real_time(&self) -> Option<u32> {
+        self.server_real_time
+    }
+
+    /// Returns the most recent Steam Big Picture mode state read through this plugin.
+    pub fn steam_in_big_picture_mode(&self) -> Option<bool> {
+        self.steam_in_big_picture_mode
+    }
+
+    /// Returns the most recent Steam Deck state read through this plugin.
+    pub fn steam_running_on_steam_deck(&self) -> Option<bool> {
+        self.steam_running_on_steam_deck
     }
 
     /// Returns the most recent overlay notification position submitted through this plugin.
@@ -97,6 +139,34 @@ impl SteamworksUtilsState {
         match operation {
             SteamworksUtilsOperation::CurrentInfoRead { info } => {
                 self.current_info = Some(info.clone());
+                self.app_id = Some(info.app_id);
+                self.ip_country = Some(info.ip_country.clone());
+                self.overlay_enabled = Some(info.overlay_enabled);
+                self.ui_language = Some(info.ui_language.clone());
+                self.server_real_time = Some(info.server_real_time);
+                self.steam_in_big_picture_mode = Some(info.steam_in_big_picture_mode);
+                self.steam_running_on_steam_deck = Some(info.steam_running_on_steam_deck);
+            }
+            SteamworksUtilsOperation::AppIdRead { app_id } => {
+                self.app_id = Some(*app_id);
+            }
+            SteamworksUtilsOperation::IpCountryRead { country } => {
+                self.ip_country = Some(country.clone());
+            }
+            SteamworksUtilsOperation::OverlayEnabledRead { enabled } => {
+                self.overlay_enabled = Some(*enabled);
+            }
+            SteamworksUtilsOperation::UiLanguageRead { language } => {
+                self.ui_language = Some(language.clone());
+            }
+            SteamworksUtilsOperation::ServerRealTimeRead { unix_epoch_seconds } => {
+                self.server_real_time = Some(*unix_epoch_seconds);
+            }
+            SteamworksUtilsOperation::SteamInBigPictureModeRead { enabled } => {
+                self.steam_in_big_picture_mode = Some(*enabled);
+            }
+            SteamworksUtilsOperation::SteamRunningOnSteamDeckRead { enabled } => {
+                self.steam_running_on_steam_deck = Some(*enabled);
             }
             SteamworksUtilsOperation::OverlayNotificationPositionSet { position } => {
                 self.overlay_notification_position = Some(*position);
@@ -107,7 +177,6 @@ impl SteamworksUtilsState {
             SteamworksUtilsOperation::FloatingGamepadTextInputDismissed { dismissed } => {
                 self.last_floating_gamepad_text_input_dismissed = Some(*dismissed);
             }
-            _ => {}
         }
     }
 }
@@ -547,6 +616,66 @@ mod tests {
             Some(&floating)
         );
         assert_eq!(state.last_error(), None);
+    }
+
+    #[test]
+    fn state_records_utility_operations() {
+        let mut state = SteamworksUtilsState::default();
+        let info = SteamworksUtilsInfo {
+            app_id: steamworks::AppId(480),
+            ip_country: "US".to_owned(),
+            overlay_enabled: true,
+            ui_language: "english".to_owned(),
+            server_real_time: 123,
+            steam_in_big_picture_mode: false,
+            steam_running_on_steam_deck: false,
+        };
+
+        state.record_operation(&SteamworksUtilsOperation::CurrentInfoRead { info: info.clone() });
+        assert_eq!(state.current_info(), Some(&info));
+        assert_eq!(state.app_id(), Some(steamworks::AppId(480)));
+        assert_eq!(state.ip_country(), Some("US"));
+        assert_eq!(state.overlay_enabled(), Some(true));
+        assert_eq!(state.ui_language(), Some("english"));
+        assert_eq!(state.server_real_time(), Some(123));
+        assert_eq!(state.steam_in_big_picture_mode(), Some(false));
+        assert_eq!(state.steam_running_on_steam_deck(), Some(false));
+
+        state.record_operation(&SteamworksUtilsOperation::AppIdRead {
+            app_id: steamworks::AppId(481),
+        });
+        state.record_operation(&SteamworksUtilsOperation::IpCountryRead {
+            country: "CN".to_owned(),
+        });
+        state.record_operation(&SteamworksUtilsOperation::OverlayEnabledRead { enabled: false });
+        state.record_operation(&SteamworksUtilsOperation::UiLanguageRead {
+            language: "schinese".to_owned(),
+        });
+        state.record_operation(&SteamworksUtilsOperation::ServerRealTimeRead {
+            unix_epoch_seconds: 456,
+        });
+        state.record_operation(&SteamworksUtilsOperation::SteamInBigPictureModeRead {
+            enabled: true,
+        });
+        state.record_operation(&SteamworksUtilsOperation::SteamRunningOnSteamDeckRead {
+            enabled: true,
+        });
+        state.record_operation(&SteamworksUtilsOperation::OverlayNotificationPositionSet {
+            position: SteamworksNotificationPosition::BottomRight,
+        });
+
+        assert_eq!(state.current_info(), Some(&info));
+        assert_eq!(state.app_id(), Some(steamworks::AppId(481)));
+        assert_eq!(state.ip_country(), Some("CN"));
+        assert_eq!(state.overlay_enabled(), Some(false));
+        assert_eq!(state.ui_language(), Some("schinese"));
+        assert_eq!(state.server_real_time(), Some(456));
+        assert_eq!(state.steam_in_big_picture_mode(), Some(true));
+        assert_eq!(state.steam_running_on_steam_deck(), Some(true));
+        assert_eq!(
+            state.overlay_notification_position(),
+            Some(SteamworksNotificationPosition::BottomRight)
+        );
     }
 
     #[test]

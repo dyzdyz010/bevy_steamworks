@@ -354,7 +354,7 @@ fn main() {
 }
 ```
 
-Gamepad text input dismissal callbacks arrive through both `SteamworksEvent` and `SteamworksUtilsOperation::{GamepadTextInputDismissed, FloatingGamepadTextInputDismissed}`. `GamepadTextInputDismissed` includes Steam's submitted text length when the user submitted text, but the text itself must still be read inside Steam's original callback timing through the raw `steamworks::Utils` helper. Be aware that the upstream text input helpers register their own typed callbacks, so avoid also registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`.
+`SteamworksUtilsState` caches both `GetCurrentInfo` snapshots and the latest individual app id, IP country, overlay availability, UI language, server time, Big Picture mode, Steam Deck, and submitted overlay notification position. Gamepad text input dismissal callbacks arrive through both `SteamworksEvent` and `SteamworksUtilsOperation::{GamepadTextInputDismissed, FloatingGamepadTextInputDismissed}`. `GamepadTextInputDismissed` includes Steam's submitted text length when the user submitted text, but the text itself must still be read inside Steam's original callback timing through the raw `steamworks::Utils` helper. Be aware that the upstream text input helpers register their own typed callbacks, so avoid also registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`.
 
 Run the utils example with:
 
