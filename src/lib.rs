@@ -35,6 +35,7 @@ pub mod input;
 pub mod matchmaking;
 pub mod networking;
 pub mod networking_messages;
+pub mod networking_sockets;
 pub mod networking_utils;
 pub mod remote_play;
 pub mod remote_storage;
@@ -50,6 +51,7 @@ pub use input::*;
 pub use matchmaking::*;
 pub use networking::*;
 pub use networking_messages::*;
+pub use networking_sockets::*;
 pub use networking_utils::*;
 pub use remote_play::*;
 pub use remote_storage::*;
@@ -66,12 +68,12 @@ pub mod prelude {
         steamworks, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
         SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState,
         SteamworksAuthSessionError, SteamworksAvatar, SteamworksAvatarSize,
-        SteamworksCallbackRegistry, SteamworksClient, SteamworksCoplayFriendInfo,
-        SteamworksCurrentAppInfo, SteamworksEvent, SteamworksFailurePolicy,
-        SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendsCommand,
-        SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
-        SteamworksFriendsResult, SteamworksFriendsState, SteamworksInitMode,
-        SteamworksInputActionOrigin, SteamworksInputActionOriginInfo,
+        SteamworksCallbackRegistry, SteamworksClient, SteamworksConnectionRequestPolicy,
+        SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
+        SteamworksFailurePolicy, SteamworksFriendGameInfo, SteamworksFriendInfo,
+        SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
+        SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksFriendsState,
+        SteamworksInitMode, SteamworksInputActionOrigin, SteamworksInputActionOriginInfo,
         SteamworksInputActionSetHandle, SteamworksInputAnalogActionData,
         SteamworksInputAnalogActionHandle, SteamworksInputAnalogActionSnapshot,
         SteamworksInputCommand, SteamworksInputControllerInfo, SteamworksInputDigitalActionData,
@@ -81,17 +83,25 @@ pub mod prelude {
         SteamworksInputNamedAnalogActionHandle, SteamworksInputNamedDigitalActionHandle,
         SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
         SteamworksInputSourceMode, SteamworksInputState, SteamworksInputType,
-        SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
-        SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
-        SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
-        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNetworkingCommand,
-        SteamworksNetworkingError, SteamworksNetworkingMessage,
-        SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesConnectionInfo,
-        SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
-        SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesRealtimeInfo,
-        SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesSessionRequestInfo,
-        SteamworksNetworkingMessagesState, SteamworksNetworkingOperation, SteamworksNetworkingPeer,
-        SteamworksNetworkingPlugin, SteamworksNetworkingResult, SteamworksNetworkingState,
+        SteamworksListenSocketEventInfo, SteamworksListenSocketId, SteamworksLobbyGameServer,
+        SteamworksLobbyListFilter, SteamworksLobbyNearFilter, SteamworksLobbyNumberFilter,
+        SteamworksLobbyStringFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
+        SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
+        SteamworksMatchmakingState, SteamworksNetworkingCommand, SteamworksNetworkingError,
+        SteamworksNetworkingMessage, SteamworksNetworkingMessagesCommand,
+        SteamworksNetworkingMessagesConnectionInfo, SteamworksNetworkingMessagesError,
+        SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
+        SteamworksNetworkingMessagesRealtimeInfo, SteamworksNetworkingMessagesResult,
+        SteamworksNetworkingMessagesSessionRequestInfo, SteamworksNetworkingMessagesState,
+        SteamworksNetworkingOperation, SteamworksNetworkingPeer, SteamworksNetworkingPlugin,
+        SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
+        SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionId,
+        SteamworksNetworkingSocketsConnectionInfo, SteamworksNetworkingSocketsConnectionTarget,
+        SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
+        SteamworksNetworkingSocketsMessage, SteamworksNetworkingSocketsOperation,
+        SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsRealtimeLaneStatus,
+        SteamworksNetworkingSocketsRealtimeStatus, SteamworksNetworkingSocketsResult,
+        SteamworksNetworkingSocketsState, SteamworksNetworkingState,
         SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
         SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
         SteamworksNetworkingUtilsResult, SteamworksNetworkingUtilsState,
@@ -125,8 +135,12 @@ pub mod prelude {
         SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
         SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
         SteamworksUtilsResult, SteamworksUtilsState, STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
-        STEAMWORKS_P2P_MAX_READ_PACKET_BYTES, STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES,
-        STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES, STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
+        STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
+        STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
+        STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES, STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
+        STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES, STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES,
+        STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -670,6 +684,8 @@ pub enum SteamworksSystem {
     ProcessNetworkingCommands,
     /// Processes high-level Steam Networking Messages commands.
     ProcessNetworkingMessagesCommands,
+    /// Processes high-level Steam Networking Sockets commands.
+    ProcessNetworkingSocketsCommands,
     /// Processes high-level Steam Networking Utils commands.
     ProcessNetworkingUtilsCommands,
     /// Processes high-level Steam Workshop / UGC commands.

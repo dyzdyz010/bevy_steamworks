@@ -460,6 +460,72 @@ $env:BEVY_STEAMWORKS_RELAY_INIT = "0"
 cargo run --example networking_utils
 ```
 
+## Networking Sockets
+
+`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send and receive owned message snapshots, read connection status, set user data, flush, and close handles.
+
+The plugin owns upstream `ListenSocket` and `NetConnection` handles in a private resource and exposes stable IDs such as `SteamworksListenSocketId` and `SteamworksNetworkingSocketsConnectionId`. This prevents accidental handle drops from closing sockets outside the command layer.
+
+Accepted listen-socket connections are tracked against their parent listen socket. A listen-socket disconnect event removes the matching connection ID when it can be identified unambiguously, and `CloseListenSocket` removes accepted child connections before dropping the listen socket. Independent connection polls report `connection_removed: true` when a terminal connection event caused the plugin to free the handle.
+
+```rust,no_run
+# use std::net::{Ipv4Addr, SocketAddr};
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn open_socket(mut sockets: MessageWriter<SteamworksNetworkingSocketsCommand>) {
+    sockets.write(SteamworksNetworkingSocketsCommand::InitAuthentication);
+    sockets.write(SteamworksNetworkingSocketsCommand::create_listen_socket_ip(
+        SocketAddr::from((Ipv4Addr::UNSPECIFIED, 27015)),
+    ));
+}
+
+fn poll_socket(
+    listen_socket: Res<MyListenSocket>,
+    mut sockets: MessageWriter<SteamworksNetworkingSocketsCommand>,
+) {
+    sockets.write(SteamworksNetworkingSocketsCommand::poll_listen_socket_events(
+        listen_socket.0,
+        32,
+        SteamworksConnectionRequestPolicy::Accept,
+    ));
+}
+
+#[derive(Resource)]
+struct MyListenSocket(SteamworksListenSocketId);
+
+fn read_socket_results(mut results: MessageReader<SteamworksNetworkingSocketsResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksNetworkingSocketsPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, open_socket)
+        .add_systems(Update, read_socket_results)
+        .run();
+}
+```
+
+Listen socket connection requests must be answered immediately. `PollListenSocketEvents` therefore takes a `SteamworksConnectionRequestPolicy` and accepts or rejects each incoming request in the same frame instead of exposing a cross-frame pending request handle.
+
+This first command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries, poll groups, lane configuration, and zero-copy allocated messages remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
+
+Run the Networking Sockets example with:
+
+```powershell
+cargo run --example networking_sockets
+$env:BEVY_STEAMWORKS_SOCKETS_LISTEN_IP = "0.0.0.0:27015"
+$env:BEVY_STEAMWORKS_SOCKETS_ACCEPT = "1"
+cargo run --example networking_sockets
+$env:BEVY_STEAMWORKS_SOCKETS_CONNECT_IP = "127.0.0.1:27015"
+$env:BEVY_STEAMWORKS_SOCKETS_MESSAGE = "hello"
+cargo run --example networking_sockets
+```
+
 ## Screenshots
 
 `SteamworksScreenshotsPlugin` adds command/result messages for Steam screenshot workflows: hook screenshot hotkeys, read hook state, trigger a screenshot, and add an existing image file to the user's Steam screenshot library.
