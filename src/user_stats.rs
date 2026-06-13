@@ -65,6 +65,7 @@ pub struct SteamworksStatsState {
     last_achievements: Vec<SteamworksAchievementInfo>,
     last_achievement_icon: Option<SteamworksAchievementIcon>,
     achievement_icon_callback_count: u64,
+    last_global_achievement_percentages: Vec<SteamworksAchievementGlobalPercentage>,
     leaderboard_count: usize,
     last_leaderboard_info: Option<SteamworksLeaderboardInfo>,
     last_leaderboard_entries: Vec<SteamworksLeaderboardEntry>,
@@ -99,6 +100,11 @@ impl SteamworksStatsState {
     /// Returns how many achievement icon fetched callbacks this plugin observed.
     pub fn achievement_icon_callback_count(&self) -> u64 {
         self.achievement_icon_callback_count
+    }
+
+    /// Returns the most recent global achievement percentage page.
+    pub fn last_global_achievement_percentages(&self) -> &[SteamworksAchievementGlobalPercentage] {
+        &self.last_global_achievement_percentages
     }
 
     /// Returns the number of leaderboard handles currently owned by this plugin.
@@ -150,6 +156,12 @@ impl SteamworksStatsState {
                 self.achievement_icon_callback_count =
                     self.achievement_icon_callback_count.saturating_add(1);
             }
+            SteamworksStatsOperation::AchievementGlobalPercentagesListed {
+                percentages, ..
+            } => {
+                self.last_global_achievement_percentages
+                    .clone_from(percentages);
+            }
             SteamworksStatsOperation::LeaderboardInfoRead { info } => {
                 self.last_leaderboard_info = Some(info.clone());
             }
@@ -176,6 +188,15 @@ pub struct SteamworksAchievementInfo {
     pub achieved: Option<bool>,
     /// Unix epoch seconds when the current user unlocked it, if requested and available.
     pub unlock_time: Option<u32>,
+}
+
+/// Global unlock percentage snapshot for one Steam achievement.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksAchievementGlobalPercentage {
+    /// Steam achievement API name.
+    pub api_name: String,
+    /// Percentage of players who have unlocked this achievement.
+    pub percent: f32,
 }
 
 /// RGBA icon snapshot for one Steam achievement.
@@ -592,6 +613,17 @@ pub enum SteamworksStatsCommand {
         /// Steamworks achievement API name.
         name: String,
     },
+    /// List global achievement unlock percentages for the current app.
+    ///
+    /// Call [`SteamworksStatsCommand::RequestGlobalAchievementPercentages`] and
+    /// wait for [`SteamworksStatsOperation::GlobalAchievementPercentagesReceived`]
+    /// before reading percentages.
+    ListAchievementGlobalPercentages {
+        /// Zero-based achievement index to start from.
+        offset: usize,
+        /// Maximum percentages returned by this command.
+        limit: usize,
+    },
     /// Request global stat data for stats marked as aggregated.
     RequestGlobalStats {
         /// Number of history days to request, up to Steam's supported limit.
@@ -782,6 +814,19 @@ impl SteamworksStatsCommand {
     /// Creates a [`SteamworksStatsCommand::GetAchievementAchievedPercent`] command.
     pub fn get_achievement_achieved_percent(name: impl Into<String>) -> Self {
         Self::GetAchievementAchievedPercent { name: name.into() }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::ListAchievementGlobalPercentages`] command.
+    pub fn list_achievement_global_percentages() -> Self {
+        Self::list_achievement_global_percentages_page(
+            0,
+            STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+        )
+    }
+
+    /// Creates a paged [`SteamworksStatsCommand::ListAchievementGlobalPercentages`] command.
+    pub fn list_achievement_global_percentages_page(offset: usize, limit: usize) -> Self {
+        Self::ListAchievementGlobalPercentages { offset, limit }
     }
 
     /// Creates a [`SteamworksStatsCommand::RequestGlobalStats`] command.
@@ -1045,6 +1090,15 @@ pub enum SteamworksStatsOperation {
         name: String,
         /// Global unlock percentage.
         percent: f32,
+    },
+    /// Global achievement unlock percentage snapshots were listed.
+    AchievementGlobalPercentagesListed {
+        /// Zero-based achievement index the page starts from.
+        offset: usize,
+        /// Total achievements reported by Steam for the current app.
+        total: usize,
+        /// Global unlock percentages.
+        percentages: Vec<SteamworksAchievementGlobalPercentage>,
     },
     /// Global stat data was requested.
     GlobalStatsRequested {
@@ -1603,6 +1657,17 @@ fn handle_stats_command(
                     "achievement.get_achievement_achieved_percent",
                 )
             }),
+        SteamworksStatsCommand::ListAchievementGlobalPercentages { offset, limit } => {
+            list_achievement_global_percentages(&client.user_stats(), offset, limit).map(
+                |(total, percentages)| {
+                    SteamworksStatsOperation::AchievementGlobalPercentagesListed {
+                        offset,
+                        total,
+                        percentages,
+                    }
+                },
+            )
+        }
         SteamworksStatsCommand::RequestGlobalStats { history_days } => {
             let async_results = async_results.clone();
             client
@@ -1952,6 +2017,31 @@ fn list_achievement_infos(
     Ok((total, achievements))
 }
 
+fn list_achievement_global_percentages(
+    stats: &steamworks::UserStats,
+    offset: usize,
+    limit: usize,
+) -> Result<(usize, Vec<SteamworksAchievementGlobalPercentage>), SteamworksStatsError> {
+    let (total, names) = list_achievement_names(stats, offset, limit)?;
+    let percentages = names
+        .into_iter()
+        .map(|api_name| {
+            let percent = stats
+                .achievement(&api_name)
+                .get_achievement_achieved_percent()
+                .map_err(|()| {
+                    SteamworksStatsError::operation_failed(
+                        "achievement.get_achievement_achieved_percent",
+                    )
+                })?;
+
+            Ok(SteamworksAchievementGlobalPercentage { api_name, percent })
+        })
+        .collect::<Result<Vec<_>, SteamworksStatsError>>()?;
+
+    Ok((total, percentages))
+}
+
 fn achievement_display_attribute(
     stats: &steamworks::UserStats,
     achievement: &str,
@@ -2066,7 +2156,8 @@ fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), Steamw
             validate_no_nul("key", key)
         }
         SteamworksStatsCommand::ListAchievementNames { limit, .. }
-        | SteamworksStatsCommand::ListAchievements { limit, .. } => {
+        | SteamworksStatsCommand::ListAchievements { limit, .. }
+        | SteamworksStatsCommand::ListAchievementGlobalPercentages { limit, .. } => {
             validate_achievement_page_limit(*limit)
         }
         SteamworksStatsCommand::UploadLeaderboardScore { details, .. } => {
@@ -2281,6 +2372,20 @@ mod tests {
                 name: "ACH_WIN".to_owned(),
             }
         );
+        assert_eq!(
+            SteamworksStatsCommand::list_achievement_global_percentages(),
+            SteamworksStatsCommand::ListAchievementGlobalPercentages {
+                offset: 0,
+                limit: STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::list_achievement_global_percentages_page(6, 9),
+            SteamworksStatsCommand::ListAchievementGlobalPercentages {
+                offset: 6,
+                limit: 9,
+            }
+        );
     }
 
     #[test]
@@ -2375,6 +2480,18 @@ mod tests {
                 0,
                 STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
             )),
+            Err(SteamworksStatsError::TooManyAchievementEntries {
+                requested: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
+                max_supported: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
+            })
+        );
+        assert_eq!(
+            validate_stats_command(
+                &SteamworksStatsCommand::list_achievement_global_percentages_page(
+                    0,
+                    STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
+                )
+            ),
             Err(SteamworksStatsError::TooManyAchievementEntries {
                 requested: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
                 max_supported: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
@@ -2520,10 +2637,27 @@ mod tests {
             icon_handle: 99,
             icon: SteamworksAchievementIconStatus::PendingOrUnavailable,
         });
+        state.record_operation(
+            &SteamworksStatsOperation::AchievementGlobalPercentagesListed {
+                offset: 0,
+                total: 1,
+                percentages: vec![SteamworksAchievementGlobalPercentage {
+                    api_name: "ACH_WIN".to_owned(),
+                    percent: 12.5,
+                }],
+            },
+        );
 
         assert_eq!(state.last_achievements(), &[achievement]);
         assert_eq!(state.last_achievement_icon(), Some(&icon));
         assert_eq!(state.achievement_icon_callback_count(), 1);
+        assert_eq!(
+            state.last_global_achievement_percentages(),
+            &[SteamworksAchievementGlobalPercentage {
+                api_name: "ACH_WIN".to_owned(),
+                percent: 12.5,
+            }]
+        );
     }
 
     #[test]

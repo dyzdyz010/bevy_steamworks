@@ -937,6 +937,8 @@ Achievement catalog commands can list API names or owned `SteamworksAchievementI
 
 `GetAchievementIcon` emits `SteamworksAchievementIconStatus::Available(SteamworksAchievementIcon)` when Steam returns a 64x64 RGBA icon. `SteamworksAchievementIconStatus::PendingOrUnavailable` means the upstream safe wrapper did not return bytes; Steam may still be fetching the icon, the icon may be missing, or the image read may have failed. A later `UserAchievementIconFetched` callback is converted into `SteamworksStatsOperation::AchievementIconFetched` and preserves Steam's callback `icon_handle`.
 
+After `RequestGlobalAchievementPercentages` completes with `GlobalAchievementPercentagesReceived`, `list_achievement_global_percentages()` and `list_achievement_global_percentages_page(offset, limit)` return paged `SteamworksAchievementGlobalPercentage` snapshots. These commands also enumerate achievement names through the upstream safe wrapper, so treat them as startup/tooling reads rather than every-frame work.
+
 Leaderboard find and find-or-create commands are asynchronous. Successful results insert the upstream leaderboard handle into the plugin and return a `SteamworksLeaderboardId`; later info reads, score uploads, entry downloads, and forget commands use that stable ID. Global downloads use absolute rank ranges, user-relative downloads accept signed offsets around the current user, and friends downloads do not take a range. Ranged downloads are capped per command to keep frame work bounded.
 
 For read-only tools or examples, disable automatic storage:
@@ -955,6 +957,7 @@ $env:BEVY_STEAMWORKS_STAT_I32 = "your_stat_api_name"
 $env:BEVY_STEAMWORKS_ACHIEVEMENT = "your_achievement_api_name"
 $env:BEVY_STEAMWORKS_ACHIEVEMENT_ICON = "1"
 $env:BEVY_STEAMWORKS_ACHIEVEMENT_CATALOG = "1"
+$env:BEVY_STEAMWORKS_GLOBAL_ACHIEVEMENT_PERCENTAGES = "1"
 cargo run --example stats
 $env:BEVY_STEAMWORKS_LEADERBOARD = "your_leaderboard_api_name"
 $env:BEVY_STEAMWORKS_LEADERBOARD_CREATE = "1"

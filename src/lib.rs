@@ -67,10 +67,10 @@ pub use utils::*;
 /// Common imports for Bevy apps using this crate.
 pub mod prelude {
     pub use crate::{
-        steamworks, SteamworksAchievementIcon, SteamworksAchievementIconStatus,
-        SteamworksAchievementInfo, SteamworksAppsCommand, SteamworksAppsError,
-        SteamworksAppsOperation, SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState,
-        SteamworksAuthSessionError, SteamworksAvatar, SteamworksAvatarSize,
+        steamworks, SteamworksAchievementGlobalPercentage, SteamworksAchievementIcon,
+        SteamworksAchievementIconStatus, SteamworksAchievementInfo, SteamworksAppsCommand,
+        SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin, SteamworksAppsResult,
+        SteamworksAppsState, SteamworksAuthSessionError, SteamworksAvatar, SteamworksAvatarSize,
         SteamworksCallbackRegistry, SteamworksClient, SteamworksConnectionRequestPolicy,
         SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
         SteamworksFailurePolicy, SteamworksFriendGameInfo, SteamworksFriendInfo,

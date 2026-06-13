@@ -12,6 +12,7 @@ struct StatsExampleState {
     leaderboard: Option<SteamworksLeaderboardId>,
     requested_leaderboard_reads: bool,
     uploaded_score: bool,
+    listed_global_achievement_percentages: bool,
 }
 
 fn request_stats(
@@ -85,6 +86,15 @@ fn log_stats_results(
                 ..
             } => {
                 state.leaderboard = Some(*leaderboard);
+            }
+            SteamworksStatsOperation::GlobalAchievementPercentagesReceived { .. }
+                if !state.listed_global_achievement_percentages
+                    && std::env::var("BEVY_STEAMWORKS_GLOBAL_ACHIEVEMENT_PERCENTAGES")
+                        .as_deref()
+                        == Ok("1") =>
+            {
+                commands.write(SteamworksStatsCommand::list_achievement_global_percentages());
+                state.listed_global_achievement_percentages = true;
             }
             _ => {}
         }
