@@ -34,11 +34,13 @@ pub mod friends;
 pub mod matchmaking;
 pub mod user;
 pub mod user_stats;
+pub mod utils;
 pub use apps::*;
 pub use friends::*;
 pub use matchmaking::*;
 pub use user::*;
 pub use user_stats::*;
+pub use utils::*;
 
 /// Common imports for Bevy apps using this crate.
 pub mod prelude {
@@ -54,12 +56,15 @@ pub mod prelude {
         SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
-        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksOverlayToStoreAction,
-        SteamworksPlugin, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
-        SteamworksStatsState, SteamworksSystem, SteamworksUnavailable, SteamworksUserCommand,
-        SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation, SteamworksUserPlugin,
-        SteamworksUserResult, SteamworksUserState,
+        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNotificationPosition,
+        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksStatsCommand,
+        SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+        SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem,
+        SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
+        SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
+        SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
+        SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+        SteamworksUtilsState,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -587,6 +592,8 @@ pub enum SteamworksSystem {
     ProcessAppsCommands,
     /// Processes high-level Steam user identity and authentication commands.
     ProcessUserCommands,
+    /// Processes high-level Steam utility commands.
+    ProcessUtilsCommands,
 }
 
 fn run_steam_callbacks(

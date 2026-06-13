@@ -216,6 +216,48 @@ $env:BEVY_STEAMWORKS_WEBAPI_IDENTITY = "my-service"
 cargo run --example user
 ```
 
+## Utilities and Overlay Helpers
+
+`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, and overlay notification position.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_utils(mut utils: MessageWriter<SteamworksUtilsCommand>) {
+    utils.write(SteamworksUtilsCommand::GetCurrentInfo);
+    utils.write(SteamworksUtilsCommand::IsOverlayEnabled);
+    utils.write(SteamworksUtilsCommand::set_overlay_notification_position(
+        SteamworksNotificationPosition::BottomRight,
+    ));
+}
+
+fn read_utils(mut results: MessageReader<SteamworksUtilsResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksUtilsPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_utils)
+        .add_systems(Update, read_utils)
+        .run();
+}
+```
+
+Gamepad text input callbacks are still available through `SteamworksEvent::GamepadTextInputDismissed` and `SteamworksEvent::FloatingGamepadTextInputDismissed`. For now, use the raw `steamworks::Utils` methods through `SteamworksClient` for text input flows that must read submitted text inside Steam's callback timing. Be aware that the upstream text input helpers register their own typed callbacks, so avoid also registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`.
+
+Run the utils example with:
+
+```powershell
+cargo run --example utils
+$env:BEVY_STEAMWORKS_OVERLAY_BOTTOM_RIGHT = "1"
+cargo run --example utils
+```
+
 ## App, Ownership, and Launch Parameters
 
 `SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.
