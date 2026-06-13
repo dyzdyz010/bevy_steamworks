@@ -67,8 +67,9 @@ pub use utils::*;
 /// Common imports for Bevy apps using this crate.
 pub mod prelude {
     pub use crate::{
-        steamworks, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
-        SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState,
+        steamworks, SteamworksAchievementIcon, SteamworksAchievementIconStatus,
+        SteamworksAchievementInfo, SteamworksAppsCommand, SteamworksAppsError,
+        SteamworksAppsOperation, SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState,
         SteamworksAuthSessionError, SteamworksAvatar, SteamworksAvatarSize,
         SteamworksCallbackRegistry, SteamworksClient, SteamworksConnectionRequestPolicy,
         SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
@@ -147,7 +148,8 @@ pub mod prelude {
         SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
         SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
         SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
-        SteamworksUtilsState, STEAMWORKS_LEADERBOARD_MAX_DETAILS,
+        SteamworksUtilsState, STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+        STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND, STEAMWORKS_LEADERBOARD_MAX_DETAILS,
         STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
         STEAMWORKS_MATCHMAKING_SERVER_FILTER_MAX_BYTES,
         STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,

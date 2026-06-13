@@ -11,19 +11,26 @@ use std::{
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
+    system::SystemParam,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Maximum leaderboard detail integers accepted by one command.
 pub const STEAMWORKS_LEADERBOARD_MAX_DETAILS: usize = 64;
 
 /// Maximum leaderboard entries requested by one download command.
 pub const STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND: usize = 1000;
+
+/// Default achievement catalog items read by one command.
+pub const STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND: usize = 64;
+
+/// Maximum achievement catalog items accepted by one command.
+pub const STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND: usize = 256;
 
 /// Settings used by [`SteamworksStatsPlugin`].
 #[derive(Clone, Debug, Resource)]
@@ -55,6 +62,9 @@ pub struct SteamworksStatsState {
     current_user_stats_requested: bool,
     pending_store: bool,
     last_error: Option<SteamworksStatsError>,
+    last_achievements: Vec<SteamworksAchievementInfo>,
+    last_achievement_icon: Option<SteamworksAchievementIcon>,
+    achievement_icon_callback_count: u64,
     leaderboard_count: usize,
     last_leaderboard_info: Option<SteamworksLeaderboardInfo>,
     last_leaderboard_entries: Vec<SteamworksLeaderboardEntry>,
@@ -74,6 +84,21 @@ impl SteamworksStatsState {
     /// Returns the most recent command or asynchronous callback error observed by the stats plugin.
     pub fn last_error(&self) -> Option<&SteamworksStatsError> {
         self.last_error.as_ref()
+    }
+
+    /// Returns the most recent achievement catalog snapshot.
+    pub fn last_achievements(&self) -> &[SteamworksAchievementInfo] {
+        &self.last_achievements
+    }
+
+    /// Returns the most recent achievement icon snapshot read through this plugin.
+    pub fn last_achievement_icon(&self) -> Option<&SteamworksAchievementIcon> {
+        self.last_achievement_icon.as_ref()
+    }
+
+    /// Returns how many achievement icon fetched callbacks this plugin observed.
+    pub fn achievement_icon_callback_count(&self) -> u64 {
+        self.achievement_icon_callback_count
     }
 
     /// Returns the number of leaderboard handles currently owned by this plugin.
@@ -101,6 +126,30 @@ impl SteamworksStatsState {
 
     fn record_operation(&mut self, operation: &SteamworksStatsOperation) {
         match operation {
+            SteamworksStatsOperation::AchievementNamesListed { names, .. } => {
+                self.last_achievements = names
+                    .iter()
+                    .map(|api_name| SteamworksAchievementInfo {
+                        api_name: api_name.clone(),
+                        ..Default::default()
+                    })
+                    .collect();
+            }
+            SteamworksStatsOperation::AchievementsListed { achievements, .. } => {
+                self.last_achievements.clone_from(achievements);
+            }
+            SteamworksStatsOperation::AchievementIconRead { icon, .. } => {
+                if let Some(icon) = icon.as_icon() {
+                    self.last_achievement_icon = Some(icon.clone());
+                }
+            }
+            SteamworksStatsOperation::AchievementIconFetched { icon, .. } => {
+                if let Some(icon) = icon.as_icon() {
+                    self.last_achievement_icon = Some(icon.clone());
+                }
+                self.achievement_icon_callback_count =
+                    self.achievement_icon_callback_count.saturating_add(1);
+            }
             SteamworksStatsOperation::LeaderboardInfoRead { info } => {
                 self.last_leaderboard_info = Some(info.clone());
             }
@@ -108,6 +157,64 @@ impl SteamworksStatsState {
                 self.last_leaderboard_entries.clone_from(entries);
             }
             _ => {}
+        }
+    }
+}
+
+/// Owned snapshot of one Steam achievement.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SteamworksAchievementInfo {
+    /// Steam achievement API name.
+    pub api_name: String,
+    /// Localized display name, if requested and available.
+    pub display_name: Option<String>,
+    /// Localized description, if requested and available.
+    pub description: Option<String>,
+    /// Whether the achievement is hidden, if requested and available.
+    pub hidden: Option<bool>,
+    /// Whether the current user has achieved it, if requested and available.
+    pub achieved: Option<bool>,
+    /// Unix epoch seconds when the current user unlocked it, if requested and available.
+    pub unlock_time: Option<u32>,
+}
+
+/// RGBA icon snapshot for one Steam achievement.
+///
+/// The upstream `steamworks` wrapper exposes achievement icons as 64x64 RGBA
+/// bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksAchievementIcon {
+    /// Steam achievement API name.
+    pub api_name: String,
+    /// Icon width in pixels.
+    pub width: u32,
+    /// Icon height in pixels.
+    pub height: u32,
+    /// RGBA bytes, four bytes per pixel.
+    pub rgba: Vec<u8>,
+}
+
+/// Result of reading a Steam achievement icon through the upstream safe wrapper.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SteamworksAchievementIconStatus {
+    /// The icon RGBA bytes were available.
+    Available(SteamworksAchievementIcon),
+    /// The icon bytes are not currently available.
+    ///
+    /// The upstream safe wrapper exposes this as a single `None`, which can mean
+    /// Steam is still fetching the icon, the icon is missing, the image is not
+    /// the 64x64 size returned by `get_achievement_icon`, or Steam image reads
+    /// failed. A later [`crate::SteamworksEvent::UserAchievementIconFetched`]
+    /// may make the icon available.
+    PendingOrUnavailable,
+}
+
+impl SteamworksAchievementIconStatus {
+    /// Returns the available icon snapshot, if one was returned.
+    pub fn as_icon(&self) -> Option<&SteamworksAchievementIcon> {
+        match self {
+            Self::Available(icon) => Some(icon),
+            Self::PendingOrUnavailable => None,
         }
     }
 }
@@ -429,6 +536,33 @@ pub enum SteamworksStatsCommand {
         /// Steamworks achievement API name.
         name: String,
     },
+    /// List achievement API names for the current app.
+    ///
+    /// The upstream safe wrapper enumerates the catalog names internally. Keep
+    /// this as a startup or tooling command, and use pages instead of doing
+    /// repeated full catalog work every frame.
+    ListAchievementNames {
+        /// Zero-based achievement index to start from.
+        offset: usize,
+        /// Maximum names returned by this command.
+        limit: usize,
+    },
+    /// List achievement snapshots for the current app.
+    ListAchievements {
+        /// Include localized display name, description, and hidden flag.
+        include_display_attributes: bool,
+        /// Include current-user unlock state and unlock time.
+        include_unlock_state: bool,
+        /// Zero-based achievement index to start from.
+        offset: usize,
+        /// Maximum achievement snapshots returned by this command.
+        limit: usize,
+    },
+    /// Read a 64x64 RGBA icon for an achievement.
+    GetAchievementIcon {
+        /// Steamworks achievement API name.
+        name: String,
+    },
     /// Unlock an achievement for the current user.
     UnlockAchievement {
         /// Steamworks achievement API name.
@@ -577,6 +711,46 @@ impl SteamworksStatsCommand {
     /// Creates a [`SteamworksStatsCommand::GetAchievement`] command.
     pub fn get_achievement(name: impl Into<String>) -> Self {
         Self::GetAchievement { name: name.into() }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::ListAchievementNames`] command.
+    pub fn list_achievement_names() -> Self {
+        Self::list_achievement_names_page(0, STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND)
+    }
+
+    /// Creates a paged [`SteamworksStatsCommand::ListAchievementNames`] command.
+    pub fn list_achievement_names_page(offset: usize, limit: usize) -> Self {
+        Self::ListAchievementNames { offset, limit }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::ListAchievements`] command.
+    pub fn list_achievements(include_display_attributes: bool, include_unlock_state: bool) -> Self {
+        Self::list_achievements_page(
+            include_display_attributes,
+            include_unlock_state,
+            0,
+            STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+        )
+    }
+
+    /// Creates a paged [`SteamworksStatsCommand::ListAchievements`] command.
+    pub fn list_achievements_page(
+        include_display_attributes: bool,
+        include_unlock_state: bool,
+        offset: usize,
+        limit: usize,
+    ) -> Self {
+        Self::ListAchievements {
+            include_display_attributes,
+            include_unlock_state,
+            offset,
+            limit,
+        }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::GetAchievementIcon`] command.
+    pub fn get_achievement_icon(name: impl Into<String>) -> Self {
+        Self::GetAchievementIcon { name: name.into() }
     }
 
     /// Creates a [`SteamworksStatsCommand::UnlockAchievement`] command.
@@ -793,6 +967,42 @@ pub enum SteamworksStatsOperation {
         name: String,
         /// Whether the achievement is unlocked.
         achieved: bool,
+    },
+    /// Achievement API names were listed.
+    AchievementNamesListed {
+        /// Zero-based achievement index the page starts from.
+        offset: usize,
+        /// Total achievements reported by Steam for the current app.
+        total: usize,
+        /// Steamworks achievement API names.
+        names: Vec<String>,
+    },
+    /// Achievement snapshots were listed.
+    AchievementsListed {
+        /// Zero-based achievement index the page starts from.
+        offset: usize,
+        /// Total achievements reported by Steam for the current app.
+        total: usize,
+        /// Achievement snapshots.
+        achievements: Vec<SteamworksAchievementInfo>,
+    },
+    /// Achievement icon was read.
+    AchievementIconRead {
+        /// Steamworks achievement API name.
+        name: String,
+        /// Icon read status.
+        icon: SteamworksAchievementIconStatus,
+    },
+    /// Achievement icon fetched callback was converted into a stats result.
+    AchievementIconFetched {
+        /// Steamworks achievement API name.
+        name: String,
+        /// Whether Steam reported the achievement as achieved in the callback.
+        achieved: bool,
+        /// Raw icon handle reported by Steam in the callback.
+        icon_handle: i32,
+        /// Icon read status.
+        icon: SteamworksAchievementIconStatus,
     },
     /// Achievement unlock state and unlock time were read.
     AchievementAndUnlockTimeRead {
@@ -1024,6 +1234,14 @@ pub enum SteamworksStatsError {
         /// Maximum accepted entry count.
         max_supported: usize,
     },
+    /// Achievement catalog page limit exceeds the per-command cap.
+    #[error("Steamworks achievement catalog page limit {requested} exceeds max {max_supported}")]
+    TooManyAchievementEntries {
+        /// Requested achievement count.
+        requested: usize,
+        /// Maximum accepted achievement count.
+        max_supported: usize,
+    },
 }
 
 impl SteamworksStatsError {
@@ -1080,6 +1298,7 @@ impl Plugin for SteamworksStatsPlugin {
             .init_resource::<SteamworksStatsState>()
             .init_resource::<SteamworksStatsAsyncResults>()
             .init_resource::<SteamworksStatsLeaderboardHandles>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksStatsCommand>()
             .add_message::<SteamworksStatsResult>()
             .configure_sets(
@@ -1095,24 +1314,30 @@ impl Plugin for SteamworksStatsPlugin {
     }
 }
 
+#[derive(SystemParam)]
+struct SteamworksStatsIo<'w, 's> {
+    settings: Res<'w, SteamworksStatsSettings>,
+    async_results: Res<'w, SteamworksStatsAsyncResults>,
+    leaderboards: Res<'w, SteamworksStatsLeaderboardHandles>,
+    steam_events: MessageReader<'w, 's, SteamworksEvent>,
+    commands: ResMut<'w, Messages<SteamworksStatsCommand>>,
+}
+
 fn process_stats_commands(
     client: Option<Res<SteamworksClient>>,
-    settings: Res<SteamworksStatsSettings>,
     mut state: ResMut<SteamworksStatsState>,
-    async_results: Res<SteamworksStatsAsyncResults>,
-    leaderboards: Res<SteamworksStatsLeaderboardHandles>,
-    mut commands: ResMut<Messages<SteamworksStatsCommand>>,
+    mut io: SteamworksStatsIo,
     mut results: MessageWriter<SteamworksStatsResult>,
 ) {
-    for result in async_results.drain() {
+    for result in io.async_results.drain() {
         match &result {
             SteamworksStatsResult::Ok(operation) => {
                 state.record_operation(operation);
-                state.sync_leaderboard_count(&leaderboards);
+                state.sync_leaderboard_count(&io.leaderboards);
             }
             SteamworksStatsResult::Err { error, .. } => {
                 state.record_error(error.clone());
-                state.sync_leaderboard_count(&leaderboards);
+                state.sync_leaderboard_count(&io.leaderboards);
             }
         }
         results.write(result);
@@ -1121,7 +1346,8 @@ fn process_stats_commands(
     let Some(client) = client else {
         let error = SteamworksStatsError::ClientUnavailable;
         state.record_error(error.clone());
-        for command in commands.drain() {
+        for _ in io.steam_events.read() {}
+        for command in io.commands.drain() {
             results.write(SteamworksStatsResult::Err {
                 command,
                 error: error.clone(),
@@ -1130,23 +1356,25 @@ fn process_stats_commands(
         return;
     };
 
-    if settings.request_current_user_stats_on_startup && !state.current_user_stats_requested {
+    process_stats_steam_events(&client, &mut state, &mut io.steam_events, &mut results);
+
+    if io.settings.request_current_user_stats_on_startup && !state.current_user_stats_requested {
         request_current_user_stats(&client, &mut state, &mut results);
     }
 
-    for command in commands.drain() {
+    for command in io.commands.drain() {
         handle_stats_command(
             &client,
             command,
-            &settings,
-            &async_results,
-            &leaderboards,
+            &io.settings,
+            &io.async_results,
+            &io.leaderboards,
             &mut state,
             &mut results,
         );
     }
 
-    if settings.auto_store && state.pending_store {
+    if io.settings.auto_store && state.pending_store {
         match client.user_stats().store_stats() {
             Ok(()) => {
                 state.pending_store = false;
@@ -1186,6 +1414,31 @@ fn request_current_user_stats(
         steam_id = steam_id.raw(),
         "requested Steamworks stats for current user"
     );
+}
+
+fn process_stats_steam_events(
+    client: &SteamworksClient,
+    state: &mut SteamworksStatsState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksStatsResult>,
+) {
+    for event in steam_events.read() {
+        let SteamworksEvent::UserAchievementIconFetched(event) = event else {
+            continue;
+        };
+
+        let operation = achievement_icon_fetched_operation(
+            event,
+            read_achievement_icon(&client.user_stats(), &event.achievement_name),
+        );
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks achievement icon fetched callback"
+        );
+        results.write(SteamworksStatsResult::Ok(operation));
+    }
 }
 
 fn handle_stats_command(
@@ -1234,6 +1487,40 @@ fn handle_stats_command(
             .get()
             .map(|achieved| SteamworksStatsOperation::AchievementRead { name, achieved })
             .map_err(|()| SteamworksStatsError::operation_failed("achievement.get")),
+        SteamworksStatsCommand::ListAchievementNames { offset, limit } => {
+            list_achievement_names(&client.user_stats(), offset, limit).map(|(total, names)| {
+                SteamworksStatsOperation::AchievementNamesListed {
+                    offset,
+                    total,
+                    names,
+                }
+            })
+        }
+        SteamworksStatsCommand::ListAchievements {
+            include_display_attributes,
+            include_unlock_state,
+            offset,
+            limit,
+        } => list_achievement_infos(
+            &client.user_stats(),
+            include_display_attributes,
+            include_unlock_state,
+            offset,
+            limit,
+        )
+        .map(
+            |(total, achievements)| SteamworksStatsOperation::AchievementsListed {
+                offset,
+                total,
+                achievements,
+            },
+        ),
+        SteamworksStatsCommand::GetAchievementIcon { name } => {
+            Ok(SteamworksStatsOperation::AchievementIconRead {
+                icon: read_achievement_icon(&client.user_stats(), &name),
+                name,
+            })
+        }
         SteamworksStatsCommand::UnlockAchievement { name } => client
             .user_stats()
             .achievement(&name)
@@ -1597,6 +1884,125 @@ fn operation_requires_store(operation: &SteamworksStatsOperation) -> bool {
     )
 }
 
+fn list_achievement_names(
+    stats: &steamworks::UserStats,
+    offset: usize,
+    limit: usize,
+) -> Result<(usize, Vec<String>), SteamworksStatsError> {
+    let names = read_all_achievement_names(stats)?;
+    let total = names.len();
+    let page = names.into_iter().skip(offset).take(limit).collect();
+
+    Ok((total, page))
+}
+
+fn read_all_achievement_names(
+    stats: &steamworks::UserStats,
+) -> Result<Vec<String>, SteamworksStatsError> {
+    stats
+        .get_num_achievements()
+        .map_err(|()| SteamworksStatsError::operation_failed("user_stats.get_num_achievements"))?;
+
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        stats.get_achievement_names()
+    }))
+    .map_err(|_| SteamworksStatsError::operation_failed("user_stats.get_achievement_names"))?
+    .ok_or_else(|| SteamworksStatsError::operation_failed("user_stats.get_achievement_names"))
+}
+
+fn list_achievement_infos(
+    stats: &steamworks::UserStats,
+    include_display_attributes: bool,
+    include_unlock_state: bool,
+    offset: usize,
+    limit: usize,
+) -> Result<(usize, Vec<SteamworksAchievementInfo>), SteamworksStatsError> {
+    let (total, names) = list_achievement_names(stats, offset, limit)?;
+    let achievements = names
+        .into_iter()
+        .map(|api_name| {
+            let mut info = SteamworksAchievementInfo {
+                api_name,
+                ..Default::default()
+            };
+
+            if include_display_attributes {
+                info.display_name = achievement_display_attribute(stats, &info.api_name, "name")?;
+                info.description = achievement_display_attribute(stats, &info.api_name, "desc")?;
+                info.hidden = achievement_display_attribute(stats, &info.api_name, "hidden")?
+                    .map(|value| value != "0");
+            }
+            if include_unlock_state {
+                let (achieved, unlock_time) = stats
+                    .achievement(&info.api_name)
+                    .get_achievement_and_unlock_time()
+                    .map_err(|()| {
+                        SteamworksStatsError::operation_failed(
+                            "achievement.get_achievement_and_unlock_time",
+                        )
+                    })?;
+                info.achieved = Some(achieved);
+                info.unlock_time = Some(unlock_time);
+            }
+
+            Ok(info)
+        })
+        .collect::<Result<Vec<_>, SteamworksStatsError>>()?;
+
+    Ok((total, achievements))
+}
+
+fn achievement_display_attribute(
+    stats: &steamworks::UserStats,
+    achievement: &str,
+    key: &str,
+) -> Result<Option<String>, SteamworksStatsError> {
+    stats
+        .achievement(achievement)
+        .get_achievement_display_attribute(key)
+        .map(|value| (!value.is_empty()).then(|| value.to_owned()))
+        .map_err(|()| {
+            SteamworksStatsError::operation_failed("achievement.get_achievement_display_attribute")
+        })
+}
+
+fn read_achievement_icon(
+    stats: &steamworks::UserStats,
+    achievement: &str,
+) -> SteamworksAchievementIconStatus {
+    stats
+        .achievement(achievement)
+        .get_achievement_icon()
+        .map(|rgba| {
+            SteamworksAchievementIconStatus::Available(achievement_icon_from_rgba(
+                achievement,
+                rgba,
+            ))
+        })
+        .unwrap_or(SteamworksAchievementIconStatus::PendingOrUnavailable)
+}
+
+fn achievement_icon_from_rgba(achievement: &str, rgba: Vec<u8>) -> SteamworksAchievementIcon {
+    SteamworksAchievementIcon {
+        api_name: achievement.to_owned(),
+        width: 64,
+        height: 64,
+        rgba,
+    }
+}
+
+fn achievement_icon_fetched_operation(
+    event: &steamworks::UserAchievementIconFetched,
+    icon: SteamworksAchievementIconStatus,
+) -> SteamworksStatsOperation {
+    SteamworksStatsOperation::AchievementIconFetched {
+        name: event.achievement_name.clone(),
+        achieved: event.achieved,
+        icon_handle: event.icon_handle,
+        icon,
+    }
+}
+
 fn snapshot_leaderboard_info(
     stats: &steamworks::UserStats,
     leaderboard: SteamworksLeaderboardId,
@@ -1642,6 +2048,7 @@ fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), Steamw
         | SteamworksStatsCommand::GetStatF32 { name }
         | SteamworksStatsCommand::SetStatF32 { name, .. }
         | SteamworksStatsCommand::GetAchievement { name }
+        | SteamworksStatsCommand::GetAchievementIcon { name }
         | SteamworksStatsCommand::UnlockAchievement { name }
         | SteamworksStatsCommand::ClearAchievement { name }
         | SteamworksStatsCommand::GetAchievementAndUnlockTime { name }
@@ -1657,6 +2064,10 @@ fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), Steamw
         SteamworksStatsCommand::GetAchievementDisplayAttribute { name, key } => {
             validate_no_nul("name", name)?;
             validate_no_nul("key", key)
+        }
+        SteamworksStatsCommand::ListAchievementNames { limit, .. }
+        | SteamworksStatsCommand::ListAchievements { limit, .. } => {
+            validate_achievement_page_limit(*limit)
         }
         SteamworksStatsCommand::UploadLeaderboardScore { details, .. } => {
             validate_leaderboard_details_len(details.len())
@@ -1676,6 +2087,17 @@ fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), Steamw
 fn validate_no_nul(field: &'static str, value: &str) -> Result<(), SteamworksStatsError> {
     if value.as_bytes().contains(&0) {
         Err(SteamworksStatsError::invalid_string(field))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_achievement_page_limit(limit: usize) -> Result<(), SteamworksStatsError> {
+    if limit > STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND {
+        Err(SteamworksStatsError::TooManyAchievementEntries {
+            requested: limit,
+            max_supported: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
+        })
     } else {
         Ok(())
     }
@@ -1755,6 +2177,7 @@ mod tests {
         assert!(app
             .world()
             .contains_resource::<SteamworksStatsLeaderboardHandles>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksStatsCommand>>());
@@ -1816,6 +2239,48 @@ mod tests {
         assert!(!operation_requires_store(
             &SteamworksStatsOperation::StatsStoreSubmitted
         ));
+    }
+
+    #[test]
+    fn achievement_commands_preserve_inputs() {
+        assert_eq!(
+            SteamworksStatsCommand::list_achievement_names(),
+            SteamworksStatsCommand::ListAchievementNames {
+                offset: 0,
+                limit: STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::list_achievement_names_page(8, 4),
+            SteamworksStatsCommand::ListAchievementNames {
+                offset: 8,
+                limit: 4,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::list_achievements(true, false),
+            SteamworksStatsCommand::ListAchievements {
+                include_display_attributes: true,
+                include_unlock_state: false,
+                offset: 0,
+                limit: STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::list_achievements_page(false, true, 4, 12),
+            SteamworksStatsCommand::ListAchievements {
+                include_display_attributes: false,
+                include_unlock_state: true,
+                offset: 4,
+                limit: 12,
+            }
+        );
+        assert_eq!(
+            SteamworksStatsCommand::get_achievement_icon("ACH_WIN"),
+            SteamworksStatsCommand::GetAchievementIcon {
+                name: "ACH_WIN".to_owned(),
+            }
+        );
     }
 
     #[test]
@@ -1898,6 +2363,22 @@ mod tests {
         assert_eq!(
             validate_stats_command(&SteamworksStatsCommand::find_leaderboard("bad\0name")),
             Err(SteamworksStatsError::InvalidString { field: "name" })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::get_achievement_icon("bad\0name",)),
+            Err(SteamworksStatsError::InvalidString { field: "name" })
+        );
+        assert_eq!(
+            validate_stats_command(&SteamworksStatsCommand::list_achievements_page(
+                false,
+                false,
+                0,
+                STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
+            )),
+            Err(SteamworksStatsError::TooManyAchievementEntries {
+                requested: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND + 1,
+                max_supported: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
+            })
         );
         assert_eq!(
             validate_stats_command(&SteamworksStatsCommand::get_achievement_display_attribute(
@@ -1991,5 +2472,85 @@ mod tests {
 
         assert_eq!(state.last_leaderboard_info(), Some(&info));
         assert_eq!(state.last_leaderboard_entries(), &[entry]);
+    }
+
+    #[test]
+    fn achievement_state_records_catalog_and_icons() {
+        let mut state = SteamworksStatsState::default();
+        let achievement = SteamworksAchievementInfo {
+            api_name: "ACH_WIN".to_owned(),
+            display_name: Some("Winner".to_owned()),
+            description: Some("Win once".to_owned()),
+            hidden: Some(false),
+            achieved: Some(true),
+            unlock_time: Some(12),
+        };
+        let icon = SteamworksAchievementIcon {
+            api_name: "ACH_WIN".to_owned(),
+            width: 64,
+            height: 64,
+            rgba: vec![255; 64 * 64 * 4],
+        };
+
+        state.record_operation(&SteamworksStatsOperation::AchievementNamesListed {
+            offset: 0,
+            total: 1,
+            names: vec!["ACH_ONE".to_owned()],
+        });
+        assert_eq!(
+            state.last_achievements(),
+            &[SteamworksAchievementInfo {
+                api_name: "ACH_ONE".to_owned(),
+                ..Default::default()
+            }]
+        );
+
+        state.record_operation(&SteamworksStatsOperation::AchievementsListed {
+            offset: 0,
+            total: 1,
+            achievements: vec![achievement.clone()],
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementIconRead {
+            name: "ACH_WIN".to_owned(),
+            icon: SteamworksAchievementIconStatus::Available(icon.clone()),
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementIconFetched {
+            name: "ACH_WIN".to_owned(),
+            achieved: true,
+            icon_handle: 99,
+            icon: SteamworksAchievementIconStatus::PendingOrUnavailable,
+        });
+
+        assert_eq!(state.last_achievements(), &[achievement]);
+        assert_eq!(state.last_achievement_icon(), Some(&icon));
+        assert_eq!(state.achievement_icon_callback_count(), 1);
+    }
+
+    #[test]
+    fn achievement_icon_callback_operation_preserves_context() {
+        let icon = SteamworksAchievementIconStatus::Available(achievement_icon_from_rgba(
+            "ACH_WIN",
+            vec![255; 64 * 64 * 4],
+        ));
+        let event = steamworks::UserAchievementIconFetched {
+            game_id: steamworks::GameId::from_raw(480),
+            achievement_name: "ACH_WIN".to_owned(),
+            achieved: true,
+            icon_handle: 42,
+        };
+
+        assert_eq!(
+            achievement_icon_fetched_operation(&event, icon.clone()),
+            SteamworksStatsOperation::AchievementIconFetched {
+                name: "ACH_WIN".to_owned(),
+                achieved: true,
+                icon_handle: 42,
+                icon,
+            }
+        );
+        assert_eq!(
+            SteamworksAchievementIconStatus::PendingOrUnavailable.as_icon(),
+            None
+        );
     }
 }

@@ -31,12 +31,23 @@ fn request_stats(
     commands.write(SteamworksStatsCommand::RequestCurrentUserStats);
     commands.write(SteamworksStatsCommand::RequestGlobalAchievementPercentages);
 
+    if std::env::var("BEVY_STEAMWORKS_ACHIEVEMENT_CATALOG").as_deref() == Ok("1") {
+        commands.write(SteamworksStatsCommand::list_achievements(true, true));
+    }
+
     if let Ok(stat_name) = std::env::var("BEVY_STEAMWORKS_STAT_I32") {
         commands.write(SteamworksStatsCommand::get_stat_i32(stat_name));
     }
 
     if let Ok(achievement_name) = std::env::var("BEVY_STEAMWORKS_ACHIEVEMENT") {
-        commands.write(SteamworksStatsCommand::get_achievement(achievement_name));
+        commands.write(SteamworksStatsCommand::get_achievement(
+            achievement_name.clone(),
+        ));
+        if std::env::var("BEVY_STEAMWORKS_ACHIEVEMENT_ICON").as_deref() == Ok("1") {
+            commands.write(SteamworksStatsCommand::get_achievement_icon(
+                achievement_name,
+            ));
+        }
     }
 
     if let Ok(leaderboard_name) = std::env::var("BEVY_STEAMWORKS_LEADERBOARD") {
@@ -117,11 +128,18 @@ fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: Message
     }
 }
 
+fn example_app_id() -> u32 {
+    std::env::var("BEVY_STEAMWORKS_APP_ID")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(480)
+}
+
 fn main() {
     App::new()
         .insert_resource(FramesRemaining(120))
         .init_resource::<StatsExampleState>()
-        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksPlugin::app_id(example_app_id()).log_and_continue())
         .add_plugins(
             SteamworksStatsPlugin::new()
                 .request_current_user_stats_on_startup(false)
