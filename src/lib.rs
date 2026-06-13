@@ -38,6 +38,7 @@ pub mod remote_play;
 pub mod remote_storage;
 pub mod screenshots;
 pub mod timeline;
+pub mod ugc;
 pub mod user;
 pub mod user_stats;
 pub mod utils;
@@ -50,6 +51,7 @@ pub use remote_play::*;
 pub use remote_storage::*;
 pub use screenshots::*;
 pub use timeline::*;
+pub use ugc::*;
 pub use user::*;
 pub use user_stats::*;
 pub use utils::*;
@@ -102,11 +104,17 @@ pub mod prelude {
         SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
         SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
         SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
-        SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
-        SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
-        SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
-        SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
-        SteamworksUtilsState, STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
+        SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcItemDetails,
+        SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+        SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult,
+        SteamworksUgcItemStateInfo, SteamworksUgcOperation, SteamworksUgcPlugin,
+        SteamworksUgcQuery, SteamworksUgcQueryOptions, SteamworksUgcQueryResults,
+        SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic, SteamworksUnavailable,
+        SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation,
+        SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
+        SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+        SteamworksUtilsResult, SteamworksUtilsState, STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
+        STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -648,6 +656,8 @@ pub enum SteamworksSystem {
     ProcessInputCommands,
     /// Processes high-level Steam Networking Messages commands.
     ProcessNetworkingMessagesCommands,
+    /// Processes high-level Steam Workshop / UGC commands.
+    ProcessUgcCommands,
 }
 
 fn run_steam_callbacks(

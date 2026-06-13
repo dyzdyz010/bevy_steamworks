@@ -453,6 +453,68 @@ $env:BEVY_STEAMWORKS_REMOTE_STORAGE_SHARE = "1"
 cargo run --example remote_storage
 ```
 
+## Workshop / UGC
+
+`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, and start/stop playtime tracking.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_ugc(mut ugc: MessageWriter<SteamworksUgcCommand>) {
+    ugc.write(SteamworksUgcCommand::list_subscribed_items(false));
+    ugc.write(SteamworksUgcCommand::query(
+        SteamworksUgcQuery::item(PublishedFileId(123456)).with_options(
+            SteamworksUgcQueryOptions::new()
+                .with_metadata(true)
+                .with_key_value_tags(true)
+                .with_statistic(UGCStatisticType::Subscriptions),
+        ),
+    ));
+}
+
+fn read_ugc(mut results: MessageReader<SteamworksUgcResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn read_ugc_callbacks(mut events: MessageReader<SteamworksEvent>) {
+    for event in events.read() {
+        if let SteamworksEvent::DownloadItemResult(event) = event {
+            info!("Workshop download finished: {event:?}");
+        }
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksUgcPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_ugc)
+        .add_systems(Update, (read_ugc, read_ugc_callbacks))
+        .run();
+}
+```
+
+All async UGC commands emit an immediate `*Requested` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Query results are copied into owned `SteamworksUgcQueryResults` snapshots, so callers do not need to hold upstream query handles or lifetimes.
+
+String query options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. `DownloadItem` only confirms that Steam accepted the download request; final completion still arrives through `SteamworksEvent::DownloadItemResult`.
+
+The current UGC layer covers the runtime Workshop workflows most games need. Full item update submission with content and preview paths will be added as a separate command layer extension because it has a longer multi-step handle lifecycle.
+
+Run the UGC example with:
+
+```powershell
+cargo run --example ugc
+$env:BEVY_STEAMWORKS_UGC_ITEM = "123456"
+cargo run --example ugc
+$env:BEVY_STEAMWORKS_UGC_SEARCH = "levels"
+cargo run --example ugc
+$env:BEVY_STEAMWORKS_UGC_DOWNLOAD = "1"
+cargo run --example ugc
+```
+
 ## Remote Play
 
 `SteamworksRemotePlayPlugin` adds command/result messages for Steam Remote Play sessions and Remote Play Together invites.
