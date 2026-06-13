@@ -34,6 +34,7 @@ pub mod friends;
 pub mod input;
 pub mod matchmaking;
 pub mod networking_messages;
+pub mod networking_utils;
 pub mod remote_play;
 pub mod remote_storage;
 pub mod screenshots;
@@ -47,6 +48,7 @@ pub use friends::*;
 pub use input::*;
 pub use matchmaking::*;
 pub use networking_messages::*;
+pub use networking_utils::*;
 pub use remote_play::*;
 pub use remote_storage::*;
 pub use screenshots::*;
@@ -86,22 +88,25 @@ pub mod prelude {
         SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesRealtimeInfo,
         SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesSessionRequestInfo,
         SteamworksNetworkingMessagesState, SteamworksNetworkingPeer,
+        SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+        SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+        SteamworksNetworkingUtilsResult, SteamworksNetworkingUtilsState,
         SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksPlugin,
-        SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-        SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
-        SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
-        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageCommand,
-        SteamworksRemoteStorageError, SteamworksRemoteStorageFileInfo,
-        SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageFileSummary,
-        SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
-        SteamworksRemoteStorageResult, SteamworksRemoteStorageSharedFile,
-        SteamworksRemoteStorageState, SteamworksScreenshotLibraryError,
-        SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-        SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksScreenshotsState,
-        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
-        SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
-        SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
+        SteamworksRelayNetworkStatus, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+        SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+        SteamworksRemotePlaySessionInfo, SteamworksRemotePlaySessionSnapshot,
+        SteamworksRemotePlayState, SteamworksRemoteStorageCloudInfo,
+        SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+        SteamworksRemoteStorageFileInfo, SteamworksRemoteStorageFileShareHandle,
+        SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageOperation,
+        SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+        SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState,
+        SteamworksScreenshotLibraryError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
+        SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
+        SteamworksScreenshotsState, SteamworksStatsCommand, SteamworksStatsError,
+        SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
+        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand,
+        SteamworksTimelineError, SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
         SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
         SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
         SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcItemDetails,
@@ -656,6 +661,8 @@ pub enum SteamworksSystem {
     ProcessInputCommands,
     /// Processes high-level Steam Networking Messages commands.
     ProcessNetworkingMessagesCommands,
+    /// Processes high-level Steam Networking Utils commands.
+    ProcessNetworkingUtilsCommands,
     /// Processes high-level Steam Workshop / UGC commands.
     ProcessUgcCommands,
 }

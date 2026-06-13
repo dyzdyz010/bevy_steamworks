@@ -354,6 +354,47 @@ $env:BEVY_STEAMWORKS_NETWORKING_MESSAGE = "hello"
 cargo run --example networking_messages
 ```
 
+## Networking Utils and Relay Status
+
+`SteamworksNetworkingUtilsPlugin` adds command/result messages for Steam Datagram Relay diagnostics: initialize relay network access early, read summary relay availability, read detailed relay status, and receive relay status callbacks as Bevy messages.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_relay_status(mut utils: MessageWriter<SteamworksNetworkingUtilsCommand>) {
+    utils.write(SteamworksNetworkingUtilsCommand::init_relay_network_access());
+    utils.write(SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus);
+}
+
+fn read_relay_status(mut results: MessageReader<SteamworksNetworkingUtilsResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksNetworkingUtilsPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_relay_status)
+        .add_systems(Update, read_relay_status)
+        .run();
+}
+```
+
+Relay status callbacks arrive through the main `SteamworksEvent::RelayNetworkStatusCallback` stream. This plugin observes those events after `SteamworksSystem::RunCallbacks`, reads the current detailed relay status, and emits an owned `SteamworksNetworkingUtilsResult::Ok` snapshot. Detailed status is copied into `SteamworksRelayNetworkStatus`, including Steam's diagnostic debug string, so the snapshot can be stored in ECS state safely.
+
+This layer intentionally leaves `NetworkingUtils::allocate_message` to the future `networking_sockets` command layer, because allocated message handles are part of low-level socket send workflows rather than relay diagnostics.
+
+Run the Networking Utils example with:
+
+```powershell
+cargo run --example networking_utils
+$env:BEVY_STEAMWORKS_RELAY_INIT = "0"
+cargo run --example networking_utils
+```
+
 ## Screenshots
 
 `SteamworksScreenshotsPlugin` adds command/result messages for Steam screenshot workflows: hook screenshot hotkeys, read hook state, trigger a screenshot, and add an existing image file to the user's Steam screenshot library.
