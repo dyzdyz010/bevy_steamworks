@@ -33,6 +33,7 @@ pub mod apps;
 pub mod friends;
 pub mod input;
 pub mod matchmaking;
+pub mod networking;
 pub mod networking_messages;
 pub mod networking_utils;
 pub mod remote_play;
@@ -47,6 +48,7 @@ pub use apps::*;
 pub use friends::*;
 pub use input::*;
 pub use matchmaking::*;
+pub use networking::*;
 pub use networking_messages::*;
 pub use networking_utils::*;
 pub use remote_play::*;
@@ -82,31 +84,35 @@ pub mod prelude {
         SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
         SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
         SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
-        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNetworkingMessage,
+        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksNetworkingCommand,
+        SteamworksNetworkingError, SteamworksNetworkingMessage,
         SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesConnectionInfo,
         SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
         SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesRealtimeInfo,
         SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesSessionRequestInfo,
-        SteamworksNetworkingMessagesState, SteamworksNetworkingPeer,
+        SteamworksNetworkingMessagesState, SteamworksNetworkingOperation, SteamworksNetworkingPeer,
+        SteamworksNetworkingPlugin, SteamworksNetworkingResult, SteamworksNetworkingState,
         SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
         SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
         SteamworksNetworkingUtilsResult, SteamworksNetworkingUtilsState,
-        SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksPlugin,
-        SteamworksRelayNetworkStatus, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
-        SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
-        SteamworksRemotePlaySessionInfo, SteamworksRemotePlaySessionSnapshot,
-        SteamworksRemotePlayState, SteamworksRemoteStorageCloudInfo,
-        SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
-        SteamworksRemoteStorageFileInfo, SteamworksRemoteStorageFileShareHandle,
-        SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageOperation,
-        SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-        SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState,
-        SteamworksScreenshotLibraryError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
-        SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
-        SteamworksScreenshotsState, SteamworksStatsCommand, SteamworksStatsError,
-        SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
-        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand,
-        SteamworksTimelineError, SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
+        SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksP2pPacket,
+        SteamworksP2pPacketAvailability, SteamworksP2pSendType, SteamworksP2pSessionState,
+        SteamworksP2pSessionStateResult, SteamworksPlugin, SteamworksRelayNetworkStatus,
+        SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
+        SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
+        SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
+        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageCommand,
+        SteamworksRemoteStorageError, SteamworksRemoteStorageFileInfo,
+        SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageFileSummary,
+        SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
+        SteamworksRemoteStorageResult, SteamworksRemoteStorageSharedFile,
+        SteamworksRemoteStorageState, SteamworksScreenshotLibraryError,
+        SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+        SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksScreenshotsState,
+        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
+        SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+        SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
         SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
         SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
         SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcItemDetails,
@@ -119,7 +125,8 @@ pub mod prelude {
         SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
         SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
         SteamworksUtilsResult, SteamworksUtilsState, STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
-        STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
+        STEAMWORKS_P2P_MAX_READ_PACKET_BYTES, STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES,
+        STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES, STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -659,6 +666,8 @@ pub enum SteamworksSystem {
     ProcessTimelineCommands,
     /// Processes high-level Steam Input commands.
     ProcessInputCommands,
+    /// Processes high-level legacy Steam P2P Networking commands.
+    ProcessNetworkingCommands,
     /// Processes high-level Steam Networking Messages commands.
     ProcessNetworkingMessagesCommands,
     /// Processes high-level Steam Networking Utils commands.

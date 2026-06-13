@@ -304,6 +304,71 @@ $env:BEVY_STEAMWORKS_INPUT_DIGITAL_ACTION = "jump"
 cargo run --example input
 ```
 
+## Legacy P2P Networking
+
+`SteamworksNetworkingPlugin` adds command/result messages for Steam's older P2P networking API: accept and close P2P sessions, send packets, poll packet availability, read owned packet snapshots, inspect session state, and mirror `P2PSessionRequest` / `P2PSessionConnectFail` callbacks as Bevy results.
+
+New projects should prefer `SteamworksNetworkingMessagesPlugin`; this legacy layer exists for older Steam networking flows and migration work.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn send_legacy_packet(mut networking: MessageWriter<SteamworksNetworkingCommand>) {
+    networking.write(SteamworksNetworkingCommand::send_p2p_packet(
+        SteamId::from_raw(76561198000000000),
+        SteamworksP2pSendType::Reliable,
+        0,
+        b"ping".to_vec(),
+    ));
+}
+
+fn read_legacy_packets(mut networking: MessageWriter<SteamworksNetworkingCommand>) {
+    networking.write(SteamworksNetworkingCommand::get_available_packet_size(0));
+    networking.write(SteamworksNetworkingCommand::read_p2p_packet(
+        0,
+        STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
+    ));
+}
+
+fn read_legacy_results(
+    mut results: MessageReader<SteamworksNetworkingResult>,
+    mut networking: MessageWriter<SteamworksNetworkingCommand>,
+) {
+    for result in results.read() {
+        info!("{result:?}");
+        if let SteamworksNetworkingResult::Ok(
+            SteamworksNetworkingOperation::SessionRequestReceived { remote },
+        ) = result
+        {
+            networking.write(SteamworksNetworkingCommand::accept_p2p_session(*remote));
+        }
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksNetworkingPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, send_legacy_packet)
+        .add_systems(Update, (read_legacy_packets, read_legacy_results))
+        .run();
+}
+```
+
+The command layer validates Steam IDs, channel ranges, send-size limits, and per-frame receive buffer sizes before calling upstream `steamworks`. `ReadP2pPacket` checks the queued packet size before reading, so too-small buffers return `SteamworksNetworkingError::PacketExceedsReadBuffer` instead of silently truncating payloads. Received packets are copied into `SteamworksP2pPacket { data: Vec<u8>, .. }`, so they are safe to store in ECS resources.
+
+`SteamworksNetworkingCommand::AcceptP2pSession` should be sent in response to a `SessionRequestReceived` result, matching Steam's `P2PSessionRequest_t` timing requirement.
+
+Run the legacy P2P example with:
+
+```powershell
+cargo run --example networking
+$env:BEVY_STEAMWORKS_P2P_PEER = "76561198000000000"
+$env:BEVY_STEAMWORKS_P2P_MESSAGE = "hello"
+cargo run --example networking
+```
+
 ## Networking Messages
 
 `SteamworksNetworkingMessagesPlugin` adds command/result messages for Steam's UDP-like P2P message API: send payloads to Steam IDs, IP endpoints, local host, or prebuilt `NetworkingIdentity` values; receive owned message snapshots by channel; read session connection state; and handle session request/failure callbacks.
