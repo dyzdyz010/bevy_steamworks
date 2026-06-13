@@ -462,11 +462,13 @@ cargo run --example networking_utils
 
 ## Networking Sockets
 
-`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send and receive owned message snapshots, read connection status, set user data, flush, and close handles.
+`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send and receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles.
 
 The plugin owns upstream `ListenSocket` and `NetConnection` handles in a private resource and exposes stable IDs such as `SteamworksListenSocketId` and `SteamworksNetworkingSocketsConnectionId`. This prevents accidental handle drops from closing sockets outside the command layer.
 
 Accepted listen-socket connections are tracked against their parent listen socket. A listen-socket disconnect event removes the matching connection ID when it can be identified unambiguously, and `CloseListenSocket` removes accepted child connections before dropping the listen socket. Independent connection polls report `connection_removed: true` when a terminal connection event caused the plugin to free the handle.
+
+Poll group messages are returned as `SteamworksNetworkingSocketsPollGroupMessage`. The upstream safe wrapper does not expose the raw connection handle carried by those messages, so the poll-group snapshot includes Steam's `connection_user_data` instead of a plugin connection ID. If you need to map poll-group messages back to game state, set unique connection user data through `SteamworksNetworkingSocketsCommand::set_connection_user_data`.
 
 ```rust,no_run
 # use std::net::{Ipv4Addr, SocketAddr};
@@ -512,7 +514,7 @@ fn main() {
 
 Listen socket connection requests must be answered immediately. `PollListenSocketEvents` therefore takes a `SteamworksConnectionRequestPolicy` and accepts or rejects each incoming request in the same frame instead of exposing a cross-frame pending request handle.
 
-This first command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries, poll groups, lane configuration, and zero-copy allocated messages remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
+This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries and zero-copy allocated messages remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
 
 Run the Networking Sockets example with:
 
@@ -523,6 +525,8 @@ $env:BEVY_STEAMWORKS_SOCKETS_ACCEPT = "1"
 cargo run --example networking_sockets
 $env:BEVY_STEAMWORKS_SOCKETS_CONNECT_IP = "127.0.0.1:27015"
 $env:BEVY_STEAMWORKS_SOCKETS_MESSAGE = "hello"
+cargo run --example networking_sockets
+$env:BEVY_STEAMWORKS_SOCKETS_POLL_GROUP = "1"
 cargo run --example networking_sockets
 ```
 

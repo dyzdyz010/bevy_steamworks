@@ -11,6 +11,7 @@ struct FramesRemaining(u32);
 struct SocketExampleHandles {
     listen_sockets: Vec<SteamworksListenSocketId>,
     connections: Vec<SteamworksNetworkingSocketsConnectionId>,
+    poll_groups: Vec<SteamworksNetworkingSocketsPollGroupId>,
     sent_message: bool,
 }
 
@@ -30,6 +31,10 @@ fn configure_networking_sockets(
 
     commands.write(SteamworksNetworkingSocketsCommand::InitAuthentication);
     commands.write(SteamworksNetworkingSocketsCommand::GetAuthenticationStatus);
+
+    if std::env::var("BEVY_STEAMWORKS_SOCKETS_POLL_GROUP").as_deref() == Ok("1") {
+        commands.write(SteamworksNetworkingSocketsCommand::create_poll_group());
+    }
 
     if let Some(address) = env_socket_addr("BEVY_STEAMWORKS_SOCKETS_LISTEN_IP") {
         commands.write(SteamworksNetworkingSocketsCommand::create_listen_socket_ip(
@@ -80,13 +85,21 @@ fn poll_networking_sockets(
             *connection,
             16,
         ));
-        commands.write(SteamworksNetworkingSocketsCommand::receive_messages(
-            *connection,
-            16,
-        ));
+        if handles.poll_groups.is_empty() {
+            commands.write(SteamworksNetworkingSocketsCommand::receive_messages(
+                *connection,
+                16,
+            ));
+        }
         commands.write(SteamworksNetworkingSocketsCommand::get_connection_info(
             *connection,
         ));
+    }
+
+    for poll_group in &handles.poll_groups {
+        commands.write(
+            SteamworksNetworkingSocketsCommand::receive_poll_group_messages(*poll_group, 16),
+        );
     }
 }
 
@@ -117,12 +130,26 @@ fn send_optional_message(
 fn log_networking_sockets_results(
     mut handles: ResMut<SocketExampleHandles>,
     mut results: MessageReader<SteamworksNetworkingSocketsResult>,
+    mut commands: MessageWriter<SteamworksNetworkingSocketsCommand>,
 ) {
     for result in results.read() {
         println!("{result:?}");
 
         if let SteamworksNetworkingSocketsResult::Ok(operation) = result {
             match operation {
+                SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group }
+                    if !handles.poll_groups.contains(poll_group) =>
+                {
+                    handles.poll_groups.push(*poll_group);
+                    for connection in &handles.connections {
+                        commands.write(
+                            SteamworksNetworkingSocketsCommand::set_connection_poll_group(
+                                *connection,
+                                *poll_group,
+                            ),
+                        );
+                    }
+                }
                 SteamworksNetworkingSocketsOperation::ListenSocketCreated {
                     listen_socket, ..
                 } if !handles.listen_sockets.contains(listen_socket) => {
@@ -132,6 +159,14 @@ fn log_networking_sockets_results(
                     if !handles.connections.contains(connection) =>
                 {
                     handles.connections.push(*connection);
+                    if let Some(poll_group) = handles.poll_groups.first() {
+                        commands.write(
+                            SteamworksNetworkingSocketsCommand::set_connection_poll_group(
+                                *connection,
+                                *poll_group,
+                            ),
+                        );
+                    }
                 }
                 SteamworksNetworkingSocketsOperation::ListenSocketEventsPolled {
                     events, ..
@@ -142,6 +177,14 @@ fn log_networking_sockets_results(
                                 if !handles.connections.contains(connection) =>
                             {
                                 handles.connections.push(*connection);
+                                if let Some(poll_group) = handles.poll_groups.first() {
+                                    commands.write(
+                                        SteamworksNetworkingSocketsCommand::set_connection_poll_group(
+                                            *connection,
+                                            *poll_group,
+                                        ),
+                                    );
+                                }
                             }
                             SteamworksListenSocketEventInfo::Disconnected {
                                 connection: Some(connection),
@@ -171,6 +214,9 @@ fn log_networking_sockets_results(
                     handles
                         .connections
                         .retain(|known| !closed_connections.contains(known));
+                }
+                SteamworksNetworkingSocketsOperation::PollGroupClosed { poll_group } => {
+                    handles.poll_groups.retain(|known| known != poll_group);
                 }
                 _ => {}
             }
