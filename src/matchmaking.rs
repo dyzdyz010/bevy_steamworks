@@ -1,8 +1,8 @@
 //! High-level Bevy ECS integration for Steam matchmaking and lobbies.
 //!
 //! This module builds on top of the upstream [`steamworks::Matchmaking`] API.
-//! It keeps async Steam call results flowing through Bevy messages, while
-//! avoiding blocking work in the frame loop.
+//! It keeps async Steam call results and lobby callbacks flowing through Bevy
+//! messages, while avoiding blocking work in the frame loop.
 
 use std::{
     net::SocketAddrV4,
@@ -11,13 +11,13 @@ use std::{
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 const MAX_LOBBY_MEMBERS: u32 = 250;
 const MAX_LOBBY_CHAT_MESSAGE_BYTES: usize = 4096;
@@ -28,7 +28,7 @@ const MAX_LOBBY_LIST_RESULTS: u64 = i32::MAX as u64;
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksMatchmakingCommand`] and [`SteamworksMatchmakingResult`]
 /// messages and runs its command processor in [`bevy_app::First`] after Steam
-/// callbacks.
+/// callbacks. It also mirrors lobby callbacks into matchmaking results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksMatchmakingPlugin;
 
@@ -43,6 +43,7 @@ impl Plugin for SteamworksMatchmakingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksMatchmakingState>()
             .init_resource::<SteamworksMatchmakingAsyncResults>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksMatchmakingCommand>()
             .add_message::<SteamworksMatchmakingResult>()
             .configure_sets(
@@ -64,6 +65,11 @@ pub struct SteamworksMatchmakingState {
     last_error: Option<SteamworksMatchmakingError>,
     last_lobby_list: Vec<steamworks::LobbyId>,
     joined_lobbies: Vec<steamworks::LobbyId>,
+    last_lobby_created_callback: Option<SteamworksLobbyCreatedCallback>,
+    last_lobby_enter_callback: Option<SteamworksLobbyEnterCallback>,
+    last_lobby_chat_message: Option<SteamworksLobbyChatMessage>,
+    last_lobby_chat_update: Option<SteamworksLobbyChatUpdate>,
+    last_lobby_data_update: Option<SteamworksLobbyDataUpdate>,
     next_request_id: u64,
 }
 
@@ -83,6 +89,31 @@ impl SteamworksMatchmakingState {
         &self.joined_lobbies
     }
 
+    /// Returns the most recent lobby created callback snapshot.
+    pub fn last_lobby_created_callback(&self) -> Option<&SteamworksLobbyCreatedCallback> {
+        self.last_lobby_created_callback.as_ref()
+    }
+
+    /// Returns the most recent lobby enter callback snapshot.
+    pub fn last_lobby_enter_callback(&self) -> Option<&SteamworksLobbyEnterCallback> {
+        self.last_lobby_enter_callback.as_ref()
+    }
+
+    /// Returns the most recent lobby chat message callback snapshot.
+    pub fn last_lobby_chat_message(&self) -> Option<&SteamworksLobbyChatMessage> {
+        self.last_lobby_chat_message.as_ref()
+    }
+
+    /// Returns the most recent lobby membership change callback snapshot.
+    pub fn last_lobby_chat_update(&self) -> Option<&SteamworksLobbyChatUpdate> {
+        self.last_lobby_chat_update.as_ref()
+    }
+
+    /// Returns the most recent lobby metadata update callback snapshot.
+    pub fn last_lobby_data_update(&self) -> Option<&SteamworksLobbyDataUpdate> {
+        self.last_lobby_data_update.as_ref()
+    }
+
     fn record_error(&mut self, error: SteamworksMatchmakingError) {
         self.last_error = Some(error);
     }
@@ -100,6 +131,26 @@ impl SteamworksMatchmakingState {
             }
             SteamworksMatchmakingOperation::LobbyLeft { lobby } => {
                 self.joined_lobbies.retain(|known| known != lobby);
+            }
+            SteamworksMatchmakingOperation::LobbyCreateCallbackReceived { callback } => {
+                self.last_lobby_created_callback = Some(callback.clone());
+            }
+            SteamworksMatchmakingOperation::LobbyEnterCallbackReceived { callback } => {
+                if callback.chat_room_enter_response == steamworks::ChatRoomEnterResponse::Success
+                    && !self.joined_lobbies.contains(&callback.lobby)
+                {
+                    self.joined_lobbies.push(callback.lobby);
+                }
+                self.last_lobby_enter_callback = Some(callback.clone());
+            }
+            SteamworksMatchmakingOperation::LobbyChatMessageReceived { message } => {
+                self.last_lobby_chat_message = Some(message.clone());
+            }
+            SteamworksMatchmakingOperation::LobbyChatUpdateReceived { update } => {
+                self.last_lobby_chat_update = Some(update.clone());
+            }
+            SteamworksMatchmakingOperation::LobbyDataUpdateReceived { update } => {
+                self.last_lobby_data_update = Some(update.clone());
             }
             _ => {}
         }
@@ -255,6 +306,65 @@ pub struct SteamworksLobbyGameServer {
     pub steam_id: Option<steamworks::SteamId>,
 }
 
+/// Lobby created callback snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyCreatedCallback {
+    /// Raw Steam result code reported by the upstream callback.
+    pub result: u32,
+    /// Lobby created by Steam, or zero when creation failed.
+    pub lobby: steamworks::LobbyId,
+}
+
+/// Lobby enter callback snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyEnterCallback {
+    /// Lobby entered by the local user.
+    pub lobby: steamworks::LobbyId,
+    /// Raw chat permissions reported by Steam.
+    pub chat_permissions: u32,
+    /// Whether Steam reported the lobby as locked.
+    pub blocked: bool,
+    /// Steam lobby enter response.
+    pub chat_room_enter_response: steamworks::ChatRoomEnterResponse,
+}
+
+/// Lobby chat message callback snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyChatMessage {
+    /// Lobby that received the chat entry.
+    pub lobby: steamworks::LobbyId,
+    /// User who sent the message.
+    pub user: steamworks::SteamId,
+    /// Chat entry kind reported by Steam.
+    pub chat_entry_type: steamworks::ChatEntryType,
+    /// Chat entry index reported by Steam.
+    pub chat_id: i32,
+}
+
+/// Lobby member state change callback snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyChatUpdate {
+    /// Lobby where the membership change occurred.
+    pub lobby: steamworks::LobbyId,
+    /// User whose lobby state changed.
+    pub user_changed: steamworks::SteamId,
+    /// User who caused the change.
+    pub making_change: steamworks::SteamId,
+    /// Member state change reported by Steam.
+    pub member_state_change: steamworks::ChatMemberStateChange,
+}
+
+/// Lobby metadata update callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksLobbyDataUpdate {
+    /// Lobby whose metadata changed.
+    pub lobby: steamworks::LobbyId,
+    /// Lobby member whose data changed, or the lobby ID when room data changed.
+    pub member: steamworks::SteamId,
+    /// Whether Steam reported the metadata update as successful.
+    pub success: bool,
+}
+
 /// A high-level command for Steam matchmaking and lobbies.
 #[derive(Clone, Debug, Message, PartialEq)]
 pub enum SteamworksMatchmakingCommand {
@@ -264,6 +374,12 @@ pub enum SteamworksMatchmakingCommand {
         filter: SteamworksLobbyListFilter,
     },
     /// Create a lobby.
+    ///
+    /// The async command result emits
+    /// [`SteamworksMatchmakingOperation::LobbyCreated`] with a request ID. Steam
+    /// may also emit [`SteamworksMatchmakingOperation::LobbyCreateCallbackReceived`]
+    /// and [`SteamworksMatchmakingOperation::LobbyEnterCallbackReceived`] as
+    /// callback observations.
     CreateLobby {
         /// Lobby visibility.
         lobby_type: steamworks::LobbyType,
@@ -271,6 +387,11 @@ pub enum SteamworksMatchmakingCommand {
         max_members: u32,
     },
     /// Join a lobby.
+    ///
+    /// The async command result emits [`SteamworksMatchmakingOperation::LobbyJoined`]
+    /// with a request ID. Steam may also emit
+    /// [`SteamworksMatchmakingOperation::LobbyEnterCallbackReceived`] as a
+    /// callback observation.
     JoinLobby {
         /// Lobby to join.
         lobby: steamworks::LobbyId,
@@ -372,7 +493,13 @@ pub enum SteamworksMatchmakingCommand {
         /// Message bytes. Steam supports up to 4096 bytes.
         data: Vec<u8>,
     },
-    /// Read the bytes for a lobby chat entry after a [`crate::SteamworksEvent::LobbyChatMsg`].
+    /// Read the bytes for a lobby chat entry.
+    ///
+    /// Steam treats chat entry IDs as callback-scope values. Prefer a lower-level
+    /// callback registered through [`crate::SteamworksCallbackRegistry`] when
+    /// bytes must be copied immediately and reliably. This command is retained
+    /// for callers that know the entry is still available through Steam's lobby
+    /// cache.
     GetLobbyChatEntry {
         /// Lobby that received the chat entry.
         lobby: steamworks::LobbyId,
@@ -648,12 +775,37 @@ pub enum SteamworksMatchmakingOperation {
         /// Game-server data, if Steam had one.
         server: Option<SteamworksLobbyGameServer>,
     },
+    /// A lobby created callback was observed.
+    LobbyCreateCallbackReceived {
+        /// Callback snapshot.
+        callback: SteamworksLobbyCreatedCallback,
+    },
+    /// A lobby enter callback was observed.
+    LobbyEnterCallbackReceived {
+        /// Callback snapshot.
+        callback: SteamworksLobbyEnterCallback,
+    },
+    /// A lobby chat message callback was observed.
+    LobbyChatMessageReceived {
+        /// Callback snapshot.
+        message: SteamworksLobbyChatMessage,
+    },
+    /// A lobby membership change callback was observed.
+    LobbyChatUpdateReceived {
+        /// Callback snapshot.
+        update: SteamworksLobbyChatUpdate,
+    },
+    /// A lobby metadata update callback was observed.
+    LobbyDataUpdateReceived {
+        /// Callback snapshot.
+        update: SteamworksLobbyDataUpdate,
+    },
 }
 
 /// Result message emitted by [`SteamworksMatchmakingPlugin`].
 #[derive(Clone, Debug, Message, PartialEq)]
 pub enum SteamworksMatchmakingResult {
-    /// The command was submitted to Steamworks or a value was read.
+    /// The command, async call result, or observed callback was processed successfully.
     Ok(SteamworksMatchmakingOperation),
     /// The command failed synchronously or through a Steam async call result.
     Err {
@@ -745,6 +897,7 @@ fn process_matchmaking_commands(
     async_results: Res<SteamworksMatchmakingAsyncResults>,
     mut state: ResMut<SteamworksMatchmakingState>,
     mut commands: ResMut<Messages<SteamworksMatchmakingCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksMatchmakingResult>,
 ) {
     for result in async_results.drain() {
@@ -752,10 +905,12 @@ fn process_matchmaking_commands(
         results.write(result);
     }
 
+    process_matchmaking_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksMatchmakingError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             results.write(SteamworksMatchmakingResult::Err {
                 command,
                 error: error.clone(),
@@ -787,6 +942,77 @@ fn process_matchmaking_commands(
                 results.write(SteamworksMatchmakingResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_matchmaking_steam_events(
+    state: &mut SteamworksMatchmakingState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksMatchmakingResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::LobbyCreated(event) => {
+                SteamworksMatchmakingOperation::LobbyCreateCallbackReceived {
+                    callback: SteamworksLobbyCreatedCallback {
+                        result: event.result,
+                        lobby: event.lobby,
+                    },
+                }
+            }
+            SteamworksEvent::LobbyEnter(event) => {
+                SteamworksMatchmakingOperation::LobbyEnterCallbackReceived {
+                    callback: SteamworksLobbyEnterCallback {
+                        lobby: event.lobby,
+                        chat_permissions: event.chat_permissions,
+                        blocked: event.blocked,
+                        chat_room_enter_response: event.chat_room_enter_response,
+                    },
+                }
+            }
+            SteamworksEvent::LobbyChatMsg(event) => {
+                SteamworksMatchmakingOperation::LobbyChatMessageReceived {
+                    message: snapshot_lobby_chat_message(event),
+                }
+            }
+            SteamworksEvent::LobbyChatUpdate(event) => {
+                SteamworksMatchmakingOperation::LobbyChatUpdateReceived {
+                    update: SteamworksLobbyChatUpdate {
+                        lobby: event.lobby,
+                        user_changed: event.user_changed,
+                        making_change: event.making_change,
+                        member_state_change: event.member_state_change.clone(),
+                    },
+                }
+            }
+            SteamworksEvent::LobbyDataUpdate(event) => {
+                SteamworksMatchmakingOperation::LobbyDataUpdateReceived {
+                    update: SteamworksLobbyDataUpdate {
+                        lobby: event.lobby,
+                        member: event.member,
+                        success: event.success,
+                    },
+                }
+            }
+            _ => continue,
+        };
+
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks matchmaking callback"
+        );
+        results.write(SteamworksMatchmakingResult::Ok(operation));
+    }
+}
+
+fn snapshot_lobby_chat_message(event: &steamworks::LobbyChatMsg) -> SteamworksLobbyChatMessage {
+    SteamworksLobbyChatMessage {
+        lobby: event.lobby,
+        user: event.user,
+        chat_entry_type: event.chat_entry_type,
+        chat_id: event.chat_id,
     }
 }
 
@@ -1200,6 +1426,7 @@ mod tests {
         assert!(app
             .world()
             .contains_resource::<SteamworksMatchmakingState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksMatchmakingCommand>>());
@@ -1353,5 +1580,127 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn lobby_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let lobby = steamworks::LobbyId::from_raw(11);
+        let user = steamworks::SteamId::from_raw(22);
+        let maker = steamworks::SteamId::from_raw(33);
+
+        app.add_plugins(SteamworksMatchmakingPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::LobbyCreated(steamworks::LobbyCreated {
+                result: 1,
+                lobby,
+            }));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::LobbyEnter(steamworks::LobbyEnter {
+                lobby,
+                chat_permissions: 0,
+                blocked: false,
+                chat_room_enter_response: steamworks::ChatRoomEnterResponse::Success,
+            }));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::LobbyChatMsg(steamworks::LobbyChatMsg {
+                lobby,
+                user,
+                chat_entry_type: steamworks::ChatEntryType::ChatMsg,
+                chat_id: 5,
+            }));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::LobbyChatUpdate(
+                steamworks::LobbyChatUpdate {
+                    lobby,
+                    user_changed: user,
+                    making_change: maker,
+                    member_state_change: steamworks::ChatMemberStateChange::Entered,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::LobbyDataUpdate(
+                steamworks::LobbyDataUpdate {
+                    lobby,
+                    member: user,
+                    success: true,
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksMatchmakingResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        let expected_created = SteamworksLobbyCreatedCallback { result: 1, lobby };
+        let expected_enter = SteamworksLobbyEnterCallback {
+            lobby,
+            chat_permissions: 0,
+            blocked: false,
+            chat_room_enter_response: steamworks::ChatRoomEnterResponse::Success,
+        };
+        let expected_message = SteamworksLobbyChatMessage {
+            lobby,
+            user,
+            chat_entry_type: steamworks::ChatEntryType::ChatMsg,
+            chat_id: 5,
+        };
+        let expected_chat_update = SteamworksLobbyChatUpdate {
+            lobby,
+            user_changed: user,
+            making_change: maker,
+            member_state_change: steamworks::ChatMemberStateChange::Entered,
+        };
+        let expected_data_update = SteamworksLobbyDataUpdate {
+            lobby,
+            member: user,
+            success: true,
+        };
+
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksMatchmakingResult::Ok(
+                    SteamworksMatchmakingOperation::LobbyCreateCallbackReceived {
+                        callback: expected_created.clone(),
+                    },
+                ),
+                SteamworksMatchmakingResult::Ok(
+                    SteamworksMatchmakingOperation::LobbyEnterCallbackReceived {
+                        callback: expected_enter.clone(),
+                    },
+                ),
+                SteamworksMatchmakingResult::Ok(
+                    SteamworksMatchmakingOperation::LobbyChatMessageReceived {
+                        message: expected_message.clone(),
+                    },
+                ),
+                SteamworksMatchmakingResult::Ok(
+                    SteamworksMatchmakingOperation::LobbyChatUpdateReceived {
+                        update: expected_chat_update.clone(),
+                    },
+                ),
+                SteamworksMatchmakingResult::Ok(
+                    SteamworksMatchmakingOperation::LobbyDataUpdateReceived {
+                        update: expected_data_update.clone(),
+                    },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksMatchmakingState>();
+        assert_eq!(state.joined_lobbies(), &[lobby]);
+        assert_eq!(state.last_lobby_created_callback(), Some(&expected_created));
+        assert_eq!(state.last_lobby_enter_callback(), Some(&expected_enter));
+        assert_eq!(state.last_lobby_chat_message(), Some(&expected_message));
+        assert_eq!(state.last_lobby_chat_update(), Some(&expected_chat_update));
+        assert_eq!(state.last_lobby_data_update(), Some(&expected_data_update));
+        assert_eq!(state.last_error(), None);
     }
 }

@@ -161,7 +161,9 @@ fn main() {
 }
 ```
 
-Async calls such as lobby list requests, lobby creation, and lobby joins first emit a submitted operation, then later emit the Steam call result after `SteamworksSystem::RunCallbacks` pumps Steam callbacks. These submitted/completed operations include a plugin-assigned `request_id` so identical in-flight requests can be correlated. Steam lobby callbacks such as `LobbyCreated`, `LobbyEnter`, `LobbyChatMsg`, and `LobbyDataUpdate` still arrive through `SteamworksEvent`.
+Async calls such as lobby list requests, lobby creation, and lobby joins first emit a submitted operation, then later emit the Steam call result after `SteamworksSystem::RunCallbacks` pumps Steam callbacks. These submitted/completed operations include a plugin-assigned `request_id` so identical in-flight requests can be correlated. Steam lobby callbacks such as `LobbyCreated`, `LobbyEnter`, `LobbyChatMsg`, `LobbyChatUpdate`, and `LobbyDataUpdate` arrive through both `SteamworksEvent` and `SteamworksMatchmakingOperation::*Received` snapshots.
+
+`SteamworksMatchmakingOperation::LobbyChatMessageReceived` carries the lobby, sender, entry type, and chat entry ID, but it does not copy chat bytes. Steam's chat entry ID is callback-timing-sensitive, so register a lower-level callback through `SteamworksCallbackRegistry` if you need to copy lobby chat bytes immediately and reliably.
 
 Commands validate lobby keys, strings, lobby size, and chat message size before calling upstream `steamworks` methods, so common invalid inputs become structured `SteamworksMatchmakingError` values instead of panicking in the Steam API wrapper.
 
