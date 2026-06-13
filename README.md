@@ -890,7 +890,7 @@ fn main() {
 }
 ```
 
-`SteamworksAppsCommand::GetCurrentAppInfo` combines the most commonly needed app checks into one `SteamworksCurrentAppInfo` snapshot. Launch query keys are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksAppsError::InvalidString` instead of panicking.
+`SteamworksAppsCommand::GetCurrentAppInfo` combines the most commonly needed app checks into one `SteamworksCurrentAppInfo` snapshot. Launch query keys are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksAppsError::InvalidString` instead of panicking. If Steam delivers new URL launch parameters while the app is already running, `SteamworksEvent::NewUrlLaunchParameters` is also mirrored as `SteamworksAppsOperation::NewUrlLaunchParametersReceived`; send `GetLaunchCommandLine` or `GetLaunchQueryParam` afterwards to read the latest values.
 
 Run the app info example with:
 

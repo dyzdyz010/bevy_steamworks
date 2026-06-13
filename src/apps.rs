@@ -7,19 +7,20 @@
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam app and launch-parameter commands.
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksAppsCommand`] and [`SteamworksAppsResult`] messages and runs its
-/// command processor in [`bevy_app::First`] after Steam callbacks.
+/// command processor in [`bevy_app::First`] after Steam callbacks. It also
+/// mirrors [`crate::SteamworksEvent::NewUrlLaunchParameters`] into apps results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksAppsPlugin;
 
@@ -33,6 +34,7 @@ impl SteamworksAppsPlugin {
 impl Plugin for SteamworksAppsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksAppsState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksAppsCommand>()
             .add_message::<SteamworksAppsResult>()
             .configure_sets(
@@ -53,6 +55,7 @@ impl Plugin for SteamworksAppsPlugin {
 pub struct SteamworksAppsState {
     last_error: Option<SteamworksAppsError>,
     current_app_info: Option<SteamworksCurrentAppInfo>,
+    new_url_launch_parameters_count: u64,
 }
 
 impl SteamworksAppsState {
@@ -66,13 +69,24 @@ impl SteamworksAppsState {
         self.current_app_info.as_ref()
     }
 
+    /// Returns how many new URL launch parameter callbacks this plugin observed.
+    pub fn new_url_launch_parameters_count(&self) -> u64 {
+        self.new_url_launch_parameters_count
+    }
+
     fn record_error(&mut self, error: SteamworksAppsError) {
         self.last_error = Some(error);
     }
 
     fn record_operation(&mut self, operation: &SteamworksAppsOperation) {
-        if let SteamworksAppsOperation::CurrentAppInfoRead { info } = operation {
-            self.current_app_info = Some(info.clone());
+        match operation {
+            SteamworksAppsOperation::CurrentAppInfoRead { info } => {
+                self.current_app_info = Some(info.clone());
+            }
+            SteamworksAppsOperation::NewUrlLaunchParametersReceived { count } => {
+                self.new_url_launch_parameters_count = *count;
+            }
+            _ => {}
         }
     }
 }
@@ -291,12 +305,21 @@ pub enum SteamworksAppsOperation {
         /// Launch query parameter value.
         value: String,
     },
+    /// Steam reported new URL launch parameters while the app was already running.
+    ///
+    /// Send [`SteamworksAppsCommand::GetLaunchCommandLine`] or
+    /// [`SteamworksAppsCommand::GetLaunchQueryParam`] after this operation to read
+    /// the latest launch data.
+    NewUrlLaunchParametersReceived {
+        /// Total number of new URL launch parameter callbacks observed by this plugin.
+        count: u64,
+    },
 }
 
 /// Result message emitted by [`SteamworksAppsPlugin`].
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksAppsResult {
-    /// The command was processed successfully.
+    /// The command or observed callback was processed successfully.
     Ok(SteamworksAppsOperation),
     /// The command failed synchronously.
     Err {
@@ -331,12 +354,15 @@ fn process_apps_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksAppsState>,
     mut commands: ResMut<Messages<SteamworksAppsCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksAppsResult>,
 ) {
+    process_apps_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksAppsError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             results.write(SteamworksAppsResult::Err {
                 command,
                 error: error.clone(),
@@ -367,6 +393,29 @@ fn process_apps_commands(
                 results.write(SteamworksAppsResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_apps_steam_events(
+    state: &mut SteamworksAppsState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksAppsResult>,
+) {
+    for event in steam_events.read() {
+        if !matches!(event, SteamworksEvent::NewUrlLaunchParameters(_)) {
+            continue;
+        }
+
+        let operation = SteamworksAppsOperation::NewUrlLaunchParametersReceived {
+            count: state.new_url_launch_parameters_count.saturating_add(1),
+        };
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks apps callback"
+        );
+        results.write(SteamworksAppsResult::Ok(operation));
     }
 }
 
@@ -497,6 +546,7 @@ mod tests {
         app.add_plugins(SteamworksAppsPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksAppsState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksAppsCommand>>());
@@ -544,5 +594,44 @@ mod tests {
             validate_command(&command),
             Err(SteamworksAppsError::InvalidString { field: "key" })
         );
+    }
+
+    #[test]
+    fn new_url_launch_parameters_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+
+        app.add_plugins(SteamworksAppsPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::NewUrlLaunchParameters(
+                steamworks::NewUrlLaunchParameters,
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::NewUrlLaunchParameters(
+                steamworks::NewUrlLaunchParameters,
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksAppsResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksAppsResult::Ok(SteamworksAppsOperation::NewUrlLaunchParametersReceived {
+                    count: 1
+                },),
+                SteamworksAppsResult::Ok(SteamworksAppsOperation::NewUrlLaunchParametersReceived {
+                    count: 2
+                },),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksAppsState>();
+        assert_eq!(state.new_url_launch_parameters_count(), 2);
+        assert_eq!(state.last_error(), None);
     }
 }
