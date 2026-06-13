@@ -21,6 +21,7 @@ use crate::{SteamworksClient, SteamworksSystem};
 
 const MAX_LOBBY_MEMBERS: u32 = 250;
 const MAX_LOBBY_CHAT_MESSAGE_BYTES: usize = 4096;
+const MAX_LOBBY_LIST_RESULTS: u64 = i32::MAX as u64;
 
 /// Bevy plugin for high-level Steam matchmaking and lobby commands.
 ///
@@ -63,6 +64,7 @@ pub struct SteamworksMatchmakingState {
     last_error: Option<SteamworksMatchmakingError>,
     last_lobby_list: Vec<steamworks::LobbyId>,
     joined_lobbies: Vec<steamworks::LobbyId>,
+    next_request_id: u64,
 }
 
 impl SteamworksMatchmakingState {
@@ -87,11 +89,11 @@ impl SteamworksMatchmakingState {
 
     fn record_operation(&mut self, operation: &SteamworksMatchmakingOperation) {
         match operation {
-            SteamworksMatchmakingOperation::LobbyListReceived { lobbies } => {
+            SteamworksMatchmakingOperation::LobbyListReceived { lobbies, .. } => {
                 self.last_lobby_list.clone_from(lobbies);
             }
             SteamworksMatchmakingOperation::LobbyCreated { lobby, .. }
-            | SteamworksMatchmakingOperation::LobbyJoined { lobby }
+            | SteamworksMatchmakingOperation::LobbyJoined { lobby, .. }
                 if !self.joined_lobbies.contains(lobby) =>
             {
                 self.joined_lobbies.push(*lobby);
@@ -101,6 +103,12 @@ impl SteamworksMatchmakingState {
             }
             _ => {}
         }
+    }
+
+    fn next_request_id(&mut self) -> u64 {
+        let request_id = self.next_request_id;
+        self.next_request_id = self.next_request_id.wrapping_add(1);
+        request_id
     }
 }
 
@@ -456,16 +464,24 @@ impl SteamworksMatchmakingCommand {
 pub enum SteamworksMatchmakingOperation {
     /// Lobby list request was submitted.
     LobbyListRequested {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
         /// Filters applied to the request.
         filter: SteamworksLobbyListFilter,
     },
     /// Lobby list request completed.
     LobbyListReceived {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
+        /// Filters applied to the request.
+        filter: SteamworksLobbyListFilter,
         /// Matching lobby IDs.
         lobbies: Vec<steamworks::LobbyId>,
     },
     /// Lobby creation was submitted.
     LobbyCreateRequested {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
         /// Lobby visibility.
         lobby_type: steamworks::LobbyType,
         /// Maximum members requested.
@@ -473,18 +489,28 @@ pub enum SteamworksMatchmakingOperation {
     },
     /// Lobby creation completed.
     LobbyCreated {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
         /// Lobby visibility requested.
         lobby_type: steamworks::LobbyType,
+        /// Maximum members requested.
+        max_members: u32,
         /// Created lobby.
         lobby: steamworks::LobbyId,
     },
     /// Lobby join was submitted.
     LobbyJoinRequested {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
         /// Lobby requested.
         lobby: steamworks::LobbyId,
     },
     /// Lobby join completed.
     LobbyJoined {
+        /// Unique request ID assigned by the plugin.
+        request_id: u64,
+        /// Lobby requested by the command.
+        requested_lobby: steamworks::LobbyId,
         /// Joined lobby.
         lobby: steamworks::LobbyId,
     },
@@ -664,6 +690,14 @@ pub enum SteamworksMatchmakingError {
         /// Maximum supported member count.
         max_supported: u32,
     },
+    /// A lobby list result count exceeded the upstream Steam API wrapper's safe range.
+    #[error("Steamworks lobby list result count must be <= {max_supported}, got {requested}")]
+    MaxLobbyListResultsExceeded {
+        /// Requested result count.
+        requested: u64,
+        /// Maximum supported result count before upstream integer truncation.
+        max_supported: u64,
+    },
     /// A lobby chat message length is outside Steam's supported range.
     #[error("Steamworks lobby chat messages must be 1..={max_supported} bytes, got {requested}")]
     InvalidChatMessageLength {
@@ -731,7 +765,8 @@ fn process_matchmaking_commands(
     };
 
     for command in commands.drain() {
-        match handle_matchmaking_command(&client, &async_results, command.clone()) {
+        let request_id = async_command_request_id(&command, &mut state);
+        match handle_matchmaking_command(&client, &async_results, command.clone(), request_id) {
             Ok(operation) => {
                 state.record_operation(&operation);
                 tracing::debug!(
@@ -765,25 +800,45 @@ fn record_matchmaking_result(
     }
 }
 
+fn async_command_request_id(
+    command: &SteamworksMatchmakingCommand,
+    state: &mut SteamworksMatchmakingState,
+) -> Option<u64> {
+    matches!(
+        command,
+        SteamworksMatchmakingCommand::RequestLobbyList { .. }
+            | SteamworksMatchmakingCommand::CreateLobby { .. }
+            | SteamworksMatchmakingCommand::JoinLobby { .. }
+    )
+    .then(|| state.next_request_id())
+}
+
 fn handle_matchmaking_command(
     client: &SteamworksClient,
     async_results: &SteamworksMatchmakingAsyncResults,
     command: SteamworksMatchmakingCommand,
+    request_id: Option<u64>,
 ) -> Result<SteamworksMatchmakingOperation, SteamworksMatchmakingError> {
     validate_command(&command)?;
 
     let matchmaking = client.matchmaking();
     match command {
         SteamworksMatchmakingCommand::RequestLobbyList { filter } => {
+            let request_id = request_id.expect("async matchmaking command missing request id");
             apply_lobby_list_filter(&matchmaking, &filter)?;
             let async_results = async_results.clone();
             let command = SteamworksMatchmakingCommand::RequestLobbyList {
                 filter: filter.clone(),
             };
+            let request_filter = filter.clone();
             matchmaking.request_lobby_list(move |result| {
                 async_results.push(match result {
                     Ok(lobbies) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyListReceived { lobbies },
+                        SteamworksMatchmakingOperation::LobbyListReceived {
+                            request_id,
+                            filter: request_filter.clone(),
+                            lobbies,
+                        },
                     ),
                     Err(source) => SteamworksMatchmakingResult::Err {
                         command,
@@ -794,12 +849,13 @@ fn handle_matchmaking_command(
                     },
                 });
             });
-            Ok(SteamworksMatchmakingOperation::LobbyListRequested { filter })
+            Ok(SteamworksMatchmakingOperation::LobbyListRequested { request_id, filter })
         }
         SteamworksMatchmakingCommand::CreateLobby {
             lobby_type,
             max_members,
         } => {
+            let request_id = request_id.expect("async matchmaking command missing request id");
             let async_results = async_results.clone();
             let command = SteamworksMatchmakingCommand::CreateLobby {
                 lobby_type,
@@ -808,7 +864,12 @@ fn handle_matchmaking_command(
             matchmaking.create_lobby(lobby_type, max_members, move |result| {
                 async_results.push(match result {
                     Ok(lobby) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyCreated { lobby_type, lobby },
+                        SteamworksMatchmakingOperation::LobbyCreated {
+                            request_id,
+                            lobby_type,
+                            max_members,
+                            lobby,
+                        },
                     ),
                     Err(source) => SteamworksMatchmakingResult::Err {
                         command,
@@ -820,17 +881,24 @@ fn handle_matchmaking_command(
                 });
             });
             Ok(SteamworksMatchmakingOperation::LobbyCreateRequested {
+                request_id,
                 lobby_type,
                 max_members,
             })
         }
         SteamworksMatchmakingCommand::JoinLobby { lobby } => {
+            let request_id = request_id.expect("async matchmaking command missing request id");
             let async_results = async_results.clone();
             let command = SteamworksMatchmakingCommand::JoinLobby { lobby };
+            let requested_lobby = lobby;
             matchmaking.join_lobby(lobby, move |result| {
                 async_results.push(match result {
                     Ok(lobby) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyJoined { lobby },
+                        SteamworksMatchmakingOperation::LobbyJoined {
+                            request_id,
+                            requested_lobby,
+                            lobby,
+                        },
                     ),
                     Err(()) => SteamworksMatchmakingResult::Err {
                         command,
@@ -840,7 +908,7 @@ fn handle_matchmaking_command(
                     },
                 });
             });
-            Ok(SteamworksMatchmakingOperation::LobbyJoinRequested { lobby })
+            Ok(SteamworksMatchmakingOperation::LobbyJoinRequested { request_id, lobby })
         }
         SteamworksMatchmakingCommand::LeaveLobby { lobby } => {
             matchmaking.leave_lobby(lobby);
@@ -1072,6 +1140,9 @@ fn validate_filter(filter: &SteamworksLobbyListFilter) -> Result<(), SteamworksM
     for item in &filter.near_value {
         validate_lobby_key(&item.key)?;
     }
+    if let Some(max_results) = filter.max_results {
+        validate_lobby_list_result_count(max_results)?;
+    }
     Ok(())
 }
 
@@ -1096,6 +1167,17 @@ fn validate_lobby_chat_message(len: usize) -> Result<(), SteamworksMatchmakingEr
         Err(SteamworksMatchmakingError::InvalidChatMessageLength {
             requested: len,
             max_supported: MAX_LOBBY_CHAT_MESSAGE_BYTES,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_lobby_list_result_count(count: u64) -> Result<(), SteamworksMatchmakingError> {
+    if count > MAX_LOBBY_LIST_RESULTS {
+        Err(SteamworksMatchmakingError::MaxLobbyListResultsExceeded {
+            requested: count,
+            max_supported: MAX_LOBBY_LIST_RESULTS,
         })
     } else {
         Ok(())
@@ -1208,6 +1290,68 @@ mod tests {
                 requested: 0,
                 max_supported: MAX_LOBBY_CHAT_MESSAGE_BYTES,
             })
+        );
+
+        let filter = SteamworksLobbyListFilter::new().with_max_results(MAX_LOBBY_LIST_RESULTS + 1);
+        assert_eq!(
+            validate_filter(&filter),
+            Err(SteamworksMatchmakingError::MaxLobbyListResultsExceeded {
+                requested: MAX_LOBBY_LIST_RESULTS + 1,
+                max_supported: MAX_LOBBY_LIST_RESULTS,
+            })
+        );
+    }
+
+    #[test]
+    fn async_success_operations_preserve_request_context() {
+        let filter = SteamworksLobbyListFilter::new().with_max_results(2);
+        let lobbies = vec![steamworks::LobbyId::from_raw(11)];
+
+        assert_eq!(
+            SteamworksMatchmakingOperation::LobbyListReceived {
+                request_id: 7,
+                filter: filter.clone(),
+                lobbies: lobbies.clone(),
+            },
+            SteamworksMatchmakingOperation::LobbyListReceived {
+                request_id: 7,
+                filter,
+                lobbies,
+            }
+        );
+
+        let requested_lobby = steamworks::LobbyId::from_raw(22);
+        let joined_lobby = steamworks::LobbyId::from_raw(33);
+        assert_eq!(
+            SteamworksMatchmakingOperation::LobbyJoined {
+                request_id: 8,
+                requested_lobby,
+                lobby: joined_lobby,
+            },
+            SteamworksMatchmakingOperation::LobbyJoined {
+                request_id: 8,
+                requested_lobby,
+                lobby: joined_lobby,
+            }
+        );
+    }
+
+    #[test]
+    fn async_commands_get_unique_request_ids() {
+        let mut state = SteamworksMatchmakingState::default();
+        let command =
+            SteamworksMatchmakingCommand::request_lobby_list(SteamworksLobbyListFilter::new());
+
+        assert_eq!(async_command_request_id(&command, &mut state), Some(0));
+        assert_eq!(async_command_request_id(&command, &mut state), Some(1));
+        assert_eq!(
+            async_command_request_id(
+                &SteamworksMatchmakingCommand::GetLobbyDataCount {
+                    lobby: steamworks::LobbyId::from_raw(1),
+                },
+                &mut state,
+            ),
+            None
         );
     }
 }

@@ -29,9 +29,11 @@ pub use steamworks::{
     screenshots::{ScreenshotReady, ScreenshotRequested},
 };
 
+pub mod apps;
 pub mod friends;
 pub mod matchmaking;
 pub mod user_stats;
+pub use apps::*;
 pub use friends::*;
 pub use matchmaking::*;
 pub use user_stats::*;
@@ -39,18 +41,21 @@ pub use user_stats::*;
 /// Common imports for Bevy apps using this crate.
 pub mod prelude {
     pub use crate::{
-        steamworks, SteamworksAvatar, SteamworksAvatarSize, SteamworksCallbackRegistry,
-        SteamworksClient, SteamworksCoplayFriendInfo, SteamworksEvent, SteamworksFailurePolicy,
-        SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendsCommand,
-        SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
-        SteamworksFriendsResult, SteamworksFriendsState, SteamworksInitMode,
-        SteamworksLobbyGameServer, SteamworksLobbyListFilter, SteamworksLobbyNearFilter,
-        SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter, SteamworksMatchmakingCommand,
-        SteamworksMatchmakingError, SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin,
-        SteamworksMatchmakingResult, SteamworksMatchmakingState, SteamworksOverlayToStoreAction,
-        SteamworksPlugin, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
-        SteamworksStatsState, SteamworksSystem, SteamworksUnavailable,
+        steamworks, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
+        SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState, SteamworksAvatar,
+        SteamworksAvatarSize, SteamworksCallbackRegistry, SteamworksClient,
+        SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
+        SteamworksFailurePolicy, SteamworksFriendGameInfo, SteamworksFriendInfo,
+        SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
+        SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksFriendsState,
+        SteamworksInitMode, SteamworksLobbyGameServer, SteamworksLobbyListFilter,
+        SteamworksLobbyNearFilter, SteamworksLobbyNumberFilter, SteamworksLobbyStringFilter,
+        SteamworksMatchmakingCommand, SteamworksMatchmakingError, SteamworksMatchmakingOperation,
+        SteamworksMatchmakingPlugin, SteamworksMatchmakingResult, SteamworksMatchmakingState,
+        SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksStatsCommand,
+        SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+        SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem,
+        SteamworksUnavailable,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -574,6 +579,8 @@ pub enum SteamworksSystem {
     ProcessFriendsCommands,
     /// Processes high-level Steam matchmaking and lobby commands.
     ProcessMatchmakingCommands,
+    /// Processes high-level Steam app and launch-parameter commands.
+    ProcessAppsCommands,
 }
 
 fn run_steam_callbacks(

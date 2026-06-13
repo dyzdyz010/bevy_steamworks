@@ -161,7 +161,7 @@ fn main() {
 }
 ```
 
-Async calls such as lobby list requests, lobby creation, and lobby joins first emit a submitted operation, then later emit the Steam call result after `SteamworksSystem::RunCallbacks` pumps Steam callbacks. Steam lobby callbacks such as `LobbyCreated`, `LobbyEnter`, `LobbyChatMsg`, and `LobbyDataUpdate` still arrive through `SteamworksEvent`.
+Async calls such as lobby list requests, lobby creation, and lobby joins first emit a submitted operation, then later emit the Steam call result after `SteamworksSystem::RunCallbacks` pumps Steam callbacks. These submitted/completed operations include a plugin-assigned `request_id` so identical in-flight requests can be correlated. Steam lobby callbacks such as `LobbyCreated`, `LobbyEnter`, `LobbyChatMsg`, and `LobbyDataUpdate` still arrive through `SteamworksEvent`.
 
 Commands validate lobby keys, strings, lobby size, and chat message size before calling upstream `steamworks` methods, so common invalid inputs become structured `SteamworksMatchmakingError` values instead of panicking in the Steam API wrapper.
 
@@ -171,6 +171,46 @@ Run the matchmaking example with:
 cargo run --example matchmaking
 $env:BEVY_STEAMWORKS_CREATE_PRIVATE_LOBBY = "1"
 cargo run --example matchmaking
+```
+
+## App, Ownership, and Launch Parameters
+
+`SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_app_info(mut apps: MessageWriter<SteamworksAppsCommand>) {
+    apps.write(SteamworksAppsCommand::GetCurrentAppInfo);
+    apps.write(SteamworksAppsCommand::is_dlc_installed(123456));
+    apps.write(SteamworksAppsCommand::get_launch_query_param("connect"));
+}
+
+fn read_app_info(mut results: MessageReader<SteamworksAppsResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksAppsPlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_app_info)
+        .add_systems(Update, read_app_info)
+        .run();
+}
+```
+
+`SteamworksAppsCommand::GetCurrentAppInfo` combines the most commonly needed app checks into one `SteamworksCurrentAppInfo` snapshot. Launch query keys are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksAppsError::InvalidString` instead of panicking.
+
+Run the app info example with:
+
+```powershell
+cargo run --example apps
+$env:BEVY_STEAMWORKS_LAUNCH_PARAM = "connect"
+cargo run --example apps
 ```
 
 ## Achievements and Stats
