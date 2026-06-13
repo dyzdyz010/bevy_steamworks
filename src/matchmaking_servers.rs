@@ -67,8 +67,24 @@ impl Plugin for SteamworksMatchmakingServersPlugin {
 pub struct SteamworksMatchmakingServersState {
     last_error: Option<SteamworksMatchmakingServersError>,
     active_server_list_requests: usize,
+    last_server_list_request: Option<SteamworksServerListRequestInfo>,
+    last_released_server_list_request: Option<SteamworksServerListRequestId>,
+    last_server_list_refresh_request: Option<SteamworksServerListRequestId>,
+    last_refresh_completion_request: Option<SteamworksServerListRequestId>,
+    last_server_refresh_request: Option<SteamworksServerListServerIndex>,
+    last_server_list_count: Option<SteamworksServerListCount>,
+    last_server_list_refreshing: Option<SteamworksServerListRefreshing>,
+    last_server_response: Option<SteamworksServerListServerIndex>,
+    last_server_failure: Option<SteamworksServerListServerIndex>,
+    last_server_details_read: Option<SteamworksServerListServerIndex>,
     last_server: Option<SteamworksGameServerItem>,
     last_refresh_response: Option<SteamworksServerListResponse>,
+    server_list_request_count: u64,
+    server_list_release_count: u64,
+    server_list_refresh_request_count: u64,
+    server_refresh_request_count: u64,
+    server_list_count_read_count: u64,
+    server_list_refreshing_read_count: u64,
     server_response_count: u64,
     server_failure_count: u64,
     refresh_complete_count: u64,
@@ -86,6 +102,56 @@ impl SteamworksMatchmakingServersState {
         self.active_server_list_requests
     }
 
+    /// Returns the most recent server-list request submitted through this plugin.
+    pub fn last_server_list_request(&self) -> Option<&SteamworksServerListRequestInfo> {
+        self.last_server_list_request.as_ref()
+    }
+
+    /// Returns the most recent server-list request released through this plugin.
+    pub fn last_released_server_list_request(&self) -> Option<SteamworksServerListRequestId> {
+        self.last_released_server_list_request
+    }
+
+    /// Returns the most recent server-list refresh request submitted through this plugin.
+    pub fn last_server_list_refresh_request(&self) -> Option<SteamworksServerListRequestId> {
+        self.last_server_list_refresh_request
+    }
+
+    /// Returns the most recent server-list request whose refresh completed.
+    pub fn last_refresh_completion_request(&self) -> Option<SteamworksServerListRequestId> {
+        self.last_refresh_completion_request
+    }
+
+    /// Returns the most recent single-server refresh request submitted through this plugin.
+    pub fn last_server_refresh_request(&self) -> Option<SteamworksServerListServerIndex> {
+        self.last_server_refresh_request
+    }
+
+    /// Returns the most recent server-list count read through this plugin.
+    pub fn last_server_list_count(&self) -> Option<SteamworksServerListCount> {
+        self.last_server_list_count
+    }
+
+    /// Returns the most recent server-list refreshing state read through this plugin.
+    pub fn last_server_list_refreshing(&self) -> Option<SteamworksServerListRefreshing> {
+        self.last_server_list_refreshing
+    }
+
+    /// Returns the most recent server response callback context.
+    pub fn last_server_response(&self) -> Option<SteamworksServerListServerIndex> {
+        self.last_server_response
+    }
+
+    /// Returns the most recent server failure callback context.
+    pub fn last_server_failure(&self) -> Option<SteamworksServerListServerIndex> {
+        self.last_server_failure
+    }
+
+    /// Returns the most recent server details read context.
+    pub fn last_server_details_read(&self) -> Option<SteamworksServerListServerIndex> {
+        self.last_server_details_read
+    }
+
     /// Returns the most recent server snapshot read or received by callback.
     pub fn last_server(&self) -> Option<&SteamworksGameServerItem> {
         self.last_server.as_ref()
@@ -94,6 +160,36 @@ impl SteamworksMatchmakingServersState {
     /// Returns the most recent server-list refresh completion response.
     pub fn last_refresh_response(&self) -> Option<SteamworksServerListResponse> {
         self.last_refresh_response
+    }
+
+    /// Returns how many server-list requests were submitted.
+    pub fn server_list_request_count(&self) -> u64 {
+        self.server_list_request_count
+    }
+
+    /// Returns how many server-list requests were released.
+    pub fn server_list_release_count(&self) -> u64 {
+        self.server_list_release_count
+    }
+
+    /// Returns how many server-list refresh commands were submitted.
+    pub fn server_list_refresh_request_count(&self) -> u64 {
+        self.server_list_refresh_request_count
+    }
+
+    /// Returns how many single-server refresh commands were submitted.
+    pub fn server_refresh_request_count(&self) -> u64 {
+        self.server_refresh_request_count
+    }
+
+    /// Returns how many server-list count reads were observed.
+    pub fn server_list_count_read_count(&self) -> u64 {
+        self.server_list_count_read_count
+    }
+
+    /// Returns how many server-list refreshing state reads were observed.
+    pub fn server_list_refreshing_read_count(&self) -> u64 {
+        self.server_list_refreshing_read_count
     }
 
     /// Returns how many server responded callbacks were observed.
@@ -117,23 +213,101 @@ impl SteamworksMatchmakingServersState {
 
     fn record_operation(&mut self, operation: &SteamworksMatchmakingServersOperation) {
         match operation {
-            SteamworksMatchmakingServersOperation::ServerResponded { server, .. } => {
+            SteamworksMatchmakingServersOperation::ServerListRequested {
+                request,
+                app_id,
+                kind,
+                filters,
+            } => {
+                self.last_server_list_request = Some(SteamworksServerListRequestInfo {
+                    request: *request,
+                    app_id: *app_id,
+                    kind: *kind,
+                    filters: filters.clone(),
+                });
+                self.server_list_request_count = self.server_list_request_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerResponded {
+                request,
+                server_index,
+                server,
+            } => {
                 self.last_server = Some(server.clone());
+                self.last_server_response = Some(SteamworksServerListServerIndex {
+                    request: *request,
+                    server_index: *server_index,
+                });
                 self.server_response_count = self.server_response_count.saturating_add(1);
             }
-            SteamworksMatchmakingServersOperation::ServerFailedToRespond { .. } => {
+            SteamworksMatchmakingServersOperation::ServerFailedToRespond {
+                request,
+                server_index,
+            } => {
+                self.last_server_failure = Some(SteamworksServerListServerIndex {
+                    request: *request,
+                    server_index: *server_index,
+                });
                 self.server_failure_count = self.server_failure_count.saturating_add(1);
             }
             SteamworksMatchmakingServersOperation::ServerListRefreshCompleted {
-                response, ..
+                request,
+                response,
+                ..
             } => {
+                self.last_refresh_completion_request = Some(*request);
                 self.last_refresh_response = Some(*response);
                 self.refresh_complete_count = self.refresh_complete_count.saturating_add(1);
             }
-            SteamworksMatchmakingServersOperation::ServerDetailsRead { server, .. } => {
+            SteamworksMatchmakingServersOperation::ServerListRefreshSubmitted { request } => {
+                self.last_server_list_refresh_request = Some(*request);
+                self.server_list_refresh_request_count =
+                    self.server_list_refresh_request_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerRefreshSubmitted {
+                request,
+                server_index,
+            } => {
+                self.last_server_refresh_request = Some(SteamworksServerListServerIndex {
+                    request: *request,
+                    server_index: *server_index,
+                });
+                self.server_refresh_request_count =
+                    self.server_refresh_request_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerListCountRead { request, count } => {
+                self.last_server_list_count = Some(SteamworksServerListCount {
+                    request: *request,
+                    count: *count,
+                });
+                self.server_list_count_read_count =
+                    self.server_list_count_read_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerDetailsRead {
+                request,
+                server_index,
+                server,
+            } => {
+                self.last_server_details_read = Some(SteamworksServerListServerIndex {
+                    request: *request,
+                    server_index: *server_index,
+                });
                 self.last_server = Some(server.clone());
             }
-            _ => {}
+            SteamworksMatchmakingServersOperation::ServerListRefreshingRead {
+                request,
+                refreshing,
+            } => {
+                self.last_server_list_refreshing = Some(SteamworksServerListRefreshing {
+                    request: *request,
+                    refreshing: *refreshing,
+                });
+                self.server_list_refreshing_read_count =
+                    self.server_list_refreshing_read_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerListReleased { request } => {
+                self.last_released_server_list_request = Some(*request);
+                self.server_list_release_count = self.server_list_release_count.saturating_add(1);
+            }
         }
     }
 
@@ -162,6 +336,46 @@ impl SteamworksServerListRequestId {
     pub fn raw(self) -> u64 {
         self.0
     }
+}
+
+/// Submitted server-list request context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerListRequestInfo {
+    /// Plugin-owned request ID.
+    pub request: SteamworksServerListRequestId,
+    /// Steam app ID queried.
+    pub app_id: steamworks::AppId,
+    /// Server-list source.
+    pub kind: SteamworksServerListKind,
+    /// Filters applied to the request.
+    pub filters: SteamworksServerListFilters,
+}
+
+/// Server-list request plus server index context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksServerListServerIndex {
+    /// Plugin-owned request ID.
+    pub request: SteamworksServerListRequestId,
+    /// Server index inside the request.
+    pub server_index: i32,
+}
+
+/// Server-list count read context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksServerListCount {
+    /// Plugin-owned request ID.
+    pub request: SteamworksServerListRequestId,
+    /// Server count reported by Steam.
+    pub count: i32,
+}
+
+/// Server-list refreshing state read context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksServerListRefreshing {
+    /// Plugin-owned request ID.
+    pub request: SteamworksServerListRequestId,
+    /// Whether the request is currently refreshing.
+    pub refreshing: bool,
 }
 
 /// Server-list source supported by Steam Matchmaking Servers.
@@ -1365,6 +1579,7 @@ mod tests {
     fn state_records_callback_operations_without_unbounded_history() {
         let mut state = SteamworksMatchmakingServersState::default();
         let request = SteamworksServerListRequestId::from_raw(1);
+        let filters = SteamworksServerListFilters::new().with("map", "arena");
         let server = SteamworksGameServerItem {
             app_id: 480,
             players: 2,
@@ -1388,6 +1603,32 @@ mod tests {
             tags: "tag".to_owned(),
         };
 
+        state.record_operation(
+            &SteamworksMatchmakingServersOperation::ServerListRequested {
+                request,
+                app_id: steamworks::AppId(480),
+                kind: SteamworksServerListKind::Internet,
+                filters: filters.clone(),
+            },
+        );
+        state.record_operation(
+            &SteamworksMatchmakingServersOperation::ServerListRefreshSubmitted { request },
+        );
+        state.record_operation(
+            &SteamworksMatchmakingServersOperation::ServerRefreshSubmitted {
+                request,
+                server_index: 3,
+            },
+        );
+        state.record_operation(
+            &SteamworksMatchmakingServersOperation::ServerListCountRead { request, count: 4 },
+        );
+        state.record_operation(
+            &SteamworksMatchmakingServersOperation::ServerListRefreshingRead {
+                request,
+                refreshing: true,
+            },
+        );
         state.record_operation(&SteamworksMatchmakingServersOperation::ServerResponded {
             request,
             server_index: 0,
@@ -1405,12 +1646,77 @@ mod tests {
                 response: SteamworksServerListResponse::ServerResponded,
             },
         );
+        state.record_operation(&SteamworksMatchmakingServersOperation::ServerDetailsRead {
+            request,
+            server_index: 2,
+            server: server.clone(),
+        });
+        state.record_operation(&SteamworksMatchmakingServersOperation::ServerListReleased {
+            request,
+        });
 
+        assert_eq!(
+            state.last_server_list_request(),
+            Some(&SteamworksServerListRequestInfo {
+                request,
+                app_id: steamworks::AppId(480),
+                kind: SteamworksServerListKind::Internet,
+                filters,
+            })
+        );
+        assert_eq!(state.server_list_request_count(), 1);
+        assert_eq!(state.last_server_list_refresh_request(), Some(request));
+        assert_eq!(state.server_list_refresh_request_count(), 1);
+        assert_eq!(
+            state.last_server_refresh_request(),
+            Some(SteamworksServerListServerIndex {
+                request,
+                server_index: 3,
+            })
+        );
+        assert_eq!(state.server_refresh_request_count(), 1);
+        assert_eq!(
+            state.last_server_list_count(),
+            Some(SteamworksServerListCount { request, count: 4 })
+        );
+        assert_eq!(state.server_list_count_read_count(), 1);
+        assert_eq!(
+            state.last_server_list_refreshing(),
+            Some(SteamworksServerListRefreshing {
+                request,
+                refreshing: true,
+            })
+        );
+        assert_eq!(state.server_list_refreshing_read_count(), 1);
         assert_eq!(state.last_server(), Some(&server));
+        assert_eq!(
+            state.last_server_response(),
+            Some(SteamworksServerListServerIndex {
+                request,
+                server_index: 0,
+            })
+        );
+        assert_eq!(
+            state.last_server_failure(),
+            Some(SteamworksServerListServerIndex {
+                request,
+                server_index: 1,
+            })
+        );
+        assert_eq!(state.last_refresh_completion_request(), Some(request));
         assert_eq!(
             state.last_refresh_response(),
             Some(SteamworksServerListResponse::ServerResponded)
         );
+        assert_eq!(
+            state.last_server_details_read(),
+            Some(SteamworksServerListServerIndex {
+                request,
+                server_index: 2,
+            })
+        );
+        assert_eq!(state.last_released_server_list_request(), Some(request));
+        assert_eq!(state.server_list_release_count(), 1);
         assert_eq!(state.server_response_count(), 1);
         assert_eq!(state.server_failure_count(), 1);
         assert_eq!(state.refresh_complete_count(), 1);

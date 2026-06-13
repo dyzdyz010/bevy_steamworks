@@ -267,6 +267,8 @@ fn read_servers(
 
 Server-list callbacks are converted into owned Bevy result messages: `ServerResponded`, `ServerFailedToRespond`, and `ServerListRefreshCompleted`. Server snapshots use `SteamworksGameServerItem`, which can be stored safely in ECS. LAN requests do not accept filters; non-LAN simple keyed filter names and values are validated before calling upstream Steamworks. The upstream wrapper models filters as a map, so repeated or order-sensitive boolean filter clauses are not represented by `SteamworksServerListFilters`. Release can fail while the upstream request is still refreshing, in which case the request remains owned by the plugin and can be released later.
 
+`SteamworksMatchmakingServersState` caches bounded server-browser snapshots: active request count, latest submitted/released server-list request, latest refresh and single-server refresh submissions, latest count/refreshing reads, latest server response/failure/details contexts, latest server snapshot, and refresh completion counters. It keeps counters and last snapshots instead of retaining unbounded server or callback history.
+
 Run the server browser example with:
 
 ```powershell
