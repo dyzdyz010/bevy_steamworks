@@ -177,7 +177,7 @@ fn main() {
 }
 ```
 
-Commands validate strings before calling upstream `steamworks` methods, so interior NUL bytes are reported as `SteamworksFriendsError::InvalidString` instead of panicking inside a Steam C string conversion. Friend list results use snapshot types such as `SteamworksFriendInfo`, which are safe to store in ECS resources or messages. Overlay activation, persona state changes, lobby join requests, and Rich Presence join requests are still available through `SteamworksEvent`, and are also mirrored as `SteamworksFriendsResult` messages for module-local systems.
+Commands validate strings before calling upstream `steamworks` methods, so interior NUL bytes are reported as `SteamworksFriendsError::InvalidString` instead of panicking inside a Steam C string conversion. Friend list results use snapshot types such as `SteamworksFriendInfo`, which are safe to store in ECS resources or messages. `SteamworksFriendsState` keeps the latest friend list plus a merged per-user cache; systems can query `friend`, `coplay_friend`, `friend_rich_presence`, `friend_avatar`, `has_friend`, and the latest overlay/invite actions without retaining result history. Rich Presence and avatar accessors use an outer `Option` for unread data and an inner `Option` for a completed read where Steam had no value or image available yet. Overlay activation, persona state changes, lobby join requests, and Rich Presence join requests are still available through `SteamworksEvent`, and are also mirrored as `SteamworksFriendsResult` messages for module-local systems.
 
 Run the social example with:
 

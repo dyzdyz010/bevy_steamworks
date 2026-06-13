@@ -56,7 +56,21 @@ pub struct SteamworksFriendsState {
     last_error: Option<SteamworksFriendsError>,
     last_persona_name: Option<String>,
     friends: Vec<SteamworksFriendInfo>,
+    known_friends: Vec<SteamworksFriendInfo>,
     coplay_friends: Vec<SteamworksCoplayFriendInfo>,
+    last_user_information_request: Option<SteamworksUserInformationRequest>,
+    last_rich_presence_change: Option<SteamworksRichPresenceChange>,
+    friend_rich_presence: Vec<SteamworksFriendRichPresenceValue>,
+    last_game_overlay_dialog: Option<String>,
+    last_game_overlay_web_page: Option<String>,
+    last_game_overlay_store: Option<SteamworksOverlayStoreActivation>,
+    last_game_overlay_user: Option<SteamworksOverlayUserActivation>,
+    last_invite_dialog: Option<steamworks::LobbyId>,
+    last_invite_connect_string: Option<String>,
+    last_user_invite: Option<SteamworksUserGameInvite>,
+    last_played_with: Option<steamworks::SteamId>,
+    has_friend_results: Vec<SteamworksHasFriendResult>,
+    friend_avatars: Vec<SteamworksFriendAvatar>,
     overlay_active: Option<bool>,
     last_persona_state_change: Option<SteamworksPersonaStateChange>,
     last_lobby_join_request: Option<SteamworksLobbyJoinRequest>,
@@ -79,9 +93,139 @@ impl SteamworksFriendsState {
         &self.friends
     }
 
+    /// Returns the latest known snapshot for a Steam user.
+    ///
+    /// This cache is merged from list, coplay, and single-friend reads.
+    pub fn friend(&self, steam_id: steamworks::SteamId) -> Option<&SteamworksFriendInfo> {
+        self.known_friends
+            .iter()
+            .find(|friend| friend.steam_id == steam_id)
+    }
+
+    /// Returns all latest known friend snapshots cached by this plugin.
+    pub fn known_friends(&self) -> &[SteamworksFriendInfo] {
+        &self.known_friends
+    }
+
     /// Returns the last recently-played-with snapshot read through the plugin.
     pub fn coplay_friends(&self) -> &[SteamworksCoplayFriendInfo] {
         &self.coplay_friends
+    }
+
+    /// Returns the cached coplay snapshot for a Steam user.
+    pub fn coplay_friend(
+        &self,
+        steam_id: steamworks::SteamId,
+    ) -> Option<&SteamworksCoplayFriendInfo> {
+        self.coplay_friends
+            .iter()
+            .find(|friend| friend.friend.steam_id == steam_id)
+    }
+
+    /// Returns the most recent user information refresh request submitted through this plugin.
+    pub fn last_user_information_request(&self) -> Option<&SteamworksUserInformationRequest> {
+        self.last_user_information_request.as_ref()
+    }
+
+    /// Returns the most recent current-user Rich Presence mutation submitted through this plugin.
+    pub fn last_rich_presence_change(&self) -> Option<&SteamworksRichPresenceChange> {
+        self.last_rich_presence_change.as_ref()
+    }
+
+    /// Returns the latest Rich Presence value read for a friend/key pair.
+    ///
+    /// The outer `Option` distinguishes an unread key from a completed read. The inner
+    /// `Option` is `None` when Steam reported no value for the key.
+    pub fn friend_rich_presence(
+        &self,
+        steam_id: steamworks::SteamId,
+        key: &str,
+    ) -> Option<Option<&str>> {
+        self.friend_rich_presence
+            .iter()
+            .find(|presence| presence.steam_id == steam_id && presence.key == key)
+            .map(|presence| presence.value.as_deref())
+    }
+
+    /// Returns all friend Rich Presence reads cached by this plugin.
+    pub fn friend_rich_presence_values(&self) -> &[SteamworksFriendRichPresenceValue] {
+        &self.friend_rich_presence
+    }
+
+    /// Returns the most recent overlay dialog activated through this plugin.
+    pub fn last_game_overlay_dialog(&self) -> Option<&str> {
+        self.last_game_overlay_dialog.as_deref()
+    }
+
+    /// Returns the most recent overlay web page activated through this plugin.
+    pub fn last_game_overlay_web_page(&self) -> Option<&str> {
+        self.last_game_overlay_web_page.as_deref()
+    }
+
+    /// Returns the most recent overlay store activation submitted through this plugin.
+    pub fn last_game_overlay_store(&self) -> Option<SteamworksOverlayStoreActivation> {
+        self.last_game_overlay_store
+    }
+
+    /// Returns the most recent user-scoped overlay activation submitted through this plugin.
+    pub fn last_game_overlay_user(&self) -> Option<&SteamworksOverlayUserActivation> {
+        self.last_game_overlay_user.as_ref()
+    }
+
+    /// Returns the most recent lobby invite dialog activated through this plugin.
+    pub fn last_invite_dialog(&self) -> Option<steamworks::LobbyId> {
+        self.last_invite_dialog
+    }
+
+    /// Returns the most recent connect-string invite dialog activated through this plugin.
+    pub fn last_invite_connect_string(&self) -> Option<&str> {
+        self.last_invite_connect_string.as_deref()
+    }
+
+    /// Returns the most recent game invite submitted through this plugin.
+    pub fn last_user_invite(&self) -> Option<&SteamworksUserGameInvite> {
+        self.last_user_invite.as_ref()
+    }
+
+    /// Returns the most recent user marked as played-with through this plugin.
+    pub fn last_played_with(&self) -> Option<steamworks::SteamId> {
+        self.last_played_with
+    }
+
+    /// Returns the latest relationship check result for a user/flags pair.
+    pub fn has_friend(
+        &self,
+        steam_id: steamworks::SteamId,
+        flags: steamworks::FriendFlags,
+    ) -> Option<bool> {
+        self.has_friend_results.iter().find_map(|result| {
+            (result.steam_id == steam_id && result.flags == flags).then_some(result.has_friend)
+        })
+    }
+
+    /// Returns all friend relationship checks cached by this plugin.
+    pub fn has_friend_results(&self) -> &[SteamworksHasFriendResult] {
+        &self.has_friend_results
+    }
+
+    /// Returns the latest avatar read result for a user and size.
+    ///
+    /// The outer `Option` distinguishes an unread avatar from a completed read. The inner
+    /// `Option` is `None` when Steam has no image available yet.
+    pub fn friend_avatar(
+        &self,
+        steam_id: steamworks::SteamId,
+        size: SteamworksAvatarSize,
+    ) -> Option<Option<&SteamworksAvatar>> {
+        self.friend_avatars
+            .iter()
+            .find(|avatar| avatar.steam_id == steam_id && avatar.size == size)
+            .map(|avatar| avatar.avatar.as_ref())
+    }
+
+    /// Returns all friend avatar reads cached by this plugin.
+    pub fn friend_avatars(&self) -> &[SteamworksFriendAvatar] {
+        &self.friend_avatars
     }
 
     /// Returns the most recent Steam overlay active state reported by callback.
@@ -115,9 +259,102 @@ impl SteamworksFriendsState {
             }
             SteamworksFriendsOperation::FriendsListed { friends, .. } => {
                 self.friends.clone_from(friends);
+                for friend in friends {
+                    upsert_friend(&mut self.known_friends, friend.clone());
+                }
             }
             SteamworksFriendsOperation::CoplayFriendsListed { friends } => {
                 self.coplay_friends.clone_from(friends);
+                for friend in friends {
+                    upsert_friend(&mut self.known_friends, friend.friend.clone());
+                }
+            }
+            SteamworksFriendsOperation::FriendRead { friend } => {
+                upsert_friend(&mut self.known_friends, friend.clone());
+            }
+            SteamworksFriendsOperation::UserInformationRequested {
+                steam_id,
+                name_only,
+                requested,
+            } => {
+                self.last_user_information_request = Some(SteamworksUserInformationRequest {
+                    steam_id: *steam_id,
+                    name_only: *name_only,
+                    requested: *requested,
+                });
+            }
+            SteamworksFriendsOperation::RichPresenceSet { key, cleared } => {
+                self.last_rich_presence_change = Some(SteamworksRichPresenceChange::Key {
+                    key: key.clone(),
+                    cleared: *cleared,
+                });
+            }
+            SteamworksFriendsOperation::RichPresenceCleared => {
+                self.last_rich_presence_change = Some(SteamworksRichPresenceChange::ClearedAll);
+            }
+            SteamworksFriendsOperation::FriendRichPresenceRead {
+                steam_id,
+                key,
+                value,
+            } => {
+                upsert_friend_rich_presence(
+                    &mut self.friend_rich_presence,
+                    *steam_id,
+                    key.clone(),
+                    value.clone(),
+                );
+            }
+            SteamworksFriendsOperation::GameOverlayActivated { dialog } => {
+                self.last_game_overlay_dialog = Some(dialog.clone());
+            }
+            SteamworksFriendsOperation::GameOverlayToWebPageActivated { url } => {
+                self.last_game_overlay_web_page = Some(url.clone());
+            }
+            SteamworksFriendsOperation::GameOverlayToStoreActivated { app_id, action } => {
+                self.last_game_overlay_store = Some(SteamworksOverlayStoreActivation {
+                    app_id: *app_id,
+                    action: *action,
+                });
+            }
+            SteamworksFriendsOperation::GameOverlayToUserActivated { dialog, steam_id } => {
+                self.last_game_overlay_user = Some(SteamworksOverlayUserActivation {
+                    dialog: dialog.clone(),
+                    steam_id: *steam_id,
+                });
+            }
+            SteamworksFriendsOperation::InviteDialogActivated { lobby } => {
+                self.last_invite_dialog = Some(*lobby);
+            }
+            SteamworksFriendsOperation::InviteDialogConnectStringActivated { connect } => {
+                self.last_invite_connect_string = Some(connect.clone());
+            }
+            SteamworksFriendsOperation::UserInvitedToGame { steam_id, connect } => {
+                self.last_user_invite = Some(SteamworksUserGameInvite {
+                    steam_id: *steam_id,
+                    connect: connect.clone(),
+                });
+            }
+            SteamworksFriendsOperation::PlayedWithSet { steam_id } => {
+                self.last_played_with = Some(*steam_id);
+            }
+            SteamworksFriendsOperation::HasFriendRead {
+                steam_id,
+                flags,
+                has_friend,
+            } => {
+                upsert_has_friend_result(
+                    &mut self.has_friend_results,
+                    *steam_id,
+                    *flags,
+                    *has_friend,
+                );
+            }
+            SteamworksFriendsOperation::FriendAvatarRead {
+                steam_id,
+                size,
+                avatar,
+            } => {
+                upsert_friend_avatar(&mut self.friend_avatars, *steam_id, *size, avatar.clone());
             }
             SteamworksFriendsOperation::GameOverlayActivationChanged { active } => {
                 self.overlay_active = Some(*active);
@@ -131,8 +368,78 @@ impl SteamworksFriendsState {
             SteamworksFriendsOperation::GameRichPresenceJoinRequested { request } => {
                 self.last_rich_presence_join_request = Some(request.clone());
             }
-            _ => {}
         }
+    }
+}
+
+fn upsert_friend(friends: &mut Vec<SteamworksFriendInfo>, friend: SteamworksFriendInfo) {
+    if let Some(known) = friends
+        .iter_mut()
+        .find(|known| known.steam_id == friend.steam_id)
+    {
+        *known = friend;
+    } else {
+        friends.push(friend);
+    }
+}
+
+fn upsert_friend_rich_presence(
+    values: &mut Vec<SteamworksFriendRichPresenceValue>,
+    steam_id: steamworks::SteamId,
+    key: String,
+    value: Option<String>,
+) {
+    if let Some(known) = values
+        .iter_mut()
+        .find(|known| known.steam_id == steam_id && known.key == key)
+    {
+        known.value = value;
+    } else {
+        values.push(SteamworksFriendRichPresenceValue {
+            steam_id,
+            key,
+            value,
+        });
+    }
+}
+
+fn upsert_has_friend_result(
+    values: &mut Vec<SteamworksHasFriendResult>,
+    steam_id: steamworks::SteamId,
+    flags: steamworks::FriendFlags,
+    has_friend: bool,
+) {
+    if let Some(known) = values
+        .iter_mut()
+        .find(|known| known.steam_id == steam_id && known.flags == flags)
+    {
+        known.has_friend = has_friend;
+    } else {
+        values.push(SteamworksHasFriendResult {
+            steam_id,
+            flags,
+            has_friend,
+        });
+    }
+}
+
+fn upsert_friend_avatar(
+    values: &mut Vec<SteamworksFriendAvatar>,
+    steam_id: steamworks::SteamId,
+    size: SteamworksAvatarSize,
+    avatar: Option<SteamworksAvatar>,
+) {
+    if let Some(known) = values
+        .iter_mut()
+        .find(|known| known.steam_id == steam_id && known.size == size)
+    {
+        known.avatar = avatar;
+    } else {
+        values.push(SteamworksFriendAvatar {
+            steam_id,
+            size,
+            avatar,
+        });
     }
 }
 
@@ -248,6 +555,91 @@ pub struct SteamworksAvatar {
     pub height: u32,
     /// RGBA pixel bytes.
     pub rgba: Vec<u8>,
+}
+
+/// User information refresh request snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksUserInformationRequest {
+    /// User Steam ID.
+    pub steam_id: steamworks::SteamId,
+    /// Whether only the persona name was requested.
+    pub name_only: bool,
+    /// Whether Steam reported that an asynchronous refresh is needed.
+    pub requested: bool,
+}
+
+/// Current-user Rich Presence mutation submitted through this plugin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SteamworksRichPresenceChange {
+    /// One key was set or cleared.
+    Key {
+        /// Rich Presence key.
+        key: String,
+        /// Whether the key was cleared.
+        cleared: bool,
+    },
+    /// All current-user Rich Presence key/value pairs were cleared.
+    ClearedAll,
+}
+
+/// Rich Presence value read for a friend/key pair.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksFriendRichPresenceValue {
+    /// Friend Steam ID.
+    pub steam_id: steamworks::SteamId,
+    /// Rich Presence key.
+    pub key: String,
+    /// Value reported by Steam, or `None` when the key is absent.
+    pub value: Option<String>,
+}
+
+/// Steam overlay store activation snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksOverlayStoreActivation {
+    /// Steam app ID opened.
+    pub app_id: steamworks::AppId,
+    /// Store overlay behavior.
+    pub action: SteamworksOverlayToStoreAction,
+}
+
+/// Steam overlay user-dialog activation snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksOverlayUserActivation {
+    /// Overlay dialog name.
+    pub dialog: String,
+    /// Target user Steam ID.
+    pub steam_id: steamworks::SteamId,
+}
+
+/// Game invite submitted to a Steam user.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUserGameInvite {
+    /// Target user Steam ID.
+    pub steam_id: steamworks::SteamId,
+    /// Connect string sent to the target user.
+    pub connect: String,
+}
+
+/// Friend relationship check snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksHasFriendResult {
+    /// Target user Steam ID.
+    pub steam_id: steamworks::SteamId,
+    /// Friend flags tested.
+    pub flags: steamworks::FriendFlags,
+    /// Whether the relationship matched.
+    pub has_friend: bool,
+}
+
+/// Friend avatar read snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksFriendAvatar {
+    /// Friend Steam ID.
+    pub steam_id: steamworks::SteamId,
+    /// Requested avatar size.
+    pub size: SteamworksAvatarSize,
+    /// Avatar bytes, or `None` when Steam has no image available yet.
+    pub avatar: Option<SteamworksAvatar>,
 }
 
 /// How the Steam overlay should handle a store page.
@@ -597,6 +989,8 @@ pub enum SteamworksFriendsOperation {
     FriendAvatarRead {
         /// Friend Steam ID.
         steam_id: steamworks::SteamId,
+        /// Avatar size requested.
+        size: SteamworksAvatarSize,
         /// Avatar bytes, or `None` when Steam has no image available yet.
         avatar: Option<SteamworksAvatar>,
     },
@@ -913,6 +1307,7 @@ fn handle_friends_command(
             });
             Ok(SteamworksFriendsOperation::FriendAvatarRead {
                 steam_id: *steam_id,
+                size: *size,
                 avatar,
             })
         }
@@ -1044,6 +1439,187 @@ mod tests {
             validate_command_strings(&command),
             Err(SteamworksFriendsError::InvalidString { field: "connect" })
         );
+    }
+
+    #[test]
+    fn state_records_friend_operations() {
+        let mut state = SteamworksFriendsState::default();
+        let user = steamworks::SteamId::from_raw(1);
+        let friend = steamworks::SteamId::from_raw(2);
+        let lobby = steamworks::LobbyId::from_raw(3);
+        let app_id = steamworks::AppId(480);
+        let flags = steamworks::FriendFlags::IMMEDIATE;
+        let initial_friend = SteamworksFriendInfo {
+            steam_id: friend,
+            name: "Alex".to_owned(),
+            nickname: None,
+            state: steamworks::FriendState::Online,
+            game: None,
+        };
+        let updated_friend = SteamworksFriendInfo {
+            steam_id: friend,
+            name: "Alex Updated".to_owned(),
+            nickname: Some("A".to_owned()),
+            state: steamworks::FriendState::Busy,
+            game: None,
+        };
+        let coplay_friend = SteamworksCoplayFriendInfo {
+            friend: SteamworksFriendInfo {
+                steam_id: user,
+                name: "Morgan".to_owned(),
+                nickname: None,
+                state: steamworks::FriendState::Away,
+                game: None,
+            },
+            coplay_app_id: app_id,
+            coplay_time: 123,
+        };
+        let avatar = SteamworksAvatar {
+            size: SteamworksAvatarSize::Small,
+            width: 32,
+            height: 32,
+            rgba: vec![255; 32 * 32 * 4],
+        };
+
+        state.record_operation(&SteamworksFriendsOperation::PersonaNameRead {
+            name: "Current User".to_owned(),
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendsListed {
+            flags,
+            friends: vec![initial_friend.clone()],
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendRead {
+            friend: updated_friend.clone(),
+        });
+        state.record_operation(&SteamworksFriendsOperation::CoplayFriendsListed {
+            friends: vec![coplay_friend.clone()],
+        });
+        state.record_operation(&SteamworksFriendsOperation::UserInformationRequested {
+            steam_id: friend,
+            name_only: true,
+            requested: false,
+        });
+        state.record_operation(&SteamworksFriendsOperation::RichPresenceSet {
+            key: "status".to_owned(),
+            cleared: false,
+        });
+        state.record_operation(&SteamworksFriendsOperation::RichPresenceCleared);
+        state.record_operation(&SteamworksFriendsOperation::FriendRichPresenceRead {
+            steam_id: friend,
+            key: "connect".to_owned(),
+            value: Some("127.0.0.1".to_owned()),
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendRichPresenceRead {
+            steam_id: friend,
+            key: "connect".to_owned(),
+            value: None,
+        });
+        state.record_operation(&SteamworksFriendsOperation::GameOverlayActivated {
+            dialog: "Friends".to_owned(),
+        });
+        state.record_operation(&SteamworksFriendsOperation::GameOverlayToWebPageActivated {
+            url: "https://steamcommunity.com".to_owned(),
+        });
+        state.record_operation(&SteamworksFriendsOperation::GameOverlayToStoreActivated {
+            app_id,
+            action: SteamworksOverlayToStoreAction::AddToCart,
+        });
+        state.record_operation(&SteamworksFriendsOperation::GameOverlayToUserActivated {
+            dialog: "steamid".to_owned(),
+            steam_id: friend,
+        });
+        state.record_operation(&SteamworksFriendsOperation::InviteDialogActivated { lobby });
+        state.record_operation(
+            &SteamworksFriendsOperation::InviteDialogConnectStringActivated {
+                connect: "join=abc".to_owned(),
+            },
+        );
+        state.record_operation(&SteamworksFriendsOperation::UserInvitedToGame {
+            steam_id: friend,
+            connect: "join=abc".to_owned(),
+        });
+        state.record_operation(&SteamworksFriendsOperation::PlayedWithSet { steam_id: friend });
+        state.record_operation(&SteamworksFriendsOperation::HasFriendRead {
+            steam_id: friend,
+            flags,
+            has_friend: false,
+        });
+        state.record_operation(&SteamworksFriendsOperation::HasFriendRead {
+            steam_id: friend,
+            flags,
+            has_friend: true,
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendAvatarRead {
+            steam_id: friend,
+            size: SteamworksAvatarSize::Small,
+            avatar: None,
+        });
+        assert_eq!(
+            state.friend_avatar(friend, SteamworksAvatarSize::Small),
+            Some(None)
+        );
+        state.record_operation(&SteamworksFriendsOperation::FriendAvatarRead {
+            steam_id: friend,
+            size: SteamworksAvatarSize::Small,
+            avatar: Some(avatar.clone()),
+        });
+
+        assert_eq!(state.last_persona_name(), Some("Current User"));
+        assert_eq!(state.friends(), &[initial_friend]);
+        assert_eq!(state.friend(friend), Some(&updated_friend));
+        assert_eq!(state.known_friends().len(), 2);
+        assert_eq!(state.coplay_friends(), std::slice::from_ref(&coplay_friend));
+        assert_eq!(state.coplay_friend(user), Some(&coplay_friend));
+        assert_eq!(
+            state.last_user_information_request(),
+            Some(&SteamworksUserInformationRequest {
+                steam_id: friend,
+                name_only: true,
+                requested: false,
+            })
+        );
+        assert_eq!(
+            state.last_rich_presence_change(),
+            Some(&SteamworksRichPresenceChange::ClearedAll)
+        );
+        assert_eq!(state.friend_rich_presence(friend, "connect"), Some(None));
+        assert_eq!(state.friend_rich_presence_values().len(), 1);
+        assert_eq!(state.last_game_overlay_dialog(), Some("Friends"));
+        assert_eq!(
+            state.last_game_overlay_web_page(),
+            Some("https://steamcommunity.com")
+        );
+        assert_eq!(
+            state.last_game_overlay_store(),
+            Some(SteamworksOverlayStoreActivation {
+                app_id,
+                action: SteamworksOverlayToStoreAction::AddToCart,
+            })
+        );
+        assert_eq!(
+            state.last_game_overlay_user(),
+            Some(&SteamworksOverlayUserActivation {
+                dialog: "steamid".to_owned(),
+                steam_id: friend,
+            })
+        );
+        assert_eq!(state.last_invite_dialog(), Some(lobby));
+        assert_eq!(state.last_invite_connect_string(), Some("join=abc"));
+        assert_eq!(
+            state.last_user_invite(),
+            Some(&SteamworksUserGameInvite {
+                steam_id: friend,
+                connect: "join=abc".to_owned(),
+            })
+        );
+        assert_eq!(state.last_played_with(), Some(friend));
+        assert_eq!(state.has_friend(friend, flags), Some(true));
+        assert_eq!(state.has_friend_results().len(), 1);
+        assert_eq!(
+            state.friend_avatar(friend, SteamworksAvatarSize::Small),
+            Some(Some(&avatar))
+        );
+        assert_eq!(state.friend_avatars().len(), 1);
     }
 
     #[test]
