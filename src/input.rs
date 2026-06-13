@@ -55,14 +55,19 @@ impl Plugin for SteamworksInputPlugin {
 pub struct SteamworksInputState {
     last_error: Option<SteamworksInputError>,
     initialized: bool,
+    frame_run_count: u64,
     controllers: Vec<SteamworksInputControllerInfo>,
     action_sets: Vec<SteamworksInputNamedActionSetHandle>,
     digital_actions: Vec<SteamworksInputNamedDigitalActionHandle>,
     analog_actions: Vec<SteamworksInputNamedAnalogActionHandle>,
     action_manifest_path: Option<String>,
+    last_action_set_activation: Option<SteamworksInputActionSetActivation>,
     last_digital_action: Option<SteamworksInputDigitalActionSnapshot>,
     last_analog_action: Option<SteamworksInputAnalogActionSnapshot>,
+    last_digital_action_origins: Option<SteamworksInputDigitalActionOriginsSnapshot>,
+    last_analog_action_origins: Option<SteamworksInputAnalogActionOriginsSnapshot>,
     last_motion: Option<SteamworksInputMotionSnapshot>,
+    last_binding_panel_controller: Option<SteamworksInputHandle>,
 }
 
 impl SteamworksInputState {
@@ -77,9 +82,24 @@ impl SteamworksInputState {
         self.initialized
     }
 
-    /// Returns the most recent connected controller list read through the plugin.
+    /// Returns how many successful [`SteamworksInputCommand::RunFrame`] commands this plugin observed.
+    pub fn frame_run_count(&self) -> u64 {
+        self.frame_run_count
+    }
+
+    /// Returns the known controller snapshots read through the plugin.
     pub fn controllers(&self) -> &[SteamworksInputControllerInfo] {
         &self.controllers
+    }
+
+    /// Returns the cached controller snapshot for a handle.
+    pub fn controller(
+        &self,
+        handle: SteamworksInputHandle,
+    ) -> Option<&SteamworksInputControllerInfo> {
+        self.controllers
+            .iter()
+            .find(|controller| controller.handle == handle)
     }
 
     /// Returns action set handles read through the plugin.
@@ -87,9 +107,23 @@ impl SteamworksInputState {
         &self.action_sets
     }
 
+    /// Returns the cached action set handle for a manifest action set name.
+    pub fn action_set_handle(&self, name: &str) -> Option<SteamworksInputActionSetHandle> {
+        self.action_sets
+            .iter()
+            .find_map(|handle| (handle.name == name).then_some(handle.handle))
+    }
+
     /// Returns digital action handles read through the plugin.
     pub fn digital_actions(&self) -> &[SteamworksInputNamedDigitalActionHandle] {
         &self.digital_actions
+    }
+
+    /// Returns the cached digital action handle for a manifest action name.
+    pub fn digital_action_handle(&self, name: &str) -> Option<SteamworksInputDigitalActionHandle> {
+        self.digital_actions
+            .iter()
+            .find_map(|handle| (handle.name == name).then_some(handle.handle))
     }
 
     /// Returns analog action handles read through the plugin.
@@ -97,9 +131,21 @@ impl SteamworksInputState {
         &self.analog_actions
     }
 
+    /// Returns the cached analog action handle for a manifest action name.
+    pub fn analog_action_handle(&self, name: &str) -> Option<SteamworksInputAnalogActionHandle> {
+        self.analog_actions
+            .iter()
+            .find_map(|handle| (handle.name == name).then_some(handle.handle))
+    }
+
     /// Returns the most recent action manifest path accepted by Steam Input.
     pub fn action_manifest_path(&self) -> Option<&str> {
         self.action_manifest_path.as_deref()
+    }
+
+    /// Returns the most recent action set activation submitted through this plugin.
+    pub fn last_action_set_activation(&self) -> Option<SteamworksInputActionSetActivation> {
+        self.last_action_set_activation
     }
 
     /// Returns the most recent digital action data snapshot.
@@ -112,9 +158,28 @@ impl SteamworksInputState {
         self.last_analog_action.as_ref()
     }
 
+    /// Returns the most recent digital action origin snapshot.
+    pub fn last_digital_action_origins(
+        &self,
+    ) -> Option<&SteamworksInputDigitalActionOriginsSnapshot> {
+        self.last_digital_action_origins.as_ref()
+    }
+
+    /// Returns the most recent analog action origin snapshot.
+    pub fn last_analog_action_origins(
+        &self,
+    ) -> Option<&SteamworksInputAnalogActionOriginsSnapshot> {
+        self.last_analog_action_origins.as_ref()
+    }
+
     /// Returns the most recent motion data snapshot.
     pub fn last_motion(&self) -> Option<&SteamworksInputMotionSnapshot> {
         self.last_motion.as_ref()
+    }
+
+    /// Returns the most recent controller for which the binding panel was shown.
+    pub fn last_binding_panel_controller(&self) -> Option<SteamworksInputHandle> {
+        self.last_binding_panel_controller
     }
 
     fn record_error(&mut self, error: SteamworksInputError) {
@@ -127,6 +192,9 @@ impl SteamworksInputState {
                 self.clear_cached_input_data();
                 self.action_manifest_path = None;
                 self.initialized = true;
+            }
+            SteamworksInputOperation::FrameRun => {
+                self.frame_run_count = self.frame_run_count.saturating_add(1);
             }
             SteamworksInputOperation::Shutdown => {
                 self.initialized = false;
@@ -152,16 +220,55 @@ impl SteamworksInputState {
             SteamworksInputOperation::AnalogActionHandleRead { name, handle } => {
                 upsert_named_analog_action(&mut self.analog_actions, name.clone(), *handle);
             }
+            SteamworksInputOperation::ActionSetActivated {
+                controller,
+                action_set,
+            } => {
+                self.last_action_set_activation = Some(SteamworksInputActionSetActivation {
+                    controller: *controller,
+                    action_set: *action_set,
+                });
+            }
             SteamworksInputOperation::DigitalActionDataRead { snapshot } => {
                 self.last_digital_action = Some(snapshot.clone());
             }
             SteamworksInputOperation::AnalogActionDataRead { snapshot } => {
                 self.last_analog_action = Some(snapshot.clone());
             }
+            SteamworksInputOperation::DigitalActionOriginsRead {
+                controller,
+                action_set,
+                action,
+                origins,
+            } => {
+                self.last_digital_action_origins =
+                    Some(SteamworksInputDigitalActionOriginsSnapshot {
+                        controller: *controller,
+                        action_set: *action_set,
+                        action: *action,
+                        origins: origins.clone(),
+                    });
+            }
+            SteamworksInputOperation::AnalogActionOriginsRead {
+                controller,
+                action_set,
+                action,
+                origins,
+            } => {
+                self.last_analog_action_origins =
+                    Some(SteamworksInputAnalogActionOriginsSnapshot {
+                        controller: *controller,
+                        action_set: *action_set,
+                        action: *action,
+                        origins: origins.clone(),
+                    });
+            }
             SteamworksInputOperation::MotionDataRead { snapshot } => {
                 self.last_motion = Some(snapshot.clone());
             }
-            _ => {}
+            SteamworksInputOperation::BindingPanelShown { controller } => {
+                self.last_binding_panel_controller = Some(*controller);
+            }
         }
     }
 
@@ -174,9 +281,13 @@ impl SteamworksInputState {
         self.action_sets.clear();
         self.digital_actions.clear();
         self.analog_actions.clear();
+        self.last_action_set_activation = None;
         self.last_digital_action = None;
         self.last_analog_action = None;
+        self.last_digital_action_origins = None;
+        self.last_analog_action_origins = None;
         self.last_motion = None;
+        self.last_binding_panel_controller = None;
     }
 }
 
@@ -394,6 +505,15 @@ pub struct SteamworksInputAnalogActionData {
     pub active: bool,
 }
 
+/// Action set activation context submitted through this plugin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksInputActionSetActivation {
+    /// Controller configured.
+    pub controller: SteamworksInputHandle,
+    /// Action set activated.
+    pub action_set: SteamworksInputActionSetHandle,
+}
+
 /// Steam Input motion data.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SteamworksInputMotionData {
@@ -425,6 +545,32 @@ pub struct SteamworksInputAnalogActionSnapshot {
     pub action: SteamworksInputAnalogActionHandle,
     /// Analog action data returned by Steam Input.
     pub data: SteamworksInputAnalogActionData,
+}
+
+/// Digital action origins with controller, action set, and action context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksInputDigitalActionOriginsSnapshot {
+    /// Controller that was inspected.
+    pub controller: SteamworksInputHandle,
+    /// Active action set context.
+    pub action_set: SteamworksInputActionSetHandle,
+    /// Digital action that was inspected.
+    pub action: SteamworksInputDigitalActionHandle,
+    /// Origin presentation data returned by Steam Input.
+    pub origins: Vec<SteamworksInputActionOriginInfo>,
+}
+
+/// Analog action origins with controller, action set, and action context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksInputAnalogActionOriginsSnapshot {
+    /// Controller that was inspected.
+    pub controller: SteamworksInputHandle,
+    /// Active action set context.
+    pub action_set: SteamworksInputActionSetHandle,
+    /// Analog action that was inspected.
+    pub action: SteamworksInputAnalogActionHandle,
+    /// Origin presentation data returned by Steam Input.
+    pub origins: Vec<SteamworksInputActionOriginInfo>,
 }
 
 /// Motion data with the controller handle context.
@@ -1406,6 +1552,10 @@ mod tests {
                 handle: SteamworksInputActionSetHandle::from_raw(2),
             }]
         );
+        assert_eq!(
+            state.action_set_handle("gameplay"),
+            Some(SteamworksInputActionSetHandle::from_raw(2))
+        );
     }
 
     #[test]
@@ -1425,21 +1575,69 @@ mod tests {
     #[test]
     fn state_clears_stale_action_data_on_manifest_change_and_shutdown() {
         let mut state = SteamworksInputState::default();
+        let controller = SteamworksInputHandle::from_raw(2);
+        let action_set = SteamworksInputActionSetHandle::from_raw(1);
+        let digital_action = SteamworksInputDigitalActionHandle::from_raw(3);
+        let analog_action = SteamworksInputAnalogActionHandle::from_raw(5);
+        let origin = SteamworksInputActionOriginInfo {
+            origin: SteamworksInputActionOrigin::from_code(9),
+            glyph_path: "glyph.png".to_owned(),
+            name: "Jump".to_owned(),
+        };
 
         state.record_operation(&SteamworksInputOperation::ActionSetHandleRead {
             name: "gameplay".to_owned(),
-            handle: SteamworksInputActionSetHandle::from_raw(1),
+            handle: action_set,
+        });
+        state.record_operation(&SteamworksInputOperation::ActionSetActivated {
+            controller,
+            action_set,
         });
         state.record_operation(&SteamworksInputOperation::DigitalActionDataRead {
             snapshot: SteamworksInputDigitalActionSnapshot {
-                controller: SteamworksInputHandle::from_raw(2),
-                action: SteamworksInputDigitalActionHandle::from_raw(3),
+                controller,
+                action: digital_action,
                 data: SteamworksInputDigitalActionData {
                     state: true,
                     active: true,
                 },
             },
         });
+        state.record_operation(&SteamworksInputOperation::AnalogActionDataRead {
+            snapshot: SteamworksInputAnalogActionSnapshot {
+                controller,
+                action: analog_action,
+                data: SteamworksInputAnalogActionData {
+                    mode: SteamworksInputSourceMode::JoystickMove,
+                    x: 1.0,
+                    y: -1.0,
+                    active: true,
+                },
+            },
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionOriginsRead {
+            controller,
+            action_set,
+            action: digital_action,
+            origins: vec![origin.clone()],
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionOriginsRead {
+            controller,
+            action_set,
+            action: analog_action,
+            origins: vec![origin],
+        });
+        state.record_operation(&SteamworksInputOperation::MotionDataRead {
+            snapshot: SteamworksInputMotionSnapshot {
+                controller,
+                data: SteamworksInputMotionData {
+                    rotation_quaternion: [0.0, 0.0, 0.0, 1.0],
+                    position_acceleration: [0.0, 1.0, 0.0],
+                    rotation_velocity: [0.0, 0.0, 1.0],
+                },
+            },
+        });
+        state.record_operation(&SteamworksInputOperation::BindingPanelShown { controller });
 
         state.record_operation(&SteamworksInputOperation::ActionManifestFilePathSet {
             path: "new_manifest.vdf".to_owned(),
@@ -1447,7 +1645,13 @@ mod tests {
 
         assert!(state.action_sets().is_empty());
         assert_eq!(state.action_manifest_path(), Some("new_manifest.vdf"));
+        assert!(state.last_action_set_activation().is_none());
         assert!(state.last_digital_action().is_none());
+        assert!(state.last_analog_action().is_none());
+        assert!(state.last_digital_action_origins().is_none());
+        assert!(state.last_analog_action_origins().is_none());
+        assert!(state.last_motion().is_none());
+        assert!(state.last_binding_panel_controller().is_none());
 
         state.record_operation(&SteamworksInputOperation::Initialized {
             explicitly_call_run_frame: false,
@@ -1461,5 +1665,144 @@ mod tests {
         assert!(!state.initialized());
         assert!(state.action_manifest_path().is_none());
         assert!(state.action_sets().is_empty());
+    }
+
+    #[test]
+    fn state_records_input_operations() {
+        let mut state = SteamworksInputState::default();
+        let controller = SteamworksInputHandle::from_raw(11);
+        let action_set = SteamworksInputActionSetHandle::from_raw(22);
+        let digital_action = SteamworksInputDigitalActionHandle::from_raw(33);
+        let analog_action = SteamworksInputAnalogActionHandle::from_raw(44);
+        let controller_info = SteamworksInputControllerInfo {
+            handle: controller,
+            input_type: SteamworksInputType::SteamDeckController,
+        };
+        let digital_snapshot = SteamworksInputDigitalActionSnapshot {
+            controller,
+            action: digital_action,
+            data: SteamworksInputDigitalActionData {
+                state: true,
+                active: true,
+            },
+        };
+        let analog_snapshot = SteamworksInputAnalogActionSnapshot {
+            controller,
+            action: analog_action,
+            data: SteamworksInputAnalogActionData {
+                mode: SteamworksInputSourceMode::JoystickMove,
+                x: 0.25,
+                y: -0.5,
+                active: true,
+            },
+        };
+        let origin = SteamworksInputActionOriginInfo {
+            origin: SteamworksInputActionOrigin::from_code(7),
+            glyph_path: "glyph.svg".to_owned(),
+            name: "A Button".to_owned(),
+        };
+        let motion = SteamworksInputMotionSnapshot {
+            controller,
+            data: SteamworksInputMotionData {
+                rotation_quaternion: [0.0, 0.0, 0.0, 1.0],
+                position_acceleration: [1.0, 2.0, 3.0],
+                rotation_velocity: [4.0, 5.0, 6.0],
+            },
+        };
+
+        state.record_operation(&SteamworksInputOperation::Initialized {
+            explicitly_call_run_frame: true,
+        });
+        state.record_operation(&SteamworksInputOperation::FrameRun);
+        state.record_operation(&SteamworksInputOperation::FrameRun);
+        state.record_operation(&SteamworksInputOperation::ControllersListed {
+            controllers: vec![controller_info.clone()],
+        });
+        state.record_operation(&SteamworksInputOperation::ControllerInfoRead {
+            controller: SteamworksInputControllerInfo {
+                input_type: SteamworksInputType::GenericGamepad,
+                ..controller_info.clone()
+            },
+        });
+        state.record_operation(&SteamworksInputOperation::ActionSetHandleRead {
+            name: "gameplay".to_owned(),
+            handle: action_set,
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionHandleRead {
+            name: "jump".to_owned(),
+            handle: digital_action,
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionHandleRead {
+            name: "move".to_owned(),
+            handle: analog_action,
+        });
+        state.record_operation(&SteamworksInputOperation::ActionSetActivated {
+            controller,
+            action_set,
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionDataRead {
+            snapshot: digital_snapshot.clone(),
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionDataRead {
+            snapshot: analog_snapshot.clone(),
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionOriginsRead {
+            controller,
+            action_set,
+            action: digital_action,
+            origins: vec![origin.clone()],
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionOriginsRead {
+            controller,
+            action_set,
+            action: analog_action,
+            origins: vec![origin.clone()],
+        });
+        state.record_operation(&SteamworksInputOperation::MotionDataRead {
+            snapshot: motion.clone(),
+        });
+        state.record_operation(&SteamworksInputOperation::BindingPanelShown { controller });
+
+        assert!(state.initialized());
+        assert_eq!(state.frame_run_count(), 2);
+        assert_eq!(
+            state.controller(controller),
+            Some(&SteamworksInputControllerInfo {
+                input_type: SteamworksInputType::GenericGamepad,
+                ..controller_info
+            })
+        );
+        assert_eq!(state.action_set_handle("gameplay"), Some(action_set));
+        assert_eq!(state.digital_action_handle("jump"), Some(digital_action));
+        assert_eq!(state.analog_action_handle("move"), Some(analog_action));
+        assert_eq!(
+            state.last_action_set_activation(),
+            Some(SteamworksInputActionSetActivation {
+                controller,
+                action_set,
+            })
+        );
+        assert_eq!(state.last_digital_action(), Some(&digital_snapshot));
+        assert_eq!(state.last_analog_action(), Some(&analog_snapshot));
+        assert_eq!(
+            state.last_digital_action_origins(),
+            Some(&SteamworksInputDigitalActionOriginsSnapshot {
+                controller,
+                action_set,
+                action: digital_action,
+                origins: vec![origin.clone()],
+            })
+        );
+        assert_eq!(
+            state.last_analog_action_origins(),
+            Some(&SteamworksInputAnalogActionOriginsSnapshot {
+                controller,
+                action_set,
+                action: analog_action,
+                origins: vec![origin],
+            })
+        );
+        assert_eq!(state.last_motion(), Some(&motion));
+        assert_eq!(state.last_binding_panel_controller(), Some(controller));
     }
 }
