@@ -31,6 +31,7 @@ pub use steamworks::{
 
 pub mod apps;
 pub mod friends;
+pub mod game_server;
 pub mod input;
 pub mod matchmaking;
 pub mod matchmaking_servers;
@@ -48,6 +49,7 @@ pub mod user_stats;
 pub mod utils;
 pub use apps::*;
 pub use friends::*;
+pub use game_server::*;
 pub use input::*;
 pub use matchmaking::*;
 pub use matchmaking_servers::*;
@@ -135,9 +137,11 @@ pub mod prelude {
         SteamworksRichPresenceJoinRequest, SteamworksScreenshotLibraryError,
         SteamworksScreenshotReady, SteamworksScreenshotReadyError, SteamworksScreenshotsCommand,
         SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-        SteamworksScreenshotsResult, SteamworksScreenshotsState, SteamworksServerListFilters,
-        SteamworksServerListKind, SteamworksServerListReleaseError, SteamworksServerListRequestId,
-        SteamworksServerListResponse, SteamworksStatsCommand, SteamworksStatsError,
+        SteamworksScreenshotsResult, SteamworksScreenshotsState, SteamworksServer,
+        SteamworksServerCallbackRegistry, SteamworksServerConfig, SteamworksServerInitMode,
+        SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListReleaseError,
+        SteamworksServerListRequestId, SteamworksServerListResponse, SteamworksServerPlugin,
+        SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
         SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
         SteamworksStatsSettings, SteamworksStatsState, SteamworksSteamServerConnectionEvent,
         SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,

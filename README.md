@@ -88,6 +88,48 @@ fn steam_callbacks(mut callbacks: MessageReader<SteamworksEvent>) {
 
 You can also register typed callbacks through the underlying `steamworks::Client`; keep the returned handles alive with `SteamworksCallbackRegistry`.
 
+## Dedicated Game Servers
+
+`SteamworksServerPlugin` initializes the upstream `steamworks::Server`, inserts `SteamworksServer` as a Bevy resource, and pumps Steam Game Server callbacks into the shared `SteamworksEvent` message stream. Dedicated server initialization is separate from `SteamworksPlugin`; use one lifecycle for the process unless you have a specific reason to initialize both.
+
+```rust,no_run
+# use std::net::Ipv4Addr;
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn read_server_callbacks(mut events: MessageReader<SteamworksEvent>) {
+    for event in events.read() {
+        if let SteamworksEvent::GSClientApprove(event) = event {
+            info!("approved client: {event:?}");
+        }
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(
+            SteamworksServerPlugin::new(SteamworksServerConfig::new(
+                Ipv4Addr::UNSPECIFIED,
+                27015,
+                27016,
+                steamworks::ServerMode::Authentication,
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .log_and_continue(),
+        )
+        .add_plugins(DefaultPlugins)
+        .add_systems(Update, read_server_callbacks)
+        .run();
+}
+```
+
+The server plugin registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` through `SteamworksEvent`. Use the `SteamworksServer` resource to call upstream safe server APIs such as logon, metadata, auth tickets, and server-browser packet helpers while higher-level command wrappers are expanded.
+
+Run the dedicated server example with:
+
+```powershell
+cargo run --example server
+```
+
 ## Friends, Rich Presence, and Overlay
 
 `SteamworksFriendsPlugin` adds a Bevy-native command/result layer for Steam persona, friends, Rich Presence, overlay, and invite workflows.
