@@ -2,8 +2,8 @@
 //!
 //! This module builds on top of the upstream [`steamworks::UGC`] API. It keeps
 //! common Workshop queries, subscriptions, downloads, and playtime tracking in
-//! Bevy messages, while converting asynchronous Steam call results into owned
-//! ECS-safe result messages.
+//! Bevy messages, while converting asynchronous Steam call results and download
+//! callbacks into owned ECS-safe result messages.
 
 use std::{
     path::{Path, PathBuf},
@@ -12,13 +12,13 @@ use std::{
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Maximum number of item IDs accepted by one UGC details or playtime command.
 ///
@@ -48,7 +48,8 @@ pub const STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS: usize = 100;
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksUgcCommand`] and [`SteamworksUgcResult`] messages and runs its
-/// command processor in [`bevy_app::First`] after Steam callbacks.
+/// command processor in [`bevy_app::First`] after Steam callbacks. It also
+/// mirrors Workshop download completion callbacks into UGC results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksUgcPlugin;
 
@@ -64,6 +65,7 @@ impl Plugin for SteamworksUgcPlugin {
         app.init_resource::<SteamworksUgcState>()
             .init_resource::<SteamworksUgcAsyncResults>()
             .init_resource::<SteamworksUgcUpdateWatches>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksUgcCommand>()
             .add_message::<SteamworksUgcResult>()
             .configure_sets(
@@ -89,6 +91,7 @@ pub struct SteamworksUgcState {
     last_item_download_info: Option<SteamworksUgcItemDownloadInfoResult>,
     last_item_install_info: Option<SteamworksUgcItemInstallInfoResult>,
     last_item_update_progress: Option<SteamworksUgcItemUpdateProgress>,
+    last_download_item_result: Option<SteamworksUgcDownloadItemResult>,
     active_item_updates: usize,
     submitted_downloads: u64,
     successful_async_operations: u64,
@@ -130,6 +133,11 @@ impl SteamworksUgcState {
     /// Returns the most recent item update progress snapshot.
     pub fn last_item_update_progress(&self) -> Option<&SteamworksUgcItemUpdateProgress> {
         self.last_item_update_progress.as_ref()
+    }
+
+    /// Returns the most recent Workshop download completion callback snapshot.
+    pub fn last_download_item_result(&self) -> Option<&SteamworksUgcDownloadItemResult> {
+        self.last_download_item_result.as_ref()
     }
 
     /// Returns the number of item update progress handles currently owned by the plugin.
@@ -185,6 +193,9 @@ impl SteamworksUgcState {
             }
             SteamworksUgcOperation::DownloadItemSubmitted { .. } => {
                 self.submitted_downloads = self.submitted_downloads.saturating_add(1);
+            }
+            SteamworksUgcOperation::DownloadItemResultReceived { result } => {
+                self.last_download_item_result = Some(result.clone());
             }
             SteamworksUgcOperation::ItemCreated { .. }
             | SteamworksUgcOperation::ItemUpdated { .. }
@@ -694,6 +705,17 @@ pub struct SteamworksUgcItemDownloadInfoResult {
     pub info: Option<SteamworksUgcItemDownloadInfo>,
 }
 
+/// Workshop download completion callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUgcDownloadItemResult {
+    /// App ID reported by Steam.
+    pub app_id: steamworks::AppId,
+    /// Workshop item whose download completed or failed.
+    pub item: steamworks::PublishedFileId,
+    /// Steam error when the download failed.
+    pub error: Option<steamworks::SteamError>,
+}
+
 /// Install information snapshot for one Workshop item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksUgcItemInstallInfo {
@@ -1147,6 +1169,11 @@ pub enum SteamworksUgcOperation {
         /// Whether high priority was requested.
         high_priority: bool,
     },
+    /// A Workshop download completion callback was observed.
+    DownloadItemResultReceived {
+        /// Callback snapshot.
+        result: SteamworksUgcDownloadItemResult,
+    },
     /// A query was submitted.
     QueryRequested {
         /// Plugin request ID.
@@ -1451,6 +1478,7 @@ fn process_ugc_commands(
     update_watches: Res<SteamworksUgcUpdateWatches>,
     mut state: ResMut<SteamworksUgcState>,
     mut commands: ResMut<Messages<SteamworksUgcCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksUgcResult>,
 ) {
     for result in async_results.drain() {
@@ -1459,10 +1487,12 @@ fn process_ugc_commands(
         results.write(result);
     }
 
+    process_ugc_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksUgcError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -1521,6 +1551,33 @@ fn process_ugc_commands(
                 results.write(SteamworksUgcResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_ugc_steam_events(
+    state: &mut SteamworksUgcState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksUgcResult>,
+) {
+    for event in steam_events.read() {
+        let SteamworksEvent::DownloadItemResult(event) = event else {
+            continue;
+        };
+
+        let operation = SteamworksUgcOperation::DownloadItemResultReceived {
+            result: SteamworksUgcDownloadItemResult {
+                app_id: event.app_id,
+                item: event.published_file_id,
+                error: event.error,
+            },
+        };
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks UGC callback"
+        );
+        results.write(SteamworksUgcResult::Ok(operation));
     }
 }
 
@@ -2346,6 +2403,7 @@ mod tests {
         assert!(app
             .world()
             .contains_resource::<SteamworksUgcUpdateWatches>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksUgcCommand>>());
@@ -2537,6 +2595,66 @@ mod tests {
                 path: missing_path,
             })
         );
+    }
+
+    #[test]
+    fn download_item_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let item = steamworks::PublishedFileId(42);
+        let app_id = steamworks::AppId(480);
+
+        app.add_plugins(SteamworksUgcPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::DownloadItemResult(
+                steamworks::DownloadItemResult {
+                    app_id,
+                    published_file_id: item,
+                    error: None,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::DownloadItemResult(
+                steamworks::DownloadItemResult {
+                    app_id,
+                    published_file_id: item,
+                    error: Some(steamworks::SteamError::PersistFailed),
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksUgcResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        let successful = SteamworksUgcDownloadItemResult {
+            app_id,
+            item,
+            error: None,
+        };
+        let failed = SteamworksUgcDownloadItemResult {
+            app_id,
+            item,
+            error: Some(steamworks::SteamError::PersistFailed),
+        };
+
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksUgcResult::Ok(SteamworksUgcOperation::DownloadItemResultReceived {
+                    result: successful,
+                }),
+                SteamworksUgcResult::Ok(SteamworksUgcOperation::DownloadItemResultReceived {
+                    result: failed.clone(),
+                }),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksUgcState>();
+        assert_eq!(state.last_download_item_result(), Some(&failed));
+        assert_eq!(state.last_error(), None);
     }
 
     #[test]

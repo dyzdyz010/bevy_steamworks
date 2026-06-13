@@ -698,21 +698,13 @@ fn read_ugc(mut results: MessageReader<SteamworksUgcResult>) {
     }
 }
 
-fn read_ugc_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        if let SteamworksEvent::DownloadItemResult(event) = event {
-            info!("Workshop download finished: {event:?}");
-        }
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
         .add_plugins(SteamworksUgcPlugin::new())
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, request_ugc)
-        .add_systems(Update, (read_ugc, read_ugc_callbacks))
+        .add_systems(Update, read_ugc)
         .run();
 }
 ```
@@ -721,7 +713,7 @@ All async UGC commands emit an immediate `*Requested` or `*Submitted` operation 
 
 String query and item update options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. Item update paths are canonicalized before submission, so paths that cannot be resolved become structured `SteamworksUgcError::InvalidPath` errors. Submitted item updates retain an internal progress watch handle until the Steam call result arrives; read it with `SteamworksUgcCommand::get_item_update_progress(request_id)`.
 
-`DownloadItem` only confirms that Steam accepted the download request; final completion still arrives through `SteamworksEvent::DownloadItemResult`.
+`DownloadItem` only confirms that Steam accepted the download request; final completion arrives later through both `SteamworksEvent::DownloadItemResult` and `SteamworksUgcOperation::DownloadItemResultReceived`.
 
 Run the UGC example with:
 

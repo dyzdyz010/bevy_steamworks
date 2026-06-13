@@ -127,14 +127,6 @@ fn log_ugc_results(
     }
 }
 
-fn log_ugc_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        if let SteamworksEvent::DownloadItemResult(event) = event {
-            println!("DownloadItemResult: {event:?}");
-        }
-    }
-}
-
 fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: MessageWriter<AppExit>) {
     if frames.0 == 0 {
         exit.write(AppExit::Success);
@@ -151,9 +143,6 @@ fn main() {
         .add_plugins(SteamworksUgcPlugin::new())
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))
         .add_systems(Startup, request_ugc)
-        .add_systems(
-            Update,
-            (log_ugc_results, log_ugc_callbacks, exit_after_a_short_run),
-        )
+        .add_systems(Update, (log_ugc_results, exit_after_a_short_run))
         .run();
 }
