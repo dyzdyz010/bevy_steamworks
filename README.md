@@ -173,6 +173,49 @@ $env:BEVY_STEAMWORKS_CREATE_PRIVATE_LOBBY = "1"
 cargo run --example matchmaking
 ```
 
+## Matchmaking Servers
+
+`SteamworksMatchmakingServersPlugin` adds a Bevy-native command/result layer for Steam's server browser APIs: LAN, Internet, favorites, history, and friends server lists. The plugin owns upstream request handles and exposes stable `SteamworksServerListRequestId` values for refresh, count/details reads, refreshing checks, and release.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_servers(mut servers: MessageWriter<SteamworksMatchmakingServersCommand>) {
+    let filters = SteamworksServerListFilters::new().with("map", "arena");
+    servers.write(SteamworksMatchmakingServersCommand::request_internet_server_list(
+        480,
+        filters,
+    ));
+}
+
+fn read_servers(
+    mut results: MessageReader<SteamworksMatchmakingServersResult>,
+    mut servers: MessageWriter<SteamworksMatchmakingServersCommand>,
+) {
+    for result in results.read() {
+        if let SteamworksMatchmakingServersResult::Ok(
+            SteamworksMatchmakingServersOperation::ServerListRefreshCompleted { request, .. },
+        ) = result
+        {
+            servers.write(SteamworksMatchmakingServersCommand::get_server_list_count(*request));
+            servers.write(SteamworksMatchmakingServersCommand::release_server_list(*request));
+        }
+    }
+}
+```
+
+Server-list callbacks are converted into owned Bevy result messages: `ServerResponded`, `ServerFailedToRespond`, and `ServerListRefreshCompleted`. Server snapshots use `SteamworksGameServerItem`, which can be stored safely in ECS. LAN requests do not accept filters; non-LAN simple keyed filter names and values are validated before calling upstream Steamworks. The upstream wrapper models filters as a map, so repeated or order-sensitive boolean filter clauses are not represented by `SteamworksServerListFilters`. Release can fail while the upstream request is still refreshing, in which case the request remains owned by the plugin and can be released later.
+
+Run the server browser example with:
+
+```powershell
+cargo run --example matchmaking_servers
+$env:BEVY_STEAMWORKS_SERVER_LIST = "internet"
+$env:BEVY_STEAMWORKS_SERVER_FILTER_KEY = "map"
+$env:BEVY_STEAMWORKS_SERVER_FILTER_VALUE = "arena"
+cargo run --example matchmaking_servers
+```
+
 ## User Identity and Authentication
 
 `SteamworksUserPlugin` adds command/result messages for current-user identity, Steam server connection state, auth session tickets, Web API auth tickets, remote ticket validation sessions, and license checks for authenticated users.
