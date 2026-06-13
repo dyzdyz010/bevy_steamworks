@@ -766,32 +766,18 @@ fn read_remote_play(mut results: MessageReader<SteamworksRemotePlayResult>) {
     }
 }
 
-fn read_remote_play_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        match event {
-            SteamworksEvent::RemotePlayConnected(event) => {
-                info!("Remote Play connected: {event:?}");
-            }
-            SteamworksEvent::RemotePlayDisconnected(event) => {
-                info!("Remote Play disconnected: {event:?}");
-            }
-            _ => {}
-        }
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
         .add_plugins(SteamworksRemotePlayPlugin::new())
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, request_remote_play)
-        .add_systems(Update, (read_remote_play, read_remote_play_callbacks))
+        .add_systems(Update, read_remote_play)
         .run();
 }
 ```
 
-`SteamworksRemotePlayCommand::ListSessions` returns session snapshots with user, client name, form factor, and resolution. The upstream bulk listing API does not expose session IDs, so use `SteamworksEvent::RemotePlayConnected` to capture a `RemotePlaySessionId`, then call `SteamworksRemotePlayCommand::GetSession` for ID-based session reads.
+`SteamworksRemotePlayCommand::ListSessions` returns session snapshots with user, client name, form factor, and resolution. The upstream bulk listing API does not expose session IDs, so use `SteamworksRemotePlayOperation::SessionConnected` to capture a `RemotePlaySessionId`, then call `SteamworksRemotePlayCommand::GetSession` for ID-based session reads. Remote Play connect/disconnect callbacks are still available through `SteamworksEvent`, and are mirrored as `SteamworksRemotePlayResult` messages for module-local systems.
 
 The current upstream Rust wrapper exposes Remote Play Together invites through `steamworks::RemotePlaySession`, but the underlying invite result only confirms whether Steam accepted an invite for the friend. `SteamworksRemotePlayCommand::Invite` therefore treats the session ID as caller-provided context, not proof that Steam created a session-specific invite.
 

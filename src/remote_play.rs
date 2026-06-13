@@ -1,24 +1,26 @@
 //! High-level Bevy ECS integration for Steam Remote Play.
 //!
 //! This module builds on top of the upstream [`steamworks::RemotePlay`] API.
-//! Session connect/disconnect callbacks still arrive through
-//! [`crate::SteamworksEvent`].
+//! Session connect/disconnect callbacks are mirrored from
+//! [`crate::SteamworksEvent`] into [`SteamworksRemotePlayResult`].
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam Remote Play commands.
 ///
 /// Add this plugin after [`crate::SteamworksPlugin`]. It registers
 /// [`SteamworksRemotePlayCommand`] and [`SteamworksRemotePlayResult`] messages
 /// and runs its command processor in [`bevy_app::First`] after Steam callbacks.
+/// It also mirrors Remote Play session connect/disconnect callbacks into Remote
+/// Play results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksRemotePlayPlugin;
 
@@ -32,6 +34,7 @@ impl SteamworksRemotePlayPlugin {
 impl Plugin for SteamworksRemotePlayPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksRemotePlayState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksRemotePlayCommand>()
             .add_message::<SteamworksRemotePlayResult>()
             .configure_sets(
@@ -53,6 +56,7 @@ pub struct SteamworksRemotePlayState {
     last_error: Option<SteamworksRemotePlayError>,
     sessions: Vec<SteamworksRemotePlaySessionSnapshot>,
     known_sessions: Vec<SteamworksRemotePlaySessionInfo>,
+    observed_connected_sessions: Vec<steamworks::RemotePlaySessionId>,
 }
 
 impl SteamworksRemotePlayState {
@@ -65,6 +69,7 @@ impl SteamworksRemotePlayState {
     ///
     /// Upstream `steamworks` does not expose session IDs from bulk session listing;
     /// use [`SteamworksRemotePlayCommand::GetSession`] with IDs from
+    /// [`SteamworksRemotePlayOperation::SessionConnected`] or
     /// [`crate::SteamworksEvent::RemotePlayConnected`] when a stable ID is needed.
     pub fn sessions(&self) -> &[SteamworksRemotePlaySessionSnapshot] {
         &self.sessions
@@ -73,6 +78,15 @@ impl SteamworksRemotePlayState {
     /// Returns session snapshots read through ID-based commands.
     pub fn known_sessions(&self) -> &[SteamworksRemotePlaySessionInfo] {
         &self.known_sessions
+    }
+
+    /// Returns session IDs observed as connected and not yet disconnected.
+    ///
+    /// This list is callback-driven and only reflects sessions observed while
+    /// this plugin has been running. Use [`SteamworksRemotePlayCommand::ListSessions`]
+    /// for a fresh bulk snapshot from Steam.
+    pub fn observed_connected_sessions(&self) -> &[steamworks::RemotePlaySessionId] {
+        &self.observed_connected_sessions
     }
 
     fn record_error(&mut self, error: SteamworksRemotePlayError) {
@@ -95,6 +109,17 @@ impl SteamworksRemotePlayState {
                     self.known_sessions.push(session.clone());
                 }
             }
+            SteamworksRemotePlayOperation::SessionConnected { session }
+                if !self.observed_connected_sessions.contains(session) =>
+            {
+                self.observed_connected_sessions.push(*session);
+            }
+            SteamworksRemotePlayOperation::SessionDisconnected { session } => {
+                self.observed_connected_sessions
+                    .retain(|known| known != session);
+                self.known_sessions
+                    .retain(|known| known.session != *session);
+            }
             _ => {}
         }
     }
@@ -104,6 +129,7 @@ impl SteamworksRemotePlayState {
 ///
 /// The upstream `steamworks` API does not expose the session ID from
 /// [`steamworks::RemotePlay::sessions`]. Session IDs are available from
+/// [`SteamworksRemotePlayOperation::SessionConnected`] or
 /// [`crate::SteamworksEvent::RemotePlayConnected`] and can then be queried with
 /// [`SteamworksRemotePlayCommand::GetSession`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,12 +215,22 @@ pub enum SteamworksRemotePlayOperation {
         /// Friend Steam ID invited.
         friend: steamworks::SteamId,
     },
+    /// A Remote Play session connected callback was observed.
+    SessionConnected {
+        /// Session that connected.
+        session: steamworks::RemotePlaySessionId,
+    },
+    /// A Remote Play session disconnected callback was observed.
+    SessionDisconnected {
+        /// Session that disconnected.
+        session: steamworks::RemotePlaySessionId,
+    },
 }
 
 /// Result message emitted by [`SteamworksRemotePlayPlugin`].
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksRemotePlayResult {
-    /// The command was submitted to Steamworks or a value was read.
+    /// The command or observed callback was processed successfully.
     Ok(SteamworksRemotePlayOperation),
     /// The command failed synchronously.
     Err {
@@ -220,12 +256,15 @@ fn process_remote_play_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksRemotePlayState>,
     mut commands: ResMut<Messages<SteamworksRemotePlayCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksRemotePlayResult>,
 ) {
+    process_remote_play_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksRemotePlayError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -262,6 +301,36 @@ fn process_remote_play_commands(
                 results.write(SteamworksRemotePlayResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_remote_play_steam_events(
+    state: &mut SteamworksRemotePlayState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksRemotePlayResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::RemotePlayConnected(event) => {
+                SteamworksRemotePlayOperation::SessionConnected {
+                    session: event.session,
+                }
+            }
+            SteamworksEvent::RemotePlayDisconnected(event) => {
+                SteamworksRemotePlayOperation::SessionDisconnected {
+                    session: event.session,
+                }
+            }
+            _ => continue,
+        };
+
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks Remote Play callback"
+        );
+        results.write(SteamworksRemotePlayResult::Ok(operation));
     }
 }
 
@@ -338,6 +407,7 @@ mod tests {
         app.add_plugins(SteamworksRemotePlayPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksRemotePlayState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksRemotePlayCommand>>());
@@ -390,5 +460,54 @@ mod tests {
             SteamworksRemotePlayCommand::invite(session, friend),
             SteamworksRemotePlayCommand::Invite { session, friend }
         );
+    }
+
+    #[test]
+    fn remote_play_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let first = steamworks::RemotePlaySessionId::from_raw(1);
+        let second = steamworks::RemotePlaySessionId::from_raw(2);
+
+        app.add_plugins(SteamworksRemotePlayPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::RemotePlayConnected(
+                steamworks::RemotePlayConnected { session: first },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::RemotePlayConnected(
+                steamworks::RemotePlayConnected { session: second },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::RemotePlayDisconnected(
+                steamworks::RemotePlayDisconnected { session: first },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksRemotePlayResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksRemotePlayResult::Ok(SteamworksRemotePlayOperation::SessionConnected {
+                    session: first
+                },),
+                SteamworksRemotePlayResult::Ok(SteamworksRemotePlayOperation::SessionConnected {
+                    session: second
+                },),
+                SteamworksRemotePlayResult::Ok(
+                    SteamworksRemotePlayOperation::SessionDisconnected { session: first },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksRemotePlayState>();
+        assert_eq!(state.observed_connected_sessions(), &[second]);
+        assert_eq!(state.last_error(), None);
     }
 }

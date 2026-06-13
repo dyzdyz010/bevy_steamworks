@@ -40,20 +40,6 @@ fn log_remote_play_results(mut results: MessageReader<SteamworksRemotePlayResult
     }
 }
 
-fn log_remote_play_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        match event {
-            SteamworksEvent::RemotePlayConnected(event) => {
-                println!("RemotePlayConnected: {event:?}");
-            }
-            SteamworksEvent::RemotePlayDisconnected(event) => {
-                println!("RemotePlayDisconnected: {event:?}");
-            }
-            _ => {}
-        }
-    }
-}
-
 fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: MessageWriter<AppExit>) {
     if frames.0 == 0 {
         exit.write(AppExit::Success);
@@ -77,13 +63,6 @@ fn main() {
         .add_plugins(SteamworksRemotePlayPlugin::new())
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))
         .add_systems(Startup, request_remote_play)
-        .add_systems(
-            Update,
-            (
-                log_remote_play_results,
-                log_remote_play_callbacks,
-                exit_after_a_short_run,
-            ),
-        )
+        .add_systems(Update, (log_remote_play_results, exit_after_a_short_run))
         .run();
 }
