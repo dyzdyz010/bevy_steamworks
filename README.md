@@ -359,6 +359,50 @@ $env:BEVY_STEAMWORKS_SCREENSHOT_HEIGHT = "1080"
 cargo run --example screenshots
 ```
 
+## Remote Storage
+
+`SteamworksRemoteStoragePlugin` adds command/result messages for Steam Cloud availability, file listing, file metadata, delete/forget, sync platforms, and asynchronous file sharing.
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_storage(mut storage: MessageWriter<SteamworksRemoteStorageCommand>) {
+    storage.write(SteamworksRemoteStorageCommand::GetCloudInfo);
+    storage.write(SteamworksRemoteStorageCommand::ListFiles);
+    storage.write(SteamworksRemoteStorageCommand::get_file_info("save.dat"));
+}
+
+fn read_storage(mut results: MessageReader<SteamworksRemoteStorageResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksRemoteStoragePlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_storage)
+        .add_systems(Update, read_storage)
+        .run();
+}
+```
+
+This command layer intentionally does not wrap upstream `SteamFileReader` and `SteamFileWriter`, because the current upstream reader busy-waits for async file reads and file payload IO should not run in a Bevy frame loop. Use `SteamworksClient::remote_storage()` directly from your own background/file-IO layer for payload reads and writes.
+
+`SteamworksRemoteStorageCommand::ShareFile` emits `FileShareRequested` immediately with a plugin-assigned `request_id`, then emits `FileShared` or an async error after `SteamworksSystem::RunCallbacks` pumps the Steam call result. File names are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksRemoteStorageError::InvalidString` instead of panicking in a C string conversion.
+
+Run the Remote Storage example with:
+
+```powershell
+cargo run --example remote_storage
+$env:BEVY_STEAMWORKS_REMOTE_STORAGE_FILE = "save.dat"
+cargo run --example remote_storage
+$env:BEVY_STEAMWORKS_REMOTE_STORAGE_SHARE = "1"
+cargo run --example remote_storage
+```
+
 ## Remote Play
 
 `SteamworksRemotePlayPlugin` adds command/result messages for Steam Remote Play sessions and Remote Play Together invites.

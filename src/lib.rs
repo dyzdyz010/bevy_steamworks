@@ -34,6 +34,7 @@ pub mod friends;
 pub mod input;
 pub mod matchmaking;
 pub mod remote_play;
+pub mod remote_storage;
 pub mod screenshots;
 pub mod timeline;
 pub mod user;
@@ -44,6 +45,7 @@ pub use friends::*;
 pub use input::*;
 pub use matchmaking::*;
 pub use remote_play::*;
+pub use remote_storage::*;
 pub use screenshots::*;
 pub use timeline::*;
 pub use user::*;
@@ -79,12 +81,18 @@ pub mod prelude {
         SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
         SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
         SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
-        SteamworksScreenshotLibraryError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
-        SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
-        SteamworksScreenshotsState, SteamworksStatsCommand, SteamworksStatsError,
-        SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
-        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand,
-        SteamworksTimelineError, SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
+        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageCommand,
+        SteamworksRemoteStorageError, SteamworksRemoteStorageFileInfo,
+        SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageFileSummary,
+        SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
+        SteamworksRemoteStorageResult, SteamworksRemoteStorageSharedFile,
+        SteamworksRemoteStorageState, SteamworksScreenshotLibraryError,
+        SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+        SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksScreenshotsState,
+        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
+        SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+        SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
         SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
         SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
         SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
@@ -625,6 +633,8 @@ pub enum SteamworksSystem {
     ProcessScreenshotsCommands,
     /// Processes high-level Steam Remote Play commands.
     ProcessRemotePlayCommands,
+    /// Processes high-level Steam Remote Storage commands.
+    ProcessRemoteStorageCommands,
     /// Processes high-level Steam Timeline commands.
     ProcessTimelineCommands,
     /// Processes high-level Steam Input commands.
