@@ -69,14 +69,15 @@ pub use utils::*;
 /// Common imports for Bevy apps using this crate.
 pub mod prelude {
     pub use crate::{
-        steamworks, SteamworksAchievementGlobalPercentage, SteamworksAchievementIcon,
-        SteamworksAchievementIconStatus, SteamworksAchievementInfo, SteamworksAppsCommand,
-        SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin, SteamworksAppsResult,
-        SteamworksAppsState, SteamworksAuthSessionError, SteamworksAuthSessionTicketResponse,
-        SteamworksAuthSessionValidateError, SteamworksAuthTicketValidation, SteamworksAvatar,
-        SteamworksAvatarSize, SteamworksCallbackRegistry, SteamworksClient,
-        SteamworksConnectionRequestPolicy, SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo,
-        SteamworksEvent, SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
+        steamworks, SteamworksAchievementDisplayAttribute, SteamworksAchievementGlobalPercentage,
+        SteamworksAchievementIcon, SteamworksAchievementIconStatus, SteamworksAchievementInfo,
+        SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin,
+        SteamworksAppsResult, SteamworksAppsState, SteamworksAuthSessionError,
+        SteamworksAuthSessionTicketResponse, SteamworksAuthSessionValidateError,
+        SteamworksAuthTicketValidation, SteamworksAvatar, SteamworksAvatarSize,
+        SteamworksCallbackRegistry, SteamworksClient, SteamworksConnectionRequestPolicy,
+        SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
+        SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
         SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendsCommand,
         SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
         SteamworksFriendsResult, SteamworksFriendsState, SteamworksGameServerItem,

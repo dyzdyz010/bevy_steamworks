@@ -61,13 +61,19 @@ impl Default for SteamworksStatsSettings {
 pub struct SteamworksStatsState {
     current_user_stats_requested: bool,
     pending_store: bool,
+    force_store: bool,
     last_error: Option<SteamworksStatsError>,
+    local_stat_i32: Vec<(String, i32)>,
+    local_stat_f32: Vec<(String, f32)>,
     last_achievements: Vec<SteamworksAchievementInfo>,
+    achievements: Vec<SteamworksAchievementInfo>,
+    achievement_display_attributes: Vec<SteamworksAchievementDisplayAttribute>,
     last_achievement_icon: Option<SteamworksAchievementIcon>,
     achievement_icon_callback_count: u64,
     last_user_stats_received: Option<SteamworksUserStatsReceived>,
     last_user_stats_stored: Option<SteamworksUserStatsStored>,
     last_user_achievement_stored: Option<SteamworksUserAchievementStored>,
+    achievement_global_percentages: Vec<SteamworksAchievementGlobalPercentage>,
     last_global_achievement_percentages: Vec<SteamworksAchievementGlobalPercentage>,
     last_global_stats_game_id: Option<steamworks::GameId>,
     last_global_stat_i64: Option<SteamworksGlobalStatValue<i64>>,
@@ -95,9 +101,53 @@ impl SteamworksStatsState {
         self.last_error.as_ref()
     }
 
+    /// Returns the most recent current-user integer stat value read or set through this plugin.
+    pub fn stat_i32(&self, name: &str) -> Option<i32> {
+        named_value(&self.local_stat_i32, name).copied()
+    }
+
+    /// Returns the most recent current-user floating-point stat value read or set through this plugin.
+    pub fn stat_f32(&self, name: &str) -> Option<f32> {
+        named_value(&self.local_stat_f32, name).copied()
+    }
+
     /// Returns the most recent achievement catalog snapshot.
     pub fn last_achievements(&self) -> &[SteamworksAchievementInfo] {
         &self.last_achievements
+    }
+
+    /// Returns the cached achievement snapshot for an API name.
+    pub fn achievement(&self, api_name: &str) -> Option<&SteamworksAchievementInfo> {
+        self.achievements
+            .iter()
+            .find(|achievement| achievement.api_name == api_name)
+    }
+
+    /// Returns the most recent current-user unlock state for an achievement.
+    pub fn achievement_unlocked(&self, api_name: &str) -> Option<bool> {
+        self.achievement(api_name)
+            .and_then(|achievement| achievement.achieved)
+    }
+
+    /// Returns the most recent current-user unlock time for an achievement.
+    pub fn achievement_unlock_time(&self, api_name: &str) -> Option<u32> {
+        self.achievement(api_name)
+            .and_then(|achievement| achievement.unlock_time)
+    }
+
+    /// Returns the most recent display attribute read for an achievement and key.
+    pub fn achievement_display_attribute(&self, api_name: &str, key: &str) -> Option<&str> {
+        self.achievement_display_attributes
+            .iter()
+            .find_map(|attribute| {
+                (attribute.api_name == api_name && attribute.key == key)
+                    .then_some(attribute.value.as_str())
+            })
+    }
+
+    /// Returns all achievement display attributes cached by this plugin.
+    pub fn achievement_display_attributes(&self) -> &[SteamworksAchievementDisplayAttribute] {
+        &self.achievement_display_attributes
     }
 
     /// Returns the most recent achievement icon snapshot read through this plugin.
@@ -128,6 +178,13 @@ impl SteamworksStatsState {
     /// Returns the most recent global achievement percentage page.
     pub fn last_global_achievement_percentages(&self) -> &[SteamworksAchievementGlobalPercentage] {
         &self.last_global_achievement_percentages
+    }
+
+    /// Returns the most recent global unlock percentage for one achievement.
+    pub fn achievement_global_percent(&self, api_name: &str) -> Option<f32> {
+        self.achievement_global_percentages
+            .iter()
+            .find_map(|percentage| (percentage.api_name == api_name).then_some(percentage.percent))
     }
 
     /// Returns the most recent global stats received callback game ID.
@@ -180,6 +237,23 @@ impl SteamworksStatsState {
 
     fn record_operation(&mut self, operation: &SteamworksStatsOperation) {
         match operation {
+            SteamworksStatsOperation::CurrentUserStatsRequested { .. } => {
+                self.current_user_stats_requested = true;
+            }
+            SteamworksStatsOperation::UserStatsRequested { .. } => {}
+            SteamworksStatsOperation::StatI32Read { name, value }
+            | SteamworksStatsOperation::StatI32Set { name, value } => {
+                upsert_named_value(&mut self.local_stat_i32, name.clone(), *value);
+            }
+            SteamworksStatsOperation::StatF32Read { name, value }
+            | SteamworksStatsOperation::StatF32Set { name, value } => {
+                upsert_named_value(&mut self.local_stat_f32, name.clone(), *value);
+            }
+            SteamworksStatsOperation::AchievementRead { name, achieved } => {
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    achievement.achieved = Some(*achieved);
+                });
+            }
             SteamworksStatsOperation::AchievementNamesListed { names, .. } => {
                 self.last_achievements = names
                     .iter()
@@ -188,16 +262,34 @@ impl SteamworksStatsState {
                         ..Default::default()
                     })
                     .collect();
+                for achievement in &self.last_achievements {
+                    merge_achievement_info(&mut self.achievements, achievement);
+                }
             }
             SteamworksStatsOperation::AchievementsListed { achievements, .. } => {
                 self.last_achievements.clone_from(achievements);
+                for achievement in achievements {
+                    merge_achievement_info(&mut self.achievements, achievement);
+                    merge_achievement_display_attributes(
+                        &mut self.achievement_display_attributes,
+                        achievement,
+                    );
+                }
             }
             SteamworksStatsOperation::AchievementIconRead { icon, .. } => {
                 if let Some(icon) = icon.as_icon() {
                     self.last_achievement_icon = Some(icon.clone());
                 }
             }
-            SteamworksStatsOperation::AchievementIconFetched { icon, .. } => {
+            SteamworksStatsOperation::AchievementIconFetched {
+                name,
+                achieved,
+                icon,
+                ..
+            } => {
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    achievement.achieved = Some(*achieved);
+                });
                 if let Some(icon) = icon.as_icon() {
                     self.last_achievement_icon = Some(icon.clone());
                 }
@@ -213,11 +305,65 @@ impl SteamworksStatsState {
             SteamworksStatsOperation::UserAchievementStored { callback } => {
                 self.last_user_achievement_stored = Some(callback.clone());
             }
+            SteamworksStatsOperation::AchievementAndUnlockTimeRead {
+                name,
+                achieved,
+                unlock_time,
+            } => {
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    achievement.achieved = Some(*achieved);
+                    achievement.unlock_time = Some(*unlock_time);
+                });
+            }
+            SteamworksStatsOperation::AchievementDisplayAttributeRead { name, key, value } => {
+                upsert_achievement_display_attribute(
+                    &mut self.achievement_display_attributes,
+                    name.clone(),
+                    key.clone(),
+                    value.clone(),
+                );
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    match key.as_str() {
+                        "name" => achievement.display_name = Some(value.clone()),
+                        "desc" => achievement.description = Some(value.clone()),
+                        "hidden" => achievement.hidden = Some(value != "0"),
+                        _ => {}
+                    }
+                });
+            }
+            SteamworksStatsOperation::AchievementUnlocked { name } => {
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    achievement.achieved = Some(true);
+                    achievement.unlock_time = None;
+                });
+            }
+            SteamworksStatsOperation::AchievementCleared { name } => {
+                update_achievement(&mut self.achievements, name, |achievement| {
+                    achievement.achieved = Some(false);
+                    achievement.unlock_time = Some(0);
+                });
+            }
+            SteamworksStatsOperation::GlobalAchievementPercentagesRequested => {}
+            SteamworksStatsOperation::GlobalAchievementPercentagesReceived { .. } => {}
+            SteamworksStatsOperation::AchievementAchievedPercentRead { name, percent } => {
+                upsert_global_achievement_percentage(
+                    &mut self.achievement_global_percentages,
+                    name.clone(),
+                    *percent,
+                );
+            }
             SteamworksStatsOperation::AchievementGlobalPercentagesListed {
                 percentages, ..
             } => {
                 self.last_global_achievement_percentages
                     .clone_from(percentages);
+                for percentage in percentages {
+                    upsert_global_achievement_percentage(
+                        &mut self.achievement_global_percentages,
+                        percentage.api_name.clone(),
+                        percentage.percent,
+                    );
+                }
             }
             SteamworksStatsOperation::GlobalStatsReceived { game_id } => {
                 self.last_global_stats_game_id = Some(*game_id);
@@ -253,14 +399,166 @@ impl SteamworksStatsState {
                     values: values.clone(),
                 });
             }
+            SteamworksStatsOperation::StatsStoreSubmitted => {
+                self.pending_store = false;
+                self.force_store = false;
+            }
+            SteamworksStatsOperation::AllStatsReset { achievements_too } => {
+                self.local_stat_i32.clear();
+                self.local_stat_f32.clear();
+                if *achievements_too {
+                    for achievement in &mut self.achievements {
+                        achievement.achieved = Some(false);
+                        achievement.unlock_time = Some(0);
+                    }
+                    for achievement in &mut self.last_achievements {
+                        achievement.achieved = Some(false);
+                        achievement.unlock_time = Some(0);
+                    }
+                }
+            }
+            SteamworksStatsOperation::LeaderboardFindSubmitted { .. }
+            | SteamworksStatsOperation::LeaderboardFindCompleted { .. }
+            | SteamworksStatsOperation::LeaderboardFindOrCreateSubmitted { .. }
+            | SteamworksStatsOperation::LeaderboardFindOrCreateCompleted { .. } => {}
             SteamworksStatsOperation::LeaderboardInfoRead { info } => {
                 self.last_leaderboard_info = Some(info.clone());
             }
+            SteamworksStatsOperation::LeaderboardScoreUploadSubmitted { .. }
+            | SteamworksStatsOperation::LeaderboardScoreUploaded { .. }
+            | SteamworksStatsOperation::LeaderboardEntriesDownloadSubmitted { .. } => {}
             SteamworksStatsOperation::LeaderboardEntriesDownloaded { entries, .. } => {
                 self.last_leaderboard_entries.clone_from(entries);
             }
-            _ => {}
+            SteamworksStatsOperation::LeaderboardForgotten { .. } => {}
         }
+    }
+}
+
+fn named_value<'a, T>(values: &'a [(String, T)], name: &str) -> Option<&'a T> {
+    values
+        .iter()
+        .find_map(|(known_name, value)| (known_name == name).then_some(value))
+}
+
+fn upsert_named_value<T>(values: &mut Vec<(String, T)>, name: String, value: T) {
+    if let Some((_, known_value)) = values
+        .iter_mut()
+        .find(|(known_name, _)| known_name == &name)
+    {
+        *known_value = value;
+    } else {
+        values.push((name, value));
+    }
+}
+
+fn update_achievement<F>(
+    achievements: &mut Vec<SteamworksAchievementInfo>,
+    api_name: &str,
+    update: F,
+) where
+    F: FnOnce(&mut SteamworksAchievementInfo),
+{
+    if let Some(achievement) = achievements
+        .iter_mut()
+        .find(|achievement| achievement.api_name == api_name)
+    {
+        update(achievement);
+    } else {
+        let mut achievement = SteamworksAchievementInfo {
+            api_name: api_name.to_owned(),
+            ..Default::default()
+        };
+        update(&mut achievement);
+        achievements.push(achievement);
+    }
+}
+
+fn merge_achievement_info(
+    achievements: &mut Vec<SteamworksAchievementInfo>,
+    info: &SteamworksAchievementInfo,
+) {
+    update_achievement(achievements, &info.api_name, |achievement| {
+        if info.display_name.is_some() {
+            achievement.display_name.clone_from(&info.display_name);
+        }
+        if info.description.is_some() {
+            achievement.description.clone_from(&info.description);
+        }
+        if info.hidden.is_some() {
+            achievement.hidden = info.hidden;
+        }
+        if info.achieved.is_some() {
+            achievement.achieved = info.achieved;
+        }
+        if info.unlock_time.is_some() {
+            achievement.unlock_time = info.unlock_time;
+        }
+    });
+}
+
+fn merge_achievement_display_attributes(
+    attributes: &mut Vec<SteamworksAchievementDisplayAttribute>,
+    info: &SteamworksAchievementInfo,
+) {
+    if let Some(display_name) = &info.display_name {
+        upsert_achievement_display_attribute(
+            attributes,
+            info.api_name.clone(),
+            "name".to_owned(),
+            display_name.clone(),
+        );
+    }
+    if let Some(description) = &info.description {
+        upsert_achievement_display_attribute(
+            attributes,
+            info.api_name.clone(),
+            "desc".to_owned(),
+            description.clone(),
+        );
+    }
+    if let Some(hidden) = info.hidden {
+        upsert_achievement_display_attribute(
+            attributes,
+            info.api_name.clone(),
+            "hidden".to_owned(),
+            if hidden { "1" } else { "0" }.to_owned(),
+        );
+    }
+}
+
+fn upsert_achievement_display_attribute(
+    attributes: &mut Vec<SteamworksAchievementDisplayAttribute>,
+    api_name: String,
+    key: String,
+    value: String,
+) {
+    if let Some(attribute) = attributes
+        .iter_mut()
+        .find(|attribute| attribute.api_name == api_name && attribute.key == key)
+    {
+        attribute.value = value;
+    } else {
+        attributes.push(SteamworksAchievementDisplayAttribute {
+            api_name,
+            key,
+            value,
+        });
+    }
+}
+
+fn upsert_global_achievement_percentage(
+    percentages: &mut Vec<SteamworksAchievementGlobalPercentage>,
+    api_name: String,
+    percent: f32,
+) {
+    if let Some(known_percentage) = percentages
+        .iter_mut()
+        .find(|known_percentage| known_percentage.api_name == api_name)
+    {
+        known_percentage.percent = percent;
+    } else {
+        percentages.push(SteamworksAchievementGlobalPercentage { api_name, percent });
     }
 }
 
@@ -288,6 +586,17 @@ pub struct SteamworksAchievementGlobalPercentage {
     pub api_name: String,
     /// Percentage of players who have unlocked this achievement.
     pub percent: f32,
+}
+
+/// Localized display attribute snapshot for one Steam achievement.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksAchievementDisplayAttribute {
+    /// Steam achievement API name.
+    pub api_name: String,
+    /// Display attribute key, such as `"name"`, `"desc"`, or `"hidden"`.
+    pub key: String,
+    /// Attribute value returned by Steam.
+    pub value: String,
 }
 
 /// Aggregated global stat value snapshot.
@@ -1594,10 +1903,11 @@ fn process_stats_commands(
         );
     }
 
-    if io.settings.auto_store && state.pending_store {
+    if should_submit_store(&io.settings, &state) {
         match client.user_stats().store_stats() {
             Ok(()) => {
                 state.pending_store = false;
+                state.force_store = false;
                 results.write(SteamworksStatsResult::Ok(
                     SteamworksStatsOperation::StatsStoreSubmitted,
                 ));
@@ -1616,6 +1926,10 @@ fn process_stats_commands(
             }
         }
     }
+}
+
+fn should_submit_store(settings: &SteamworksStatsSettings, state: &SteamworksStatsState) -> bool {
+    state.pending_store && (settings.auto_store || state.force_store)
 }
 
 fn request_current_user_stats(
@@ -1921,6 +2235,7 @@ fn handle_stats_command(
             .map(|()| {
                 if store_after_reset {
                     state.pending_store = true;
+                    state.force_store = true;
                 }
                 SteamworksStatsOperation::AllStatsReset { achievements_too }
             })
@@ -2140,7 +2455,6 @@ fn operation_requires_store(operation: &SteamworksStatsOperation) -> bool {
             | SteamworksStatsOperation::StatF32Set { .. }
             | SteamworksStatsOperation::AchievementUnlocked { .. }
             | SteamworksStatsOperation::AchievementCleared { .. }
-            | SteamworksStatsOperation::AllStatsReset { .. }
     )
 }
 
@@ -2624,6 +2938,161 @@ mod tests {
         assert!(!operation_requires_store(
             &SteamworksStatsOperation::StatsStoreSubmitted
         ));
+        assert!(!operation_requires_store(
+            &SteamworksStatsOperation::AllStatsReset {
+                achievements_too: true,
+            }
+        ));
+    }
+
+    #[test]
+    fn forced_store_bypasses_auto_store_setting() {
+        let mut state = SteamworksStatsState {
+            pending_store: true,
+            ..Default::default()
+        };
+        let auto_store = SteamworksStatsSettings {
+            auto_store: true,
+            ..Default::default()
+        };
+        let manual_store = SteamworksStatsSettings {
+            auto_store: false,
+            ..Default::default()
+        };
+
+        assert!(should_submit_store(&auto_store, &state));
+        assert!(!should_submit_store(&manual_store, &state));
+
+        state.force_store = true;
+        assert!(should_submit_store(&manual_store, &state));
+    }
+
+    #[test]
+    fn state_records_local_stats_and_named_achievements() {
+        let mut state = SteamworksStatsState::default();
+
+        state.record_operation(&SteamworksStatsOperation::StatI32Read {
+            name: "kills".to_owned(),
+            value: 1,
+        });
+        state.record_operation(&SteamworksStatsOperation::StatI32Set {
+            name: "kills".to_owned(),
+            value: 2,
+        });
+        state.record_operation(&SteamworksStatsOperation::StatF32Read {
+            name: "accuracy".to_owned(),
+            value: 0.5,
+        });
+        state.record_operation(&SteamworksStatsOperation::StatF32Set {
+            name: "accuracy".to_owned(),
+            value: 0.75,
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementRead {
+            name: "ACH_WIN".to_owned(),
+            achieved: false,
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementDisplayAttributeRead {
+            name: "ACH_WIN".to_owned(),
+            key: "name".to_owned(),
+            value: "Winner".to_owned(),
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementDisplayAttributeRead {
+            name: "ACH_WIN".to_owned(),
+            key: "desc".to_owned(),
+            value: "Win once".to_owned(),
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementDisplayAttributeRead {
+            name: "ACH_WIN".to_owned(),
+            key: "hidden".to_owned(),
+            value: "1".to_owned(),
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementAndUnlockTimeRead {
+            name: "ACH_WIN".to_owned(),
+            achieved: true,
+            unlock_time: 42,
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementAchievedPercentRead {
+            name: "ACH_WIN".to_owned(),
+            percent: 12.5,
+        });
+        state.record_operation(
+            &SteamworksStatsOperation::AchievementGlobalPercentagesListed {
+                offset: 0,
+                total: 1,
+                percentages: vec![SteamworksAchievementGlobalPercentage {
+                    api_name: "ACH_OTHER".to_owned(),
+                    percent: 99.0,
+                }],
+            },
+        );
+        state.record_operation(&SteamworksStatsOperation::AchievementUnlocked {
+            name: "ACH_SECRET".to_owned(),
+        });
+        state.record_operation(&SteamworksStatsOperation::AchievementCleared {
+            name: "ACH_SECRET".to_owned(),
+        });
+
+        assert_eq!(state.stat_i32("kills"), Some(2));
+        assert_eq!(state.stat_f32("accuracy"), Some(0.75));
+        assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(true));
+        assert_eq!(state.achievement_unlock_time("ACH_WIN"), Some(42));
+        assert_eq!(
+            state.achievement_display_attribute("ACH_WIN", "name"),
+            Some("Winner")
+        );
+        assert_eq!(state.achievement_global_percent("ACH_WIN"), Some(12.5));
+        assert_eq!(state.achievement_global_percent("ACH_OTHER"), Some(99.0));
+        assert_eq!(
+            state.last_global_achievement_percentages(),
+            &[SteamworksAchievementGlobalPercentage {
+                api_name: "ACH_OTHER".to_owned(),
+                percent: 99.0,
+            }]
+        );
+        assert_eq!(
+            state.achievement("ACH_WIN"),
+            Some(&SteamworksAchievementInfo {
+                api_name: "ACH_WIN".to_owned(),
+                display_name: Some("Winner".to_owned()),
+                description: Some("Win once".to_owned()),
+                hidden: Some(true),
+                achieved: Some(true),
+                unlock_time: Some(42),
+            })
+        );
+        assert_eq!(state.achievement_unlocked("ACH_SECRET"), Some(false));
+        assert_eq!(state.achievement_unlock_time("ACH_SECRET"), Some(0));
+
+        state.record_operation(&SteamworksStatsOperation::AchievementNamesListed {
+            offset: 0,
+            total: 1,
+            names: vec!["ACH_WIN".to_owned()],
+        });
+        assert_eq!(
+            state.last_achievements(),
+            &[SteamworksAchievementInfo {
+                api_name: "ACH_WIN".to_owned(),
+                ..Default::default()
+            }]
+        );
+        assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(true));
+        assert_eq!(
+            state.achievement_display_attribute("ACH_WIN", "desc"),
+            Some("Win once")
+        );
+
+        state.record_operation(&SteamworksStatsOperation::AllStatsReset {
+            achievements_too: false,
+        });
+        assert_eq!(state.stat_i32("kills"), None);
+        assert_eq!(state.stat_f32("accuracy"), None);
+        assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(true));
+
+        state.record_operation(&SteamworksStatsOperation::AllStatsReset {
+            achievements_too: true,
+        });
+        assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(false));
+        assert_eq!(state.achievement_unlock_time("ACH_WIN"), Some(0));
     }
 
     #[test]
@@ -2921,6 +3390,14 @@ mod tests {
             total: 1,
             achievements: vec![achievement.clone()],
         });
+        assert_eq!(
+            state.achievement_display_attribute("ACH_WIN", "name"),
+            Some("Winner")
+        );
+        assert_eq!(
+            state.achievement_display_attribute("ACH_WIN", "hidden"),
+            Some("0")
+        );
         state.record_operation(&SteamworksStatsOperation::AchievementIconRead {
             name: "ACH_WIN".to_owned(),
             icon: SteamworksAchievementIconStatus::Available(icon.clone()),
