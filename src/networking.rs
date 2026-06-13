@@ -64,19 +64,36 @@ impl Plugin for SteamworksNetworkingPlugin {
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksNetworkingState {
     last_error: Option<SteamworksNetworkingError>,
+    last_accepted_session: Option<steamworks::SteamId>,
+    last_closed_session: Option<steamworks::SteamId>,
     last_session_state: Option<SteamworksP2pSessionStateResult>,
     last_packet_availability: Option<SteamworksP2pPacketAvailability>,
+    last_sent_packet: Option<SteamworksP2pPacketSent>,
     last_packet: Option<SteamworksP2pPacket>,
     sent_count: u64,
     received_count: u64,
+    empty_read_count: u64,
+    last_empty_read_channel: Option<u32>,
     session_request_count: u64,
+    last_session_request: Option<steamworks::SteamId>,
     session_connect_failure_count: u64,
+    last_session_connect_failure: Option<SteamworksP2pSessionConnectFailure>,
 }
 
 impl SteamworksNetworkingState {
     /// Returns the most recent synchronous command error observed by the plugin.
     pub fn last_error(&self) -> Option<&SteamworksNetworkingError> {
         self.last_error.as_ref()
+    }
+
+    /// Returns the most recent accepted legacy P2P session remote.
+    pub fn last_accepted_session(&self) -> Option<steamworks::SteamId> {
+        self.last_accepted_session
+    }
+
+    /// Returns the most recent closed legacy P2P session remote.
+    pub fn last_closed_session(&self) -> Option<steamworks::SteamId> {
+        self.last_closed_session
     }
 
     /// Returns the most recent P2P session state read through the plugin.
@@ -87,6 +104,11 @@ impl SteamworksNetworkingState {
     /// Returns the most recent packet availability read through the plugin.
     pub fn last_packet_availability(&self) -> Option<&SteamworksP2pPacketAvailability> {
         self.last_packet_availability.as_ref()
+    }
+
+    /// Returns the most recent packet send submitted through the plugin.
+    pub fn last_sent_packet(&self) -> Option<SteamworksP2pPacketSent> {
+        self.last_sent_packet
     }
 
     /// Returns the most recent packet read through the plugin.
@@ -104,14 +126,34 @@ impl SteamworksNetworkingState {
         self.received_count
     }
 
+    /// Returns the number of read commands that found no queued packet.
+    pub fn empty_read_count(&self) -> u64 {
+        self.empty_read_count
+    }
+
+    /// Returns the most recent channel where a read command found no queued packet.
+    pub fn last_empty_read_channel(&self) -> Option<u32> {
+        self.last_empty_read_channel
+    }
+
     /// Returns the number of incoming legacy P2P session requests observed.
     pub fn session_request_count(&self) -> u64 {
         self.session_request_count
     }
 
+    /// Returns the most recent incoming legacy P2P session request remote.
+    pub fn last_session_request(&self) -> Option<steamworks::SteamId> {
+        self.last_session_request
+    }
+
     /// Returns the number of legacy P2P session connection failures observed.
     pub fn session_connect_failure_count(&self) -> u64 {
         self.session_connect_failure_count
+    }
+
+    /// Returns the most recent legacy P2P session connection failure callback snapshot.
+    pub fn last_session_connect_failure(&self) -> Option<SteamworksP2pSessionConnectFailure> {
+        self.last_session_connect_failure
     }
 
     fn record_error(&mut self, error: SteamworksNetworkingError) {
@@ -120,8 +162,35 @@ impl SteamworksNetworkingState {
 
     fn record_operation(&mut self, operation: &SteamworksNetworkingOperation) {
         match operation {
-            SteamworksNetworkingOperation::PacketSent { .. } => {
+            SteamworksNetworkingOperation::SessionAccepted { user } => {
+                self.last_accepted_session = Some(*user);
+            }
+            SteamworksNetworkingOperation::SessionClosed { user } => {
+                self.last_closed_session = Some(*user);
+                if self
+                    .last_session_state
+                    .as_ref()
+                    .is_some_and(|state| state.user == *user)
+                {
+                    self.last_session_state = None;
+                }
+            }
+            SteamworksNetworkingOperation::SessionStateRead { state } => {
+                self.last_session_state = Some(state.clone());
+            }
+            SteamworksNetworkingOperation::PacketSent {
+                remote,
+                send_type,
+                channel,
+                bytes,
+            } => {
                 self.sent_count = self.sent_count.saturating_add(1);
+                self.last_sent_packet = Some(SteamworksP2pPacketSent {
+                    remote: *remote,
+                    send_type: *send_type,
+                    channel: *channel,
+                    bytes: *bytes,
+                });
             }
             SteamworksNetworkingOperation::PacketRead {
                 packet: Some(packet),
@@ -130,20 +199,28 @@ impl SteamworksNetworkingState {
                 self.received_count = self.received_count.saturating_add(1);
                 self.last_packet = Some(packet.clone());
             }
+            SteamworksNetworkingOperation::PacketRead {
+                channel,
+                packet: None,
+            } => {
+                self.empty_read_count = self.empty_read_count.saturating_add(1);
+                self.last_empty_read_channel = Some(*channel);
+            }
             SteamworksNetworkingOperation::PacketAvailabilityRead { availability } => {
                 self.last_packet_availability = Some(availability.clone());
             }
-            SteamworksNetworkingOperation::SessionStateRead { state } => {
-                self.last_session_state = Some(state.clone());
-            }
-            SteamworksNetworkingOperation::SessionRequestReceived { .. } => {
+            SteamworksNetworkingOperation::SessionRequestReceived { remote } => {
                 self.session_request_count = self.session_request_count.saturating_add(1);
+                self.last_session_request = Some(*remote);
             }
-            SteamworksNetworkingOperation::SessionConnectFailed { .. } => {
+            SteamworksNetworkingOperation::SessionConnectFailed { remote, error } => {
                 self.session_connect_failure_count =
                     self.session_connect_failure_count.saturating_add(1);
+                self.last_session_connect_failure = Some(SteamworksP2pSessionConnectFailure {
+                    remote: *remote,
+                    error: *error,
+                });
             }
-            _ => {}
         }
     }
 }
@@ -239,6 +316,19 @@ pub struct SteamworksP2pPacket {
     pub data: Vec<u8>,
 }
 
+/// Snapshot of one submitted legacy P2P packet send.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksP2pPacketSent {
+    /// Remote Steam user targeted by the packet.
+    pub remote: steamworks::SteamId,
+    /// Delivery mode used for the send.
+    pub send_type: SteamworksP2pSendType,
+    /// Channel sent on.
+    pub channel: u32,
+    /// Payload size in bytes.
+    pub bytes: usize,
+}
+
 /// Packet availability snapshot for one legacy P2P channel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksP2pPacketAvailability {
@@ -246,6 +336,15 @@ pub struct SteamworksP2pPacketAvailability {
     pub channel: u32,
     /// Available packet size in bytes, if a packet is queued.
     pub bytes: Option<usize>,
+}
+
+/// Legacy P2P session connection failure callback snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SteamworksP2pSessionConnectFailure {
+    /// Remote Steam user.
+    pub remote: steamworks::SteamId,
+    /// Session error decoded from Steam's callback.
+    pub error: steamworks::P2PSessionError,
 }
 
 /// A high-level command for Steam's legacy P2P Networking workflows.
@@ -811,7 +910,15 @@ mod tests {
 
         let state = app.world().resource::<SteamworksNetworkingState>();
         assert_eq!(state.session_request_count(), 1);
+        assert_eq!(state.last_session_request(), Some(user()));
         assert_eq!(state.session_connect_failure_count(), 1);
+        assert_eq!(
+            state.last_session_connect_failure(),
+            Some(SteamworksP2pSessionConnectFailure {
+                remote: user(),
+                error: steamworks::P2PSessionError::Timeout,
+            })
+        );
     }
 
     #[test]
@@ -915,7 +1022,15 @@ mod tests {
         let mut state = SteamworksNetworkingState::default();
         let first = packet(&[1]);
         let second = packet(&[2, 3]);
+        let session_state = SteamworksP2pSessionStateResult {
+            user: user(),
+            state: None,
+        };
 
+        state.record_operation(&SteamworksNetworkingOperation::SessionAccepted { user: user() });
+        state.record_operation(&SteamworksNetworkingOperation::SessionStateRead {
+            state: session_state.clone(),
+        });
         state.record_operation(&SteamworksNetworkingOperation::PacketRead {
             channel: 0,
             packet: Some(first),
@@ -923,6 +1038,10 @@ mod tests {
         state.record_operation(&SteamworksNetworkingOperation::PacketRead {
             channel: 0,
             packet: Some(second.clone()),
+        });
+        state.record_operation(&SteamworksNetworkingOperation::PacketRead {
+            channel: 7,
+            packet: None,
         });
         state.record_operation(&SteamworksNetworkingOperation::PacketSent {
             remote: user(),
@@ -936,9 +1055,29 @@ mod tests {
                 bytes: Some(2),
             },
         });
+        state.record_operation(&SteamworksNetworkingOperation::SessionRequestReceived {
+            remote: user(),
+        });
+        state.record_operation(&SteamworksNetworkingOperation::SessionConnectFailed {
+            remote: user(),
+            error: steamworks::P2PSessionError::NoRightsToApp,
+        });
 
+        assert_eq!(state.last_accepted_session(), Some(user()));
+        assert_eq!(state.last_session_state(), Some(&session_state));
         assert_eq!(state.received_count(), 2);
         assert_eq!(state.sent_count(), 1);
+        assert_eq!(
+            state.last_sent_packet(),
+            Some(SteamworksP2pPacketSent {
+                remote: user(),
+                send_type: SteamworksP2pSendType::Reliable,
+                channel: 0,
+                bytes: 3,
+            })
+        );
+        assert_eq!(state.empty_read_count(), 1);
+        assert_eq!(state.last_empty_read_channel(), Some(7));
         assert_eq!(state.last_packet(), Some(&second));
         assert_eq!(
             state.last_packet_availability(),
@@ -947,5 +1086,20 @@ mod tests {
                 bytes: Some(2),
             })
         );
+        assert_eq!(state.session_request_count(), 1);
+        assert_eq!(state.last_session_request(), Some(user()));
+        assert_eq!(state.session_connect_failure_count(), 1);
+        assert_eq!(
+            state.last_session_connect_failure(),
+            Some(SteamworksP2pSessionConnectFailure {
+                remote: user(),
+                error: steamworks::P2PSessionError::NoRightsToApp,
+            })
+        );
+
+        state.record_operation(&SteamworksNetworkingOperation::SessionClosed { user: user() });
+
+        assert_eq!(state.last_closed_session(), Some(user()));
+        assert!(state.last_session_state().is_none());
     }
 }

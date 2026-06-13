@@ -466,6 +466,8 @@ fn main() {
 
 The command layer validates Steam IDs, channel ranges, send-size limits, and per-frame receive buffer sizes before calling upstream `steamworks`. `ReadP2pPacket` checks the queued packet size before reading, so too-small buffers return `SteamworksNetworkingError::PacketExceedsReadBuffer` instead of silently truncating payloads. Received packets are copied into `SteamworksP2pPacket { data: Vec<u8>, .. }`, so they are safe to store in ECS resources.
 
+`SteamworksNetworkingState` caches the latest accepted/closed session remote, latest session state read, latest packet availability, latest sent packet summary, latest received packet, empty-read count/channel, and the latest session request/failure callback snapshots. It keeps counters instead of unbounded packet or callback history, so gameplay systems can poll state resources without growing memory over time.
+
 `SteamworksNetworkingCommand::AcceptP2pSession` should be sent in response to a `SessionRequestReceived` result, matching Steam's `P2PSessionRequest_t` timing requirement.
 
 Run the legacy P2P example with:
