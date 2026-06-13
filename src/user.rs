@@ -54,9 +54,23 @@ impl Plugin for SteamworksUserPlugin {
 pub struct SteamworksUserState {
     last_error: Option<SteamworksUserError>,
     current_user: Option<SteamworksUserInfo>,
+    last_steam_id: Option<steamworks::SteamId>,
+    last_level: Option<u32>,
     steam_server_connected: Option<bool>,
     active_auth_tickets: Vec<steamworks::AuthTicket>,
     authenticated_users: Vec<steamworks::SteamId>,
+    last_auth_session_ticket: Option<SteamworksIssuedAuthSessionTicket>,
+    last_web_api_ticket_request: Option<SteamworksWebApiAuthenticationTicketRequest>,
+    last_cancelled_auth_ticket: Option<steamworks::AuthTicket>,
+    last_started_authentication_session: Option<steamworks::SteamId>,
+    last_ended_authentication_session: Option<steamworks::SteamId>,
+    last_user_license_for_app: Option<SteamworksUserLicenseForApp>,
+    auth_session_ticket_issue_count: u64,
+    web_api_ticket_request_count: u64,
+    auth_ticket_cancel_count: u64,
+    authentication_session_start_count: u64,
+    authentication_session_end_count: u64,
+    user_license_check_count: u64,
     last_steam_server_connection_event: Option<SteamworksSteamServerConnectionEvent>,
     last_micro_txn_authorization_response: Option<SteamworksMicroTxnAuthorizationResponse>,
     last_auth_ticket_response: Option<SteamworksAuthSessionTicketResponse>,
@@ -73,6 +87,16 @@ impl SteamworksUserState {
     /// Returns the most recent current-user snapshot read through the plugin.
     pub fn current_user(&self) -> Option<&SteamworksUserInfo> {
         self.current_user.as_ref()
+    }
+
+    /// Returns the most recent Steam ID read through this plugin.
+    pub fn last_steam_id(&self) -> Option<steamworks::SteamId> {
+        self.last_steam_id
+    }
+
+    /// Returns the most recent Steam user level read through this plugin.
+    pub fn last_level(&self) -> Option<u32> {
+        self.last_level
     }
 
     /// Returns the latest known Steam server connection state.
@@ -99,6 +123,68 @@ impl SteamworksUserState {
     /// for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns the most recent auth session ticket issued through this command layer.
+    pub fn last_auth_session_ticket(&self) -> Option<&SteamworksIssuedAuthSessionTicket> {
+        self.last_auth_session_ticket.as_ref()
+    }
+
+    /// Returns the most recent Web API auth ticket request submitted through this command layer.
+    pub fn last_web_api_ticket_request(
+        &self,
+    ) -> Option<&SteamworksWebApiAuthenticationTicketRequest> {
+        self.last_web_api_ticket_request.as_ref()
+    }
+
+    /// Returns the most recent auth ticket cancelled through this command layer.
+    pub fn last_cancelled_auth_ticket(&self) -> Option<steamworks::AuthTicket> {
+        self.last_cancelled_auth_ticket
+    }
+
+    /// Returns the most recent remote authentication session started through this command layer.
+    pub fn last_started_authentication_session(&self) -> Option<steamworks::SteamId> {
+        self.last_started_authentication_session
+    }
+
+    /// Returns the most recent remote authentication session ended through this command layer.
+    pub fn last_ended_authentication_session(&self) -> Option<steamworks::SteamId> {
+        self.last_ended_authentication_session
+    }
+
+    /// Returns the most recent app-license check submitted through this command layer.
+    pub fn last_user_license_for_app(&self) -> Option<&SteamworksUserLicenseForApp> {
+        self.last_user_license_for_app.as_ref()
+    }
+
+    /// Returns how many auth session tickets this plugin issued.
+    pub fn auth_session_ticket_issue_count(&self) -> u64 {
+        self.auth_session_ticket_issue_count
+    }
+
+    /// Returns how many Web API auth ticket requests this plugin submitted.
+    pub fn web_api_ticket_request_count(&self) -> u64 {
+        self.web_api_ticket_request_count
+    }
+
+    /// Returns how many auth tickets this plugin cancelled.
+    pub fn auth_ticket_cancel_count(&self) -> u64 {
+        self.auth_ticket_cancel_count
+    }
+
+    /// Returns how many remote authentication sessions this plugin started.
+    pub fn authentication_session_start_count(&self) -> u64 {
+        self.authentication_session_start_count
+    }
+
+    /// Returns how many remote authentication sessions this plugin ended.
+    pub fn authentication_session_end_count(&self) -> u64 {
+        self.authentication_session_end_count
+    }
+
+    /// Returns how many app-license checks this plugin performed.
+    pub fn user_license_check_count(&self) -> u64 {
+        self.user_license_check_count
     }
 
     /// Returns the most recent Steam server connection callback snapshot.
@@ -138,7 +224,21 @@ impl SteamworksUserState {
         match operation {
             SteamworksUserOperation::CurrentUserInfoRead { info } => {
                 self.current_user = Some(info.clone());
+                self.last_steam_id = Some(info.steam_id);
+                self.last_level = Some(info.level);
                 self.steam_server_connected = Some(info.logged_on);
+            }
+            SteamworksUserOperation::SteamIdRead { steam_id } => {
+                self.last_steam_id = Some(*steam_id);
+                if let Some(info) = &mut self.current_user {
+                    info.steam_id = *steam_id;
+                }
+            }
+            SteamworksUserOperation::LevelRead { level } => {
+                self.last_level = Some(*level);
+                if let Some(info) = &mut self.current_user {
+                    info.level = *level;
+                }
             }
             SteamworksUserOperation::LoggedOnRead { logged_on } => {
                 self.steam_server_connected = Some(*logged_on);
@@ -146,22 +246,64 @@ impl SteamworksUserState {
                     info.logged_on = *logged_on;
                 }
             }
-            SteamworksUserOperation::AuthenticationSessionTicketIssued { ticket, .. }
-            | SteamworksUserOperation::WebApiAuthenticationTicketRequested { ticket, .. }
-                if !self.active_auth_tickets.contains(ticket) =>
-            {
-                self.active_auth_tickets.push(*ticket);
+            SteamworksUserOperation::AuthenticationSessionTicketIssued {
+                ticket,
+                ticket_bytes,
+                steam_id,
+            } => {
+                if !self.active_auth_tickets.contains(ticket) {
+                    self.active_auth_tickets.push(*ticket);
+                }
+                self.last_auth_session_ticket = Some(SteamworksIssuedAuthSessionTicket {
+                    ticket: *ticket,
+                    ticket_bytes: ticket_bytes.clone(),
+                    steam_id: *steam_id,
+                });
+                self.auth_session_ticket_issue_count =
+                    self.auth_session_ticket_issue_count.saturating_add(1);
+            }
+            SteamworksUserOperation::WebApiAuthenticationTicketRequested { ticket, identity } => {
+                if !self.active_auth_tickets.contains(ticket) {
+                    self.active_auth_tickets.push(*ticket);
+                }
+                self.last_web_api_ticket_request =
+                    Some(SteamworksWebApiAuthenticationTicketRequest {
+                        ticket: *ticket,
+                        identity: identity.clone(),
+                    });
+                self.web_api_ticket_request_count =
+                    self.web_api_ticket_request_count.saturating_add(1);
             }
             SteamworksUserOperation::AuthenticationTicketCancelled { ticket } => {
                 self.active_auth_tickets.retain(|known| known != ticket);
+                self.last_cancelled_auth_ticket = Some(*ticket);
+                self.auth_ticket_cancel_count = self.auth_ticket_cancel_count.saturating_add(1);
             }
-            SteamworksUserOperation::AuthenticationSessionStarted { user }
-                if !self.authenticated_users.contains(user) =>
-            {
-                self.authenticated_users.push(*user);
+            SteamworksUserOperation::AuthenticationSessionStarted { user } => {
+                if !self.authenticated_users.contains(user) {
+                    self.authenticated_users.push(*user);
+                }
+                self.last_started_authentication_session = Some(*user);
+                self.authentication_session_start_count =
+                    self.authentication_session_start_count.saturating_add(1);
             }
             SteamworksUserOperation::AuthenticationSessionEnded { user } => {
                 self.authenticated_users.retain(|known| known != user);
+                self.last_ended_authentication_session = Some(*user);
+                self.authentication_session_end_count =
+                    self.authentication_session_end_count.saturating_add(1);
+            }
+            SteamworksUserOperation::UserLicenseForAppRead {
+                user,
+                app_id,
+                license,
+            } => {
+                self.last_user_license_for_app = Some(SteamworksUserLicenseForApp {
+                    user: *user,
+                    app_id: *app_id,
+                    license: license.clone(),
+                });
+                self.user_license_check_count = self.user_license_check_count.saturating_add(1);
             }
             SteamworksUserOperation::AuthenticationSessionTicketResponse { response } => {
                 if response.result.is_err() {
@@ -195,7 +337,6 @@ impl SteamworksUserState {
             SteamworksUserOperation::MicroTxnAuthorizationResponseReceived { response } => {
                 self.last_micro_txn_authorization_response = Some(response.clone());
             }
-            _ => {}
         }
     }
 }
@@ -211,6 +352,49 @@ pub struct SteamworksUserInfo {
     pub logged_on: bool,
 }
 
+/// Auth session ticket issued through this command layer.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksIssuedAuthSessionTicket {
+    /// Ticket handle that should be cancelled when no longer needed.
+    pub ticket: steamworks::AuthTicket,
+    /// Raw ticket bytes returned by Steam.
+    ///
+    /// Treat this as credential material; avoid logging it or storing it longer than needed.
+    pub ticket_bytes: Vec<u8>,
+    /// Steam ID used as the network identity for the verifier.
+    pub steam_id: steamworks::SteamId,
+}
+
+impl std::fmt::Debug for SteamworksIssuedAuthSessionTicket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteamworksIssuedAuthSessionTicket")
+            .field("ticket", &self.ticket)
+            .field("ticket_bytes_len", &self.ticket_bytes.len())
+            .field("steam_id", &self.steam_id)
+            .finish()
+    }
+}
+
+/// Web API auth ticket request submitted through this command layer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksWebApiAuthenticationTicketRequest {
+    /// Ticket handle that should be cancelled when no longer needed.
+    pub ticket: steamworks::AuthTicket,
+    /// Identity string submitted for the consuming service.
+    pub identity: String,
+}
+
+/// App-license check result for an authenticated user.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUserLicenseForApp {
+    /// Steam user that was checked.
+    pub user: steamworks::SteamId,
+    /// Steam app ID that was checked.
+    pub app_id: steamworks::AppId,
+    /// License state reported by Steam.
+    pub license: steamworks::UserHasLicense,
+}
+
 /// Auth session ticket creation callback snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksAuthSessionTicketResponse {
@@ -221,14 +405,26 @@ pub struct SteamworksAuthSessionTicketResponse {
 }
 
 /// Web API auth ticket callback snapshot.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SteamworksWebApiTicketResponse {
     /// Ticket handle reported by Steam.
     pub ticket_handle: steamworks::AuthTicket,
     /// Steam result for ticket creation.
     pub result: Result<(), steamworks::SteamError>,
     /// Ticket bytes returned by Steam, truncated to Steam's reported length.
+    ///
+    /// Treat this as credential material; avoid logging it or storing it longer than needed.
     pub ticket_bytes: Vec<u8>,
+}
+
+impl std::fmt::Debug for SteamworksWebApiTicketResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteamworksWebApiTicketResponse")
+            .field("ticket_handle", &self.ticket_handle)
+            .field("result", &self.result)
+            .field("ticket_bytes_len", &self.ticket_bytes.len())
+            .finish()
+    }
 }
 
 /// Auth ticket validation callback snapshot.
@@ -273,7 +469,7 @@ pub struct SteamworksMicroTxnAuthorizationResponse {
 }
 
 /// A high-level command for Steam user identity and authentication workflows.
-#[derive(Clone, Debug, Message, PartialEq, Eq)]
+#[derive(Clone, Message, PartialEq, Eq)]
 pub enum SteamworksUserCommand {
     /// Read a snapshot of common current-user information.
     GetCurrentUserInfo,
@@ -327,6 +523,43 @@ pub enum SteamworksUserCommand {
     },
 }
 
+impl std::fmt::Debug for SteamworksUserCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GetCurrentUserInfo => f.write_str("GetCurrentUserInfo"),
+            Self::GetSteamId => f.write_str("GetSteamId"),
+            Self::GetLevel => f.write_str("GetLevel"),
+            Self::IsLoggedOn => f.write_str("IsLoggedOn"),
+            Self::GetAuthenticationSessionTicket { steam_id } => f
+                .debug_struct("GetAuthenticationSessionTicket")
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::GetAuthenticationSessionTicketForWebApi { identity } => f
+                .debug_struct("GetAuthenticationSessionTicketForWebApi")
+                .field("identity", identity)
+                .finish(),
+            Self::CancelAuthenticationTicket { ticket } => f
+                .debug_struct("CancelAuthenticationTicket")
+                .field("ticket", ticket)
+                .finish(),
+            Self::BeginAuthenticationSession { user, ticket } => f
+                .debug_struct("BeginAuthenticationSession")
+                .field("user", user)
+                .field("ticket_len", &ticket.len())
+                .finish(),
+            Self::EndAuthenticationSession { user } => f
+                .debug_struct("EndAuthenticationSession")
+                .field("user", user)
+                .finish(),
+            Self::UserHasLicenseForApp { user, app_id } => f
+                .debug_struct("UserHasLicenseForApp")
+                .field("user", user)
+                .field("app_id", app_id)
+                .finish(),
+        }
+    }
+}
+
 impl SteamworksUserCommand {
     /// Creates a [`SteamworksUserCommand::GetAuthenticationSessionTicket`] command.
     pub fn get_authentication_session_ticket(steam_id: steamworks::SteamId) -> Self {
@@ -374,7 +607,7 @@ impl SteamworksUserCommand {
 }
 
 /// A successfully submitted Steam user operation or synchronous read.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum SteamworksUserOperation {
     /// Common current-user information was read.
     CurrentUserInfoRead {
@@ -473,6 +706,83 @@ pub enum SteamworksUserOperation {
         /// Callback snapshot.
         response: SteamworksMicroTxnAuthorizationResponse,
     },
+}
+
+impl std::fmt::Debug for SteamworksUserOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CurrentUserInfoRead { info } => f
+                .debug_struct("CurrentUserInfoRead")
+                .field("info", info)
+                .finish(),
+            Self::SteamIdRead { steam_id } => f
+                .debug_struct("SteamIdRead")
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::LevelRead { level } => f.debug_struct("LevelRead").field("level", level).finish(),
+            Self::LoggedOnRead { logged_on } => f
+                .debug_struct("LoggedOnRead")
+                .field("logged_on", logged_on)
+                .finish(),
+            Self::AuthenticationSessionTicketIssued {
+                ticket,
+                ticket_bytes,
+                steam_id,
+            } => f
+                .debug_struct("AuthenticationSessionTicketIssued")
+                .field("ticket", ticket)
+                .field("ticket_bytes_len", &ticket_bytes.len())
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::WebApiAuthenticationTicketRequested { ticket, identity } => f
+                .debug_struct("WebApiAuthenticationTicketRequested")
+                .field("ticket", ticket)
+                .field("identity", identity)
+                .finish(),
+            Self::AuthenticationTicketCancelled { ticket } => f
+                .debug_struct("AuthenticationTicketCancelled")
+                .field("ticket", ticket)
+                .finish(),
+            Self::AuthenticationSessionStarted { user } => f
+                .debug_struct("AuthenticationSessionStarted")
+                .field("user", user)
+                .finish(),
+            Self::AuthenticationSessionEnded { user } => f
+                .debug_struct("AuthenticationSessionEnded")
+                .field("user", user)
+                .finish(),
+            Self::UserLicenseForAppRead {
+                user,
+                app_id,
+                license,
+            } => f
+                .debug_struct("UserLicenseForAppRead")
+                .field("user", user)
+                .field("app_id", app_id)
+                .field("license", license)
+                .finish(),
+            Self::AuthenticationSessionTicketResponse { response } => f
+                .debug_struct("AuthenticationSessionTicketResponse")
+                .field("response", response)
+                .finish(),
+            Self::WebApiAuthenticationTicketReceived { response } => f
+                .debug_struct("WebApiAuthenticationTicketReceived")
+                .field("response", response)
+                .finish(),
+            Self::AuthenticationTicketValidationReceived { validation } => f
+                .debug_struct("AuthenticationTicketValidationReceived")
+                .field("validation", validation)
+                .finish(),
+            Self::SteamServerConnectionEventReceived { event } => f
+                .debug_struct("SteamServerConnectionEventReceived")
+                .field("event", event)
+                .finish(),
+            Self::MicroTxnAuthorizationResponseReceived { response } => f
+                .debug_struct("MicroTxnAuthorizationResponseReceived")
+                .field("response", response)
+                .finish(),
+        }
+    }
 }
 
 /// Result message emitted by [`SteamworksUserPlugin`].
@@ -925,6 +1235,18 @@ mod tests {
     }
 
     #[test]
+    fn command_debug_redacts_authentication_ticket_bytes() {
+        let command = SteamworksUserCommand::begin_authentication_session(
+            steamworks::SteamId::from_raw(1),
+            vec![1, 2, 3, 4],
+        );
+        let debug = format!("{command:?}");
+
+        assert!(debug.contains("ticket_len: 4"));
+        assert!(!debug.contains("[1, 2, 3, 4]"));
+    }
+
+    #[test]
     fn auth_session_errors_are_cloneable_and_comparable() {
         assert_eq!(
             SteamworksAuthSessionError::from(steamworks::AuthSessionError::InvalidTicket),
@@ -1211,6 +1533,75 @@ mod tests {
                 logged_on: false,
             })
         );
+    }
+
+    #[test]
+    fn state_records_user_operations_without_unbounded_history() {
+        let mut state = SteamworksUserState::default();
+        let first_user = steamworks::SteamId::from_raw(1);
+        let second_user = steamworks::SteamId::from_raw(2);
+        let app_id = steamworks::AppId(480);
+
+        state.record_operation(&SteamworksUserOperation::CurrentUserInfoRead {
+            info: SteamworksUserInfo {
+                steam_id: first_user,
+                level: 7,
+                logged_on: false,
+            },
+        });
+        state.record_operation(&SteamworksUserOperation::SteamIdRead {
+            steam_id: second_user,
+        });
+        state.record_operation(&SteamworksUserOperation::LevelRead { level: 9 });
+        state.record_operation(&SteamworksUserOperation::AuthenticationSessionStarted {
+            user: first_user,
+        });
+        state.record_operation(&SteamworksUserOperation::AuthenticationSessionStarted {
+            user: first_user,
+        });
+        state.record_operation(&SteamworksUserOperation::UserLicenseForAppRead {
+            user: first_user,
+            app_id,
+            license: steamworks::UserHasLicense::HasLicense,
+        });
+        state.record_operation(&SteamworksUserOperation::AuthenticationSessionEnded {
+            user: first_user,
+        });
+
+        assert_eq!(
+            state.current_user(),
+            Some(&SteamworksUserInfo {
+                steam_id: second_user,
+                level: 9,
+                logged_on: false,
+            })
+        );
+        assert_eq!(state.last_steam_id(), Some(second_user));
+        assert_eq!(state.last_level(), Some(9));
+        assert!(state.active_auth_tickets().is_empty());
+        assert!(state.last_auth_session_ticket().is_none());
+        assert_eq!(state.auth_session_ticket_issue_count(), 0);
+        assert!(state.last_web_api_ticket_request().is_none());
+        assert_eq!(state.web_api_ticket_request_count(), 0);
+        assert!(state.last_cancelled_auth_ticket().is_none());
+        assert_eq!(state.auth_ticket_cancel_count(), 0);
+        assert!(state.authenticated_users().is_empty());
+        assert_eq!(
+            state.last_started_authentication_session(),
+            Some(first_user)
+        );
+        assert_eq!(state.authentication_session_start_count(), 2);
+        assert_eq!(state.last_ended_authentication_session(), Some(first_user));
+        assert_eq!(state.authentication_session_end_count(), 1);
+        assert_eq!(
+            state.last_user_license_for_app(),
+            Some(&SteamworksUserLicenseForApp {
+                user: first_user,
+                app_id,
+                license: steamworks::UserHasLicense::HasLicense,
+            })
+        );
+        assert_eq!(state.user_license_check_count(), 1);
     }
 
     #[test]

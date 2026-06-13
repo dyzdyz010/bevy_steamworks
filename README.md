@@ -314,6 +314,8 @@ Steam server connection callbacks are mirrored as `SteamworksUserOperation::Stea
 
 Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and sessions started through its own commands in `SteamworksUserState`; validation failure callbacks prune matching started sessions without creating new ones from unrelated global events.
 
+`SteamworksUserState` also caches bounded query snapshots for the latest Steam ID and level reads, latest issued auth session ticket, latest Web API ticket request, latest cancelled ticket, latest started/ended remote authentication session, latest app-license check, and counters for those command-layer events. It keeps active ticket/session sets for lifecycle management, but only last snapshots for ticket bytes and license checks. Treat cached ticket bytes as credential material: cancel tickets promptly and avoid dumping state snapshots to logs.
+
 Run the user/auth example with:
 
 ```powershell
