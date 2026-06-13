@@ -58,6 +58,8 @@ pub struct SteamworksScreenshotsState {
     last_error: Option<SteamworksScreenshotsError>,
     screenshots_hooked: Option<bool>,
     added_screenshots: Vec<steamworks::screenshots::ScreenshotHandle>,
+    submitted_screenshots: Vec<SteamworksSubmittedScreenshot>,
+    screenshot_trigger_count: u64,
     screenshot_requested_count: u64,
     last_screenshot_ready: Option<SteamworksScreenshotReady>,
 }
@@ -82,6 +84,31 @@ impl SteamworksScreenshotsState {
         &self.added_screenshots
     }
 
+    /// Returns screenshot library submissions accepted by Steam through this command layer.
+    pub fn submitted_screenshots(&self) -> &[SteamworksSubmittedScreenshot] {
+        &self.submitted_screenshots
+    }
+
+    /// Returns one submitted screenshot snapshot by Steam screenshot handle.
+    pub fn submitted_screenshot(
+        &self,
+        handle: steamworks::screenshots::ScreenshotHandle,
+    ) -> Option<&SteamworksSubmittedScreenshot> {
+        self.submitted_screenshots
+            .iter()
+            .find(|submission| submission.handle == handle)
+    }
+
+    /// Returns the most recent screenshot library submission accepted by Steam.
+    pub fn last_submitted_screenshot(&self) -> Option<&SteamworksSubmittedScreenshot> {
+        self.submitted_screenshots.last()
+    }
+
+    /// Returns how many trigger screenshot commands this plugin successfully submitted.
+    pub fn screenshot_trigger_count(&self) -> u64 {
+        self.screenshot_trigger_count
+    }
+
     /// Returns how many screenshot requested callbacks this plugin observed.
     pub fn screenshot_requested_count(&self) -> u64 {
         self.screenshot_requested_count
@@ -102,10 +129,29 @@ impl SteamworksScreenshotsState {
             | SteamworksScreenshotsOperation::ScreenshotsHookedRead { hooked: hook } => {
                 self.screenshots_hooked = Some(*hook);
             }
-            SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted { handle, .. }
-                if !self.added_screenshots.contains(handle) =>
-            {
-                self.added_screenshots.push(*handle);
+            SteamworksScreenshotsOperation::ScreenshotTriggered => {
+                self.screenshot_trigger_count = self.screenshot_trigger_count.saturating_add(1);
+            }
+            SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted {
+                handle,
+                filename,
+                thumbnail_filename,
+                width,
+                height,
+            } => {
+                if !self.added_screenshots.contains(handle) {
+                    self.added_screenshots.push(*handle);
+                }
+                upsert_submitted_screenshot(
+                    &mut self.submitted_screenshots,
+                    SteamworksSubmittedScreenshot {
+                        handle: *handle,
+                        filename: filename.clone(),
+                        thumbnail_filename: thumbnail_filename.clone(),
+                        width: *width,
+                        height: *height,
+                    },
+                );
             }
             SteamworksScreenshotsOperation::ScreenshotRequested { count } => {
                 self.screenshot_requested_count = *count;
@@ -113,9 +159,23 @@ impl SteamworksScreenshotsState {
             SteamworksScreenshotsOperation::ScreenshotReady { ready } => {
                 self.last_screenshot_ready = Some(ready.clone());
             }
-            _ => {}
         }
     }
+}
+
+/// Screenshot library submission accepted by Steam.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksSubmittedScreenshot {
+    /// Steam screenshot handle.
+    pub handle: steamworks::screenshots::ScreenshotHandle,
+    /// Screenshot image file path submitted.
+    pub filename: PathBuf,
+    /// Optional thumbnail image file path submitted.
+    pub thumbnail_filename: Option<PathBuf>,
+    /// Screenshot width in pixels.
+    pub width: i32,
+    /// Screenshot height in pixels.
+    pub height: i32,
 }
 
 /// Screenshot ready callback snapshot.
@@ -462,6 +522,20 @@ fn validate_command(
     Ok(())
 }
 
+fn upsert_submitted_screenshot(
+    submissions: &mut Vec<SteamworksSubmittedScreenshot>,
+    submission: SteamworksSubmittedScreenshot,
+) {
+    if let Some(index) = submissions
+        .iter()
+        .position(|existing| existing.handle == submission.handle)
+    {
+        submissions.remove(index);
+    }
+
+    submissions.push(submission);
+}
+
 #[cfg(test)]
 mod tests {
     use bevy_app::App;
@@ -565,6 +639,95 @@ mod tests {
                 steamworks::screenshots::ScreenshotReadyError::IoFailure
             ),
             SteamworksScreenshotReadyError::IoFailure
+        );
+    }
+
+    #[test]
+    fn state_records_screenshot_operations() {
+        let mut state = SteamworksScreenshotsState::default();
+        let first_submission = SteamworksSubmittedScreenshot {
+            handle: 11,
+            filename: PathBuf::from("first.png"),
+            thumbnail_filename: Some(PathBuf::from("first_thumb.png")),
+            width: 1920,
+            height: 1080,
+        };
+        let updated_submission = SteamworksSubmittedScreenshot {
+            handle: 11,
+            filename: PathBuf::from("updated.png"),
+            thumbnail_filename: None,
+            width: 1280,
+            height: 720,
+        };
+        let second_submission = SteamworksSubmittedScreenshot {
+            handle: 22,
+            filename: PathBuf::from("second.png"),
+            thumbnail_filename: None,
+            width: 800,
+            height: 600,
+        };
+
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotsHookSet { hook: true });
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotsHookedRead {
+            hooked: false,
+        });
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotTriggered);
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotTriggered);
+        state.record_operation(
+            &SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted {
+                handle: first_submission.handle,
+                filename: first_submission.filename.clone(),
+                thumbnail_filename: first_submission.thumbnail_filename.clone(),
+                width: first_submission.width,
+                height: first_submission.height,
+            },
+        );
+        state.record_operation(
+            &SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted {
+                handle: second_submission.handle,
+                filename: second_submission.filename.clone(),
+                thumbnail_filename: second_submission.thumbnail_filename.clone(),
+                width: second_submission.width,
+                height: second_submission.height,
+            },
+        );
+        state.record_operation(
+            &SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted {
+                handle: updated_submission.handle,
+                filename: updated_submission.filename.clone(),
+                thumbnail_filename: updated_submission.thumbnail_filename.clone(),
+                width: updated_submission.width,
+                height: updated_submission.height,
+            },
+        );
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotRequested { count: 3 });
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotReady {
+            ready: SteamworksScreenshotReady {
+                local_handle: Ok(updated_submission.handle),
+            },
+        });
+
+        assert_eq!(state.screenshots_hooked(), Some(false));
+        assert_eq!(state.screenshot_trigger_count(), 2);
+        assert_eq!(
+            state.added_screenshots(),
+            &[updated_submission.handle, second_submission.handle]
+        );
+        assert_eq!(
+            state.submitted_screenshots(),
+            &[second_submission.clone(), updated_submission.clone()]
+        );
+        assert_eq!(
+            state.submitted_screenshot(updated_submission.handle),
+            Some(&updated_submission)
+        );
+        assert_eq!(state.last_submitted_screenshot(), Some(&updated_submission));
+        assert_eq!(state.screenshot_requested_count(), 3);
+        assert_eq!(
+            state.last_screenshot_ready(),
+            Some(&SteamworksScreenshotReady {
+                local_handle: Ok(updated_submission.handle),
+            })
         );
     }
 

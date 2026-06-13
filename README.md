@@ -668,6 +668,8 @@ fn main() {
 
 `SteamworksScreenshotsCommand::AddScreenshotToLibrary` returns a screenshot handle when Steam accepts the request. Final save confirmation arrives later through both `SteamworksEvent::ScreenshotReady` and `SteamworksScreenshotsOperation::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
 
+`SteamworksScreenshotsState` caches the latest hook state, successful trigger count, screenshot request callback count, accepted library submission metadata, and the latest screenshot ready callback. Systems can keep using `added_screenshots` for handle-only compatibility or query `submitted_screenshots`, `submitted_screenshot`, and `last_submitted_screenshot` when they need the submitted path and dimensions.
+
 Only call `SteamworksScreenshotsCommand::hook_screenshots(true)` if your game will handle `SteamworksScreenshotsOperation::ScreenshotRequested` or `SteamworksEvent::ScreenshotRequested` by capturing an image and submitting it to Steam; once hooked, Steam no longer handles the screenshot hotkey for you. `AddScreenshotToLibrary` canonicalizes local file paths through the upstream wrapper before submitting, so keep it low-frequency and avoid slow network paths in frame-critical flows.
 
 Run the screenshots example with:
