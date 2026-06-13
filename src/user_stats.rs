@@ -69,6 +69,11 @@ pub struct SteamworksStatsState {
     last_user_stats_stored: Option<SteamworksUserStatsStored>,
     last_user_achievement_stored: Option<SteamworksUserAchievementStored>,
     last_global_achievement_percentages: Vec<SteamworksAchievementGlobalPercentage>,
+    last_global_stats_game_id: Option<steamworks::GameId>,
+    last_global_stat_i64: Option<SteamworksGlobalStatValue<i64>>,
+    last_global_stat_f64: Option<SteamworksGlobalStatValue<f64>>,
+    last_global_stat_history_i64: Option<SteamworksGlobalStatHistory<i64>>,
+    last_global_stat_history_f64: Option<SteamworksGlobalStatHistory<f64>>,
     leaderboard_count: usize,
     last_leaderboard_info: Option<SteamworksLeaderboardInfo>,
     last_leaderboard_entries: Vec<SteamworksLeaderboardEntry>,
@@ -123,6 +128,31 @@ impl SteamworksStatsState {
     /// Returns the most recent global achievement percentage page.
     pub fn last_global_achievement_percentages(&self) -> &[SteamworksAchievementGlobalPercentage] {
         &self.last_global_achievement_percentages
+    }
+
+    /// Returns the most recent global stats received callback game ID.
+    pub fn last_global_stats_game_id(&self) -> Option<steamworks::GameId> {
+        self.last_global_stats_game_id
+    }
+
+    /// Returns the most recent aggregated global integer stat read through this plugin.
+    pub fn last_global_stat_i64(&self) -> Option<&SteamworksGlobalStatValue<i64>> {
+        self.last_global_stat_i64.as_ref()
+    }
+
+    /// Returns the most recent aggregated global floating-point stat read through this plugin.
+    pub fn last_global_stat_f64(&self) -> Option<&SteamworksGlobalStatValue<f64>> {
+        self.last_global_stat_f64.as_ref()
+    }
+
+    /// Returns the most recent aggregated global integer stat history read through this plugin.
+    pub fn last_global_stat_history_i64(&self) -> Option<&SteamworksGlobalStatHistory<i64>> {
+        self.last_global_stat_history_i64.as_ref()
+    }
+
+    /// Returns the most recent aggregated global floating-point stat history read through this plugin.
+    pub fn last_global_stat_history_f64(&self) -> Option<&SteamworksGlobalStatHistory<f64>> {
+        self.last_global_stat_history_f64.as_ref()
     }
 
     /// Returns the number of leaderboard handles currently owned by this plugin.
@@ -189,6 +219,40 @@ impl SteamworksStatsState {
                 self.last_global_achievement_percentages
                     .clone_from(percentages);
             }
+            SteamworksStatsOperation::GlobalStatsReceived { game_id } => {
+                self.last_global_stats_game_id = Some(*game_id);
+            }
+            SteamworksStatsOperation::GlobalStatsRequested { .. } => {
+                self.last_global_stats_game_id = None;
+                self.last_global_stat_i64 = None;
+                self.last_global_stat_f64 = None;
+                self.last_global_stat_history_i64 = None;
+                self.last_global_stat_history_f64 = None;
+            }
+            SteamworksStatsOperation::GlobalStatI64Read { name, value } => {
+                self.last_global_stat_i64 = Some(SteamworksGlobalStatValue {
+                    name: name.clone(),
+                    value: *value,
+                });
+            }
+            SteamworksStatsOperation::GlobalStatF64Read { name, value } => {
+                self.last_global_stat_f64 = Some(SteamworksGlobalStatValue {
+                    name: name.clone(),
+                    value: *value,
+                });
+            }
+            SteamworksStatsOperation::GlobalStatHistoryI64Read { name, values } => {
+                self.last_global_stat_history_i64 = Some(SteamworksGlobalStatHistory {
+                    name: name.clone(),
+                    values: values.clone(),
+                });
+            }
+            SteamworksStatsOperation::GlobalStatHistoryF64Read { name, values } => {
+                self.last_global_stat_history_f64 = Some(SteamworksGlobalStatHistory {
+                    name: name.clone(),
+                    values: values.clone(),
+                });
+            }
             SteamworksStatsOperation::LeaderboardInfoRead { info } => {
                 self.last_leaderboard_info = Some(info.clone());
             }
@@ -224,6 +288,24 @@ pub struct SteamworksAchievementGlobalPercentage {
     pub api_name: String,
     /// Percentage of players who have unlocked this achievement.
     pub percent: f32,
+}
+
+/// Aggregated global stat value snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksGlobalStatValue<T> {
+    /// Steamworks stat API name.
+    pub name: String,
+    /// Aggregated global value.
+    pub value: T,
+}
+
+/// Aggregated global stat history snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksGlobalStatHistory<T> {
+    /// Steamworks stat API name.
+    pub name: String,
+    /// Daily values from today backwards.
+    pub values: Vec<T>,
 }
 
 /// RGBA icon snapshot for one Steam achievement.
@@ -2870,6 +2952,68 @@ mod tests {
                 percent: 12.5,
             }]
         );
+    }
+
+    #[test]
+    fn global_stats_state_records_latest_values() {
+        let mut state = SteamworksStatsState::default();
+        let game_id = steamworks::GameId::from_raw(480);
+
+        state.record_operation(&SteamworksStatsOperation::GlobalStatsReceived { game_id });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatI64Read {
+            name: "total_kills".to_owned(),
+            value: 123,
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatF64Read {
+            name: "average_accuracy".to_owned(),
+            value: 0.75,
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatHistoryI64Read {
+            name: "daily_kills".to_owned(),
+            values: vec![3, 2, 1],
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatHistoryF64Read {
+            name: "daily_accuracy".to_owned(),
+            values: vec![0.5, 0.6],
+        });
+
+        assert_eq!(state.last_global_stats_game_id(), Some(game_id));
+        assert_eq!(
+            state.last_global_stat_i64(),
+            Some(&SteamworksGlobalStatValue {
+                name: "total_kills".to_owned(),
+                value: 123,
+            })
+        );
+        assert_eq!(
+            state.last_global_stat_f64(),
+            Some(&SteamworksGlobalStatValue {
+                name: "average_accuracy".to_owned(),
+                value: 0.75,
+            })
+        );
+        assert_eq!(
+            state.last_global_stat_history_i64(),
+            Some(&SteamworksGlobalStatHistory {
+                name: "daily_kills".to_owned(),
+                values: vec![3, 2, 1],
+            })
+        );
+        assert_eq!(
+            state.last_global_stat_history_f64(),
+            Some(&SteamworksGlobalStatHistory {
+                name: "daily_accuracy".to_owned(),
+                values: vec![0.5, 0.6],
+            })
+        );
+
+        state.record_operation(&SteamworksStatsOperation::GlobalStatsRequested { history_days: 7 });
+
+        assert_eq!(state.last_global_stats_game_id(), None);
+        assert_eq!(state.last_global_stat_i64(), None);
+        assert_eq!(state.last_global_stat_f64(), None);
+        assert_eq!(state.last_global_stat_history_i64(), None);
+        assert_eq!(state.last_global_stat_history_f64(), None);
     }
 
     #[test]

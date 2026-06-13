@@ -970,6 +970,8 @@ Achievement catalog commands can list API names or owned `SteamworksAchievementI
 
 After `RequestGlobalAchievementPercentages` completes with `GlobalAchievementPercentagesReceived`, `list_achievement_global_percentages()` and `list_achievement_global_percentages_page(offset, limit)` return paged `SteamworksAchievementGlobalPercentage` snapshots. These commands also enumerate achievement names through the upstream safe wrapper, so treat them as startup/tooling reads rather than every-frame work.
 
+Aggregated global stats use `request_global_stats(history_days)` first; after `GlobalStatsReceived`, read values with `get_global_stat_i64`, `get_global_stat_f64`, `get_global_stat_history_i64`, or `get_global_stat_history_f64`. `SteamworksStatsState` caches the latest game ID, value snapshots (`SteamworksGlobalStatValue<T>`), and history snapshots (`SteamworksGlobalStatHistory<T>`) so systems can inspect the last result without retaining message history. A new global stats request clears the previous cached global stat values until fresh reads complete.
+
 Leaderboard find and find-or-create commands are asynchronous. Successful results insert the upstream leaderboard handle into the plugin and return a `SteamworksLeaderboardId`; later info reads, score uploads, entry downloads, and forget commands use that stable ID. Global downloads use absolute rank ranges, user-relative downloads accept signed offsets around the current user, and friends downloads do not take a range. Ranged downloads are capped per command to keep frame work bounded.
 
 For read-only tools or examples, disable automatic storage:

@@ -11,6 +11,7 @@ struct FramesRemaining(u32);
 struct StatsExampleState {
     leaderboard: Option<SteamworksLeaderboardId>,
     requested_leaderboard_reads: bool,
+    requested_global_stat_reads: bool,
     uploaded_score: bool,
     listed_global_achievement_percentages: bool,
 }
@@ -31,6 +32,12 @@ fn request_stats(
 
     commands.write(SteamworksStatsCommand::RequestCurrentUserStats);
     commands.write(SteamworksStatsCommand::RequestGlobalAchievementPercentages);
+
+    if std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_I64").is_ok()
+        || std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_F64").is_ok()
+    {
+        commands.write(SteamworksStatsCommand::request_global_stats(7));
+    }
 
     if std::env::var("BEVY_STEAMWORKS_ACHIEVEMENT_CATALOG").as_deref() == Ok("1") {
         commands.write(SteamworksStatsCommand::list_achievements(true, true));
@@ -95,6 +102,19 @@ fn log_stats_results(
             {
                 commands.write(SteamworksStatsCommand::list_achievement_global_percentages());
                 state.listed_global_achievement_percentages = true;
+            }
+            SteamworksStatsOperation::GlobalStatsReceived { .. }
+                if !state.requested_global_stat_reads =>
+            {
+                if let Ok(name) = std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_I64") {
+                    commands.write(SteamworksStatsCommand::get_global_stat_i64(name.clone()));
+                    commands.write(SteamworksStatsCommand::get_global_stat_history_i64(name, 7));
+                }
+                if let Ok(name) = std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_F64") {
+                    commands.write(SteamworksStatsCommand::get_global_stat_f64(name.clone()));
+                    commands.write(SteamworksStatsCommand::get_global_stat_history_f64(name, 7));
+                }
+                state.requested_global_stat_reads = true;
             }
             _ => {}
         }
