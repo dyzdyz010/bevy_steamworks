@@ -674,7 +674,7 @@ cargo run --example remote_storage
 
 ## Workshop / UGC
 
-`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, and start/stop playtime tracking.
+`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, submit item updates, read update progress, and start/stop playtime tracking.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -686,8 +686,17 @@ fn request_ugc(mut ugc: MessageWriter<SteamworksUgcCommand>) {
             SteamworksUgcQueryOptions::new()
                 .with_metadata(true)
                 .with_key_value_tags(true)
-                .with_statistic(UGCStatisticType::Subscriptions),
+            .with_statistic(UGCStatisticType::Subscriptions),
         ),
+    ));
+    ugc.write(SteamworksUgcCommand::submit_item_update(
+        AppId(480),
+        PublishedFileId(123456),
+        SteamworksUgcItemUpdate::new()
+            .with_title("Updated title")
+            .with_content_path("workshop_content")
+            .with_preview_path("preview.png")
+            .with_change_note("Updated Workshop content"),
     ));
 }
 
@@ -716,11 +725,11 @@ fn main() {
 }
 ```
 
-All async UGC commands emit an immediate `*Requested` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Query results are copied into owned `SteamworksUgcQueryResults` snapshots, so callers do not need to hold upstream query handles or lifetimes.
+All async UGC commands emit an immediate `*Requested` or `*Submitted` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Query results are copied into owned `SteamworksUgcQueryResults` snapshots, so callers do not need to hold upstream query handles or lifetimes.
 
-String query options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. `DownloadItem` only confirms that Steam accepted the download request; final completion still arrives through `SteamworksEvent::DownloadItemResult`.
+String query and item update options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. Item update paths are canonicalized before submission, so paths that cannot be resolved become structured `SteamworksUgcError::InvalidPath` errors. Submitted item updates retain an internal progress watch handle until the Steam call result arrives; read it with `SteamworksUgcCommand::get_item_update_progress(request_id)`.
 
-The current UGC layer covers the runtime Workshop workflows most games need. Full item update submission with content and preview paths will be added as a separate command layer extension because it has a longer multi-step handle lifecycle.
+`DownloadItem` only confirms that Steam accepted the download request; final completion still arrives through `SteamworksEvent::DownloadItemResult`.
 
 Run the UGC example with:
 
@@ -731,6 +740,12 @@ cargo run --example ugc
 $env:BEVY_STEAMWORKS_UGC_SEARCH = "levels"
 cargo run --example ugc
 $env:BEVY_STEAMWORKS_UGC_DOWNLOAD = "1"
+cargo run --example ugc
+$env:BEVY_STEAMWORKS_UGC_UPDATE = "1"
+$env:BEVY_STEAMWORKS_UGC_UPDATE_TITLE = "Updated title"
+$env:BEVY_STEAMWORKS_UGC_UPDATE_CONTENT_PATH = "C:\path\to\workshop_content"
+$env:BEVY_STEAMWORKS_UGC_UPDATE_PREVIEW_PATH = "C:\path\to\preview.png"
+$env:BEVY_STEAMWORKS_UGC_UPDATE_CHANGE_NOTE = "Updated Workshop content"
 cargo run --example ugc
 ```
 

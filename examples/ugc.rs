@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use bevy_app::{prelude::*, ScheduleRunnerPlugin};
 use bevy_ecs::prelude::*;
@@ -6,6 +6,12 @@ use bevy_steamworks::prelude::*;
 
 #[derive(Resource)]
 struct FramesRemaining(u32);
+
+#[derive(Default, Resource)]
+struct UgcExampleState {
+    update_request_id: Option<u64>,
+    requested_update_progress: bool,
+}
 
 fn request_ugc(
     steam: Option<Res<SteamworksClient>>,
@@ -47,6 +53,13 @@ fn request_ugc(
             if std::env::var("BEVY_STEAMWORKS_UGC_UNSUBSCRIBE").as_deref() == Ok("1") {
                 commands.write(SteamworksUgcCommand::unsubscribe_item(item));
             }
+            if std::env::var("BEVY_STEAMWORKS_UGC_UPDATE").as_deref() == Ok("1") {
+                commands.write(SteamworksUgcCommand::submit_item_update(
+                    AppId(480),
+                    item,
+                    item_update_from_env(),
+                ));
+            }
         }
     }
 
@@ -67,9 +80,50 @@ fn request_ugc(
     }
 }
 
-fn log_ugc_results(mut results: MessageReader<SteamworksUgcResult>) {
+fn item_update_from_env() -> SteamworksUgcItemUpdate {
+    let mut update = SteamworksUgcItemUpdate::new();
+
+    if let Ok(title) = std::env::var("BEVY_STEAMWORKS_UGC_UPDATE_TITLE") {
+        update = update.with_title(title);
+    }
+    if let Ok(description) = std::env::var("BEVY_STEAMWORKS_UGC_UPDATE_DESCRIPTION") {
+        update = update.with_description(description);
+    }
+    if let Ok(content_path) = std::env::var("BEVY_STEAMWORKS_UGC_UPDATE_CONTENT_PATH") {
+        update = update.with_content_path(PathBuf::from(content_path));
+    }
+    if let Ok(preview_path) = std::env::var("BEVY_STEAMWORKS_UGC_UPDATE_PREVIEW_PATH") {
+        update = update.with_preview_path(PathBuf::from(preview_path));
+    }
+    if let Ok(change_note) = std::env::var("BEVY_STEAMWORKS_UGC_UPDATE_CHANGE_NOTE") {
+        update = update.with_change_note(change_note);
+    }
+
+    update
+}
+
+fn log_ugc_results(
+    mut state: ResMut<UgcExampleState>,
+    mut results: MessageReader<SteamworksUgcResult>,
+    mut commands: MessageWriter<SteamworksUgcCommand>,
+) {
     for result in results.read() {
         println!("{result:?}");
+
+        let SteamworksUgcResult::Ok(operation) = result else {
+            continue;
+        };
+
+        if let SteamworksUgcOperation::ItemUpdateSubmitted { request_id, .. } = operation {
+            state.update_request_id = Some(*request_id);
+        }
+    }
+
+    if let Some(request_id) = state.update_request_id {
+        if !state.requested_update_progress {
+            commands.write(SteamworksUgcCommand::get_item_update_progress(request_id));
+            state.requested_update_progress = true;
+        }
     }
 }
 
@@ -92,6 +146,7 @@ fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: Message
 fn main() {
     App::new()
         .insert_resource(FramesRemaining(120))
+        .init_resource::<UgcExampleState>()
         .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
         .add_plugins(SteamworksUgcPlugin::new())
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))

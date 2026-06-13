@@ -136,10 +136,11 @@ pub mod prelude {
         SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineEventClipPriority,
         SteamworksTimelineEventInfo, SteamworksTimelineGameMode, SteamworksTimelineOperation,
         SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksTimelineState,
-        SteamworksTimelineStateDescription, SteamworksUgcCommand, SteamworksUgcError,
-        SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo,
+        SteamworksTimelineStateDescription, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+        SteamworksUgcError, SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo,
         SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfo,
-        SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcOperation,
+        SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcItemUpdate,
+        SteamworksUgcItemUpdateProgress, SteamworksUgcItemUpdateTags, SteamworksUgcOperation,
         SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryOptions,
         SteamworksUgcQueryResults, SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic,
         SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
@@ -156,7 +157,10 @@ pub mod prelude {
         STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
         STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES, STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
         STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES, STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES,
-        STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND,
+        STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND, STEAMWORKS_UGC_MAX_UPDATE_DESCRIPTION_BYTES,
+        STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS, STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS,
+        STEAMWORKS_UGC_MAX_UPDATE_METADATA_BYTES, STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES,
+        STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES,
     };
     pub use steamworks::*;
     pub use steamworks::{

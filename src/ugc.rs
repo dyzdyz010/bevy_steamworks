@@ -5,7 +5,10 @@
 //! Bevy messages, while converting asynchronous Steam call results into owned
 //! ECS-safe result messages.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
@@ -22,6 +25,24 @@ use crate::{SteamworksClient, SteamworksSystem};
 /// The raw Steam call takes a `u32` count and is not intended for unbounded
 /// frame-loop payloads. Larger batches should be split by the caller.
 pub const STEAMWORKS_UGC_MAX_ITEMS_PER_COMMAND: usize = 1_000;
+
+/// Maximum item title bytes accepted before the trailing NUL terminator.
+pub const STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES: usize = 128;
+
+/// Maximum item description bytes accepted before the trailing NUL terminator.
+pub const STEAMWORKS_UGC_MAX_UPDATE_DESCRIPTION_BYTES: usize = 7_999;
+
+/// Maximum developer metadata bytes accepted before the trailing NUL terminator.
+pub const STEAMWORKS_UGC_MAX_UPDATE_METADATA_BYTES: usize = 4_999;
+
+/// Maximum item tag bytes accepted by Steam.
+pub const STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES: usize = 255;
+
+/// Maximum key/value tag removals accepted by one item update.
+pub const STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS: usize = 100;
+
+/// Maximum key/value tag additions accepted by one item update.
+pub const STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS: usize = 100;
 
 /// Bevy plugin for high-level Steam Workshop / UGC commands.
 ///
@@ -42,6 +63,7 @@ impl Plugin for SteamworksUgcPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksUgcState>()
             .init_resource::<SteamworksUgcAsyncResults>()
+            .init_resource::<SteamworksUgcUpdateWatches>()
             .add_message::<SteamworksUgcCommand>()
             .add_message::<SteamworksUgcResult>()
             .configure_sets(
@@ -66,6 +88,8 @@ pub struct SteamworksUgcState {
     last_item_state: Option<SteamworksUgcItemStateInfo>,
     last_item_download_info: Option<SteamworksUgcItemDownloadInfoResult>,
     last_item_install_info: Option<SteamworksUgcItemInstallInfoResult>,
+    last_item_update_progress: Option<SteamworksUgcItemUpdateProgress>,
+    active_item_updates: usize,
     submitted_downloads: u64,
     successful_async_operations: u64,
     failed_async_operations: u64,
@@ -101,6 +125,16 @@ impl SteamworksUgcState {
     /// Returns the most recent item install info snapshot.
     pub fn last_item_install_info(&self) -> Option<&SteamworksUgcItemInstallInfoResult> {
         self.last_item_install_info.as_ref()
+    }
+
+    /// Returns the most recent item update progress snapshot.
+    pub fn last_item_update_progress(&self) -> Option<&SteamworksUgcItemUpdateProgress> {
+        self.last_item_update_progress.as_ref()
+    }
+
+    /// Returns the number of item update progress handles currently owned by the plugin.
+    pub fn active_item_updates(&self) -> usize {
+        self.active_item_updates
     }
 
     /// Returns the number of `DownloadItem` submissions accepted by Steam.
@@ -146,10 +180,14 @@ impl SteamworksUgcState {
             SteamworksUgcOperation::ItemInstallInfoRead { info } => {
                 self.last_item_install_info = Some(info.clone());
             }
+            SteamworksUgcOperation::ItemUpdateProgressRead { progress } => {
+                self.last_item_update_progress = Some(progress.clone());
+            }
             SteamworksUgcOperation::DownloadItemSubmitted { .. } => {
                 self.submitted_downloads = self.submitted_downloads.saturating_add(1);
             }
             SteamworksUgcOperation::ItemCreated { .. }
+            | SteamworksUgcOperation::ItemUpdated { .. }
             | SteamworksUgcOperation::PlaytimeTrackingStarted { .. }
             | SteamworksUgcOperation::PlaytimeTrackingStopped { .. }
             | SteamworksUgcOperation::PlaytimeTrackingForAllItemsStopped { .. } => {
@@ -169,6 +207,8 @@ impl SteamworksUgcState {
             SteamworksUgcOperation::DownloadsSuspended { .. }
             | SteamworksUgcOperation::QueryRequested { .. }
             | SteamworksUgcOperation::ItemCreateRequested { .. }
+            | SteamworksUgcOperation::ItemUpdateSubmitted { .. }
+            | SteamworksUgcOperation::ItemUpdateForgotten { .. }
             | SteamworksUgcOperation::ItemSubscribeRequested { .. }
             | SteamworksUgcOperation::ItemUnsubscribeRequested { .. }
             | SteamworksUgcOperation::ItemDeleteRequested { .. }
@@ -184,6 +224,10 @@ impl SteamworksUgcState {
 
     fn record_failed_async_operation(&mut self) {
         self.failed_async_operations = self.failed_async_operations.saturating_add(1);
+    }
+
+    fn sync_active_item_updates(&mut self, watches: &SteamworksUgcUpdateWatches) {
+        self.active_item_updates = watches.len();
     }
 
     fn next_request_id(&mut self) -> u64 {
@@ -212,6 +256,80 @@ impl SteamworksUgcAsyncResults {
             .expect("Steamworks UGC async result mutex was poisoned")
             .drain(..)
             .collect()
+    }
+}
+
+#[derive(Clone, Debug, Default, Resource)]
+struct SteamworksUgcUpdateWatches {
+    storage: Arc<Mutex<SteamworksUgcUpdateWatchStorage>>,
+}
+
+impl SteamworksUgcUpdateWatches {
+    fn insert(&self, request_id: u64, handle: steamworks::UpdateWatchHandle) {
+        self.storage
+            .lock()
+            .expect("Steamworks UGC update watch storage mutex was poisoned")
+            .insert(request_id, handle);
+    }
+
+    fn progress(&self, request_id: u64) -> Option<SteamworksUgcItemUpdateProgress> {
+        self.storage
+            .lock()
+            .expect("Steamworks UGC update watch storage mutex was poisoned")
+            .progress(request_id)
+    }
+
+    fn remove(&self, request_id: u64) -> bool {
+        self.storage
+            .lock()
+            .expect("Steamworks UGC update watch storage mutex was poisoned")
+            .remove(request_id)
+    }
+
+    fn len(&self) -> usize {
+        self.storage
+            .lock()
+            .expect("Steamworks UGC update watch storage mutex was poisoned")
+            .len()
+    }
+}
+
+#[derive(Default)]
+struct SteamworksUgcUpdateWatchStorage {
+    watches: std::collections::HashMap<u64, steamworks::UpdateWatchHandle>,
+}
+
+impl std::fmt::Debug for SteamworksUgcUpdateWatchStorage {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SteamworksUgcUpdateWatchStorage")
+            .field("watch_count", &self.watches.len())
+            .finish()
+    }
+}
+
+impl SteamworksUgcUpdateWatchStorage {
+    fn insert(&mut self, request_id: u64, handle: steamworks::UpdateWatchHandle) {
+        self.watches.insert(request_id, handle);
+    }
+
+    fn progress(&self, request_id: u64) -> Option<SteamworksUgcItemUpdateProgress> {
+        let handle = self.watches.get(&request_id)?;
+        let (status, processed_bytes, total_bytes) = handle.progress();
+        Some(SteamworksUgcItemUpdateProgress {
+            request_id,
+            status,
+            processed_bytes,
+            total_bytes,
+        })
+    }
+
+    fn remove(&mut self, request_id: u64) -> bool {
+        self.watches.remove(&request_id).is_some()
+    }
+
+    fn len(&self) -> usize {
+        self.watches.len()
     }
 }
 
@@ -605,6 +723,194 @@ pub struct SteamworksUgcItemStateInfo {
     pub state: steamworks::ItemState,
 }
 
+/// Tags to set on a Workshop item update.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SteamworksUgcItemUpdateTags {
+    /// Tags to set.
+    pub tags: Vec<String>,
+    /// Whether Steam may apply admin-only tags.
+    pub allow_admin_tags: bool,
+}
+
+/// Mature-content descriptor used by Workshop item updates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SteamworksUgcContentDescriptor {
+    /// Some nudity or sexual content.
+    NudityOrSexualContent,
+    /// Frequent violence or gore.
+    FrequentViolenceOrGore,
+    /// Adult-only sexual content.
+    AdultOnlySexualContent,
+    /// Frequent nudity or sexual content.
+    GratuitousSexualContent,
+    /// General mature content.
+    AnyMatureContent,
+}
+
+impl From<SteamworksUgcContentDescriptor> for steamworks::UGCContentDescriptorID {
+    fn from(value: SteamworksUgcContentDescriptor) -> Self {
+        match value {
+            SteamworksUgcContentDescriptor::NudityOrSexualContent => Self::NudityOrSexualContent,
+            SteamworksUgcContentDescriptor::FrequentViolenceOrGore => Self::FrequentViolenceOrGore,
+            SteamworksUgcContentDescriptor::AdultOnlySexualContent => Self::AdultOnlySexualContent,
+            SteamworksUgcContentDescriptor::GratuitousSexualContent => {
+                Self::GratuitousSexualContent
+            }
+            SteamworksUgcContentDescriptor::AnyMatureContent => Self::AnyMatureContent,
+        }
+    }
+}
+
+/// Options applied to one Workshop item update before submission.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SteamworksUgcItemUpdate {
+    /// New title.
+    pub title: Option<String>,
+    /// New description.
+    pub description: Option<String>,
+    /// Update language.
+    pub language: Option<String>,
+    /// Preview image path.
+    pub preview_path: Option<PathBuf>,
+    /// Content directory path.
+    pub content_path: Option<PathBuf>,
+    /// Developer metadata.
+    pub metadata: Option<String>,
+    /// Item visibility.
+    pub visibility: Option<steamworks::PublishedFileVisibility>,
+    /// Replacement tag list.
+    pub tags: Option<SteamworksUgcItemUpdateTags>,
+    /// Key/value tags to add.
+    pub add_key_value_tags: Vec<(String, String)>,
+    /// Key/value tag keys to remove.
+    pub remove_key_value_tags: Vec<String>,
+    /// Whether all key/value tags should be removed before adding requested tags.
+    pub remove_all_key_value_tags: bool,
+    /// Content descriptors to add.
+    pub add_content_descriptors: Vec<SteamworksUgcContentDescriptor>,
+    /// Content descriptors to remove.
+    pub remove_content_descriptors: Vec<SteamworksUgcContentDescriptor>,
+    /// Optional change note sent with the update submission.
+    pub change_note: Option<String>,
+}
+
+impl SteamworksUgcItemUpdate {
+    /// Creates an empty item update.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the item title.
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Sets the item description.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Sets the update language.
+    pub fn with_language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    /// Sets the preview image path.
+    pub fn with_preview_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.preview_path = Some(path.into());
+        self
+    }
+
+    /// Sets the content directory path.
+    pub fn with_content_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.content_path = Some(path.into());
+        self
+    }
+
+    /// Sets developer metadata.
+    pub fn with_metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+
+    /// Sets item visibility.
+    pub fn with_visibility(mut self, visibility: steamworks::PublishedFileVisibility) -> Self {
+        self.visibility = Some(visibility);
+        self
+    }
+
+    /// Replaces item tags.
+    pub fn with_tags<I, S>(mut self, tags: I, allow_admin_tags: bool) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.tags = Some(SteamworksUgcItemUpdateTags {
+            tags: tags.into_iter().map(Into::into).collect(),
+            allow_admin_tags,
+        });
+        self
+    }
+
+    /// Adds one key/value tag.
+    pub fn with_key_value_tag(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.add_key_value_tags.push((key.into(), value.into()));
+        self
+    }
+
+    /// Removes all key/value tags with the given key.
+    pub fn with_removed_key_value_tag(mut self, key: impl Into<String>) -> Self {
+        self.remove_key_value_tags.push(key.into());
+        self
+    }
+
+    /// Removes all key/value tags before applying added key/value tags.
+    pub fn with_remove_all_key_value_tags(mut self) -> Self {
+        self.remove_all_key_value_tags = true;
+        self
+    }
+
+    /// Adds one content descriptor.
+    pub fn with_added_content_descriptor(
+        mut self,
+        descriptor: SteamworksUgcContentDescriptor,
+    ) -> Self {
+        self.add_content_descriptors.push(descriptor);
+        self
+    }
+
+    /// Removes one content descriptor.
+    pub fn with_removed_content_descriptor(
+        mut self,
+        descriptor: SteamworksUgcContentDescriptor,
+    ) -> Self {
+        self.remove_content_descriptors.push(descriptor);
+        self
+    }
+
+    /// Sets the change note submitted with this update.
+    pub fn with_change_note(mut self, change_note: impl Into<String>) -> Self {
+        self.change_note = Some(change_note.into());
+        self
+    }
+}
+
+/// Progress snapshot for a submitted Workshop item update.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUgcItemUpdateProgress {
+    /// Plugin request ID returned by the update submission.
+    pub request_id: u64,
+    /// Current update status.
+    pub status: steamworks::UpdateStatus,
+    /// Bytes processed so far.
+    pub processed_bytes: u64,
+    /// Total bytes expected by Steam.
+    pub total_bytes: u64,
+}
+
 /// A high-level command for Steam Workshop / UGC workflows.
 #[derive(Clone, Debug, Message, PartialEq)]
 pub enum SteamworksUgcCommand {
@@ -651,6 +957,25 @@ pub enum SteamworksUgcCommand {
         app_id: steamworks::AppId,
         /// Item file type.
         file_type: steamworks::FileType,
+    },
+    /// Submit an update for an existing Workshop item.
+    SubmitItemUpdate {
+        /// App ID that owns the item.
+        app_id: steamworks::AppId,
+        /// Item to update.
+        item: steamworks::PublishedFileId,
+        /// Update data and change note.
+        update: SteamworksUgcItemUpdate,
+    },
+    /// Read progress for a submitted Workshop item update.
+    GetItemUpdateProgress {
+        /// Plugin request ID returned by the update submission.
+        request_id: u64,
+    },
+    /// Stop retaining progress state for an item update.
+    ForgetItemUpdate {
+        /// Plugin request ID returned by the update submission.
+        request_id: u64,
     },
     /// Subscribe to a Workshop item.
     SubscribeItem {
@@ -717,6 +1042,29 @@ impl SteamworksUgcCommand {
     /// Creates a [`SteamworksUgcCommand::CreateItem`] command.
     pub fn create_item(app_id: steamworks::AppId, file_type: steamworks::FileType) -> Self {
         Self::CreateItem { app_id, file_type }
+    }
+
+    /// Creates a [`SteamworksUgcCommand::SubmitItemUpdate`] command.
+    pub fn submit_item_update(
+        app_id: steamworks::AppId,
+        item: steamworks::PublishedFileId,
+        update: SteamworksUgcItemUpdate,
+    ) -> Self {
+        Self::SubmitItemUpdate {
+            app_id,
+            item,
+            update,
+        }
+    }
+
+    /// Creates a [`SteamworksUgcCommand::GetItemUpdateProgress`] command.
+    pub fn get_item_update_progress(request_id: u64) -> Self {
+        Self::GetItemUpdateProgress { request_id }
+    }
+
+    /// Creates a [`SteamworksUgcCommand::ForgetItemUpdate`] command.
+    pub fn forget_item_update(request_id: u64) -> Self {
+        Self::ForgetItemUpdate { request_id }
     }
 
     /// Creates a [`SteamworksUgcCommand::DownloadItem`] command.
@@ -832,6 +1180,36 @@ pub enum SteamworksUgcOperation {
         item: steamworks::PublishedFileId,
         /// Whether Steam requires the user to accept the legal agreement.
         user_needs_to_accept_workshop_legal_agreement: bool,
+    },
+    /// Item update was submitted.
+    ItemUpdateSubmitted {
+        /// Plugin request ID.
+        request_id: u64,
+        /// App ID submitted.
+        app_id: steamworks::AppId,
+        /// Item submitted.
+        item: steamworks::PublishedFileId,
+        /// Update submitted.
+        update: SteamworksUgcItemUpdate,
+    },
+    /// Item update completed.
+    ItemUpdated {
+        /// Plugin request ID.
+        request_id: u64,
+        /// Updated item.
+        item: steamworks::PublishedFileId,
+        /// Whether Steam requires the user to accept the legal agreement.
+        user_needs_to_accept_workshop_legal_agreement: bool,
+    },
+    /// Item update progress was read.
+    ItemUpdateProgressRead {
+        /// Progress snapshot.
+        progress: SteamworksUgcItemUpdateProgress,
+    },
+    /// Item update progress tracking was forgotten.
+    ItemUpdateForgotten {
+        /// Plugin request ID.
+        request_id: u64,
     },
     /// Item subscription was submitted.
     ItemSubscribeRequested {
@@ -958,6 +1336,65 @@ pub enum SteamworksUgcError {
     /// UGC query pages are one-based.
     #[error("Steamworks UGC query page must be greater than zero")]
     InvalidPage,
+    /// A Workshop item update had no fields to apply.
+    #[error("Steamworks UGC item update must include at least one field or change note")]
+    EmptyItemUpdate,
+    /// A Workshop item update field exceeded a Steam size limit.
+    #[error(
+        "Steamworks UGC update field {field} must be <= {max_supported} bytes, got {requested}"
+    )]
+    StringTooLong {
+        /// Field that was too long.
+        field: &'static str,
+        /// Requested byte length.
+        requested: usize,
+        /// Maximum byte length supported by Steam.
+        max_supported: usize,
+    },
+    /// A Workshop item tag contained unsupported text.
+    #[error("Steamworks UGC update tag contains unsupported text: {tag}")]
+    InvalidTagText {
+        /// Tag that was rejected.
+        tag: String,
+    },
+    /// A Workshop item key/value tag key contained unsupported text.
+    #[error("Steamworks UGC update key/value tag key contains unsupported text: {key}")]
+    InvalidKeyValueTagKey {
+        /// Key that was rejected.
+        key: String,
+    },
+    /// A Workshop item update path could not be canonicalized before calling Steam.
+    #[error("Steamworks UGC update path field {field} could not be canonicalized: {path}")]
+    InvalidPath {
+        /// Field that contained the invalid path.
+        field: &'static str,
+        /// Path that failed canonicalization.
+        path: PathBuf,
+    },
+    /// Too many key/value tag removals were requested in one update.
+    #[error(
+        "Steamworks UGC update key/value tag removal count {requested} exceeds max {max_supported}"
+    )]
+    TooManyKeyValueTagRemovals {
+        /// Requested removal count.
+        requested: usize,
+        /// Maximum accepted removal count.
+        max_supported: usize,
+    },
+    /// Too many key/value tag additions were requested in one update.
+    #[error("Steamworks UGC update key/value tag addition count {requested} exceeds max {max_supported}")]
+    TooManyKeyValueTags {
+        /// Requested addition count.
+        requested: usize,
+        /// Maximum accepted addition count.
+        max_supported: usize,
+    },
+    /// No item update watch exists for the request ID.
+    #[error("Steamworks UGC item update request {request_id} was not found")]
+    ItemUpdateNotFound {
+        /// Plugin request ID.
+        request_id: u64,
+    },
     /// Steam failed to create a UGC query handle.
     #[error("Steamworks UGC failed to create query handle")]
     CreateQueryFailed,
@@ -1011,12 +1448,14 @@ impl SteamworksUgcError {
 fn process_ugc_commands(
     client: Option<Res<SteamworksClient>>,
     async_results: Res<SteamworksUgcAsyncResults>,
+    update_watches: Res<SteamworksUgcUpdateWatches>,
     mut state: ResMut<SteamworksUgcState>,
     mut commands: ResMut<Messages<SteamworksUgcCommand>>,
     mut results: MessageWriter<SteamworksUgcResult>,
 ) {
     for result in async_results.drain() {
         record_ugc_result(&mut state, &result);
+        state.sync_active_item_updates(&update_watches);
         results.write(result);
     }
 
@@ -1041,6 +1480,7 @@ fn process_ugc_commands(
     for command in commands.drain() {
         if let Err(error) = validate_command(&command) {
             state.record_error(error.clone());
+            state.sync_active_item_updates(&update_watches);
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -1052,9 +1492,16 @@ fn process_ugc_commands(
         }
 
         let request_id = async_command_request_id(&command, &mut state);
-        match handle_ugc_command(&client, &async_results, command.clone(), request_id) {
+        match handle_ugc_command(
+            &client,
+            &async_results,
+            &update_watches,
+            command.clone(),
+            request_id,
+        ) {
             Ok(operation) => {
                 state.record_operation(&operation);
+                state.sync_active_item_updates(&update_watches);
                 tracing::debug!(
                     target: "bevy_steamworks",
                     operation = ?operation,
@@ -1064,6 +1511,7 @@ fn process_ugc_commands(
             }
             Err(error) => {
                 state.record_error(error.clone());
+                state.sync_active_item_updates(&update_watches);
                 tracing::error!(
                     target: "bevy_steamworks",
                     command = ?command,
@@ -1096,6 +1544,7 @@ fn async_command_request_id(
         command,
         SteamworksUgcCommand::Query { .. }
             | SteamworksUgcCommand::CreateItem { .. }
+            | SteamworksUgcCommand::SubmitItemUpdate { .. }
             | SteamworksUgcCommand::SubscribeItem { .. }
             | SteamworksUgcCommand::UnsubscribeItem { .. }
             | SteamworksUgcCommand::DeleteItem { .. }
@@ -1109,6 +1558,7 @@ fn async_command_request_id(
 fn handle_ugc_command(
     client: &SteamworksClient,
     async_results: &SteamworksUgcAsyncResults,
+    update_watches: &SteamworksUgcUpdateWatches,
     command: SteamworksUgcCommand,
     request_id: Option<u64>,
 ) -> Result<SteamworksUgcOperation, SteamworksUgcError> {
@@ -1233,6 +1683,62 @@ fn handle_ugc_command(
                 app_id,
                 file_type,
             })
+        }
+        SteamworksUgcCommand::SubmitItemUpdate {
+            app_id,
+            item,
+            update,
+        } => {
+            let request_id = request_id.expect("async UGC item update command missing request id");
+            let update_handle = ugc.start_item_update(app_id, item);
+            let update_handle = apply_item_update(update_handle, &update)?;
+            let async_results = async_results.clone();
+            let update_watches_for_callback = update_watches.clone();
+            let command = SteamworksUgcCommand::SubmitItemUpdate {
+                app_id,
+                item,
+                update: update.clone(),
+            };
+            let watch = update_handle.submit(update.change_note.as_deref(), move |result| {
+                update_watches_for_callback.remove(request_id);
+                async_results.push(match result {
+                    Ok((updated_item, legal)) => {
+                        SteamworksUgcResult::Ok(SteamworksUgcOperation::ItemUpdated {
+                            request_id,
+                            item: updated_item,
+                            user_needs_to_accept_workshop_legal_agreement: legal,
+                        })
+                    }
+                    Err(source) => SteamworksUgcResult::Err {
+                        command,
+                        error: SteamworksUgcError::steam_error(
+                            "ugc.submit_item_update",
+                            Some(request_id),
+                            source,
+                        ),
+                    },
+                });
+            });
+            update_watches.insert(request_id, watch);
+            Ok(SteamworksUgcOperation::ItemUpdateSubmitted {
+                request_id,
+                app_id,
+                item,
+                update,
+            })
+        }
+        SteamworksUgcCommand::GetItemUpdateProgress { request_id } => {
+            let progress = update_watches
+                .progress(request_id)
+                .ok_or(SteamworksUgcError::ItemUpdateNotFound { request_id })?;
+            Ok(SteamworksUgcOperation::ItemUpdateProgressRead { progress })
+        }
+        SteamworksUgcCommand::ForgetItemUpdate { request_id } => {
+            if update_watches.remove(request_id) {
+                Ok(SteamworksUgcOperation::ItemUpdateForgotten { request_id })
+            } else {
+                Err(SteamworksUgcError::ItemUpdateNotFound { request_id })
+            }
         }
         SteamworksUgcCommand::SubscribeItem { item } => {
             let request_id = request_id.expect("async UGC subscribe command missing request id");
@@ -1414,6 +1920,53 @@ fn create_query(
     .map_err(|_| SteamworksUgcError::CreateQueryFailed)
 }
 
+fn apply_item_update(
+    mut handle: steamworks::UpdateHandle,
+    update: &SteamworksUgcItemUpdate,
+) -> Result<steamworks::UpdateHandle, SteamworksUgcError> {
+    if let Some(title) = &update.title {
+        handle = handle.title(title);
+    }
+    if let Some(description) = &update.description {
+        handle = handle.description(description);
+    }
+    if let Some(language) = &update.language {
+        handle = handle.language(language);
+    }
+    if let Some(path) = &update.preview_path {
+        handle = handle.preview_path(path);
+    }
+    if let Some(path) = &update.content_path {
+        handle = handle.content_path(path);
+    }
+    if let Some(metadata) = &update.metadata {
+        handle = handle.metadata(metadata);
+    }
+    if let Some(visibility) = update.visibility {
+        handle = handle.visibility(visibility);
+    }
+    if let Some(tags) = &update.tags {
+        handle = handle.tags(tags.tags.clone(), tags.allow_admin_tags);
+    }
+    if update.remove_all_key_value_tags {
+        handle = handle.remove_all_key_value_tags();
+    }
+    for key in &update.remove_key_value_tags {
+        handle = handle.remove_key_value_tag(key);
+    }
+    for (key, value) in &update.add_key_value_tags {
+        handle = handle.add_key_value_tag(key, value);
+    }
+    for descriptor in &update.add_content_descriptors {
+        handle = handle.add_content_descriptor((*descriptor).into());
+    }
+    for descriptor in &update.remove_content_descriptors {
+        handle = handle.remove_content_descriptor((*descriptor).into());
+    }
+
+    Ok(handle)
+}
+
 fn apply_query_options(
     mut query: steamworks::QueryHandle,
     options: &SteamworksUgcQueryOptions,
@@ -1542,6 +2095,8 @@ fn validate_command(command: &SteamworksUgcCommand) -> Result<(), SteamworksUgcE
         SteamworksUgcCommand::SuspendDownloads { .. }
         | SteamworksUgcCommand::ListSubscribedItems { .. }
         | SteamworksUgcCommand::CreateItem { .. }
+        | SteamworksUgcCommand::GetItemUpdateProgress { .. }
+        | SteamworksUgcCommand::ForgetItemUpdate { .. }
         | SteamworksUgcCommand::StopPlaytimeTrackingForAllItems => Ok(()),
         SteamworksUgcCommand::GetItemState { item }
         | SteamworksUgcCommand::GetItemDownloadInfo { item }
@@ -1550,6 +2105,10 @@ fn validate_command(command: &SteamworksUgcCommand) -> Result<(), SteamworksUgcE
         | SteamworksUgcCommand::SubscribeItem { item }
         | SteamworksUgcCommand::UnsubscribeItem { item }
         | SteamworksUgcCommand::DeleteItem { item } => validate_item(*item),
+        SteamworksUgcCommand::SubmitItemUpdate { item, update, .. } => {
+            validate_item(*item)?;
+            validate_item_update(update)
+        }
         SteamworksUgcCommand::Query { query } => validate_query(query),
         SteamworksUgcCommand::StartPlaytimeTracking { items }
         | SteamworksUgcCommand::StopPlaytimeTracking { items } => validate_items(items),
@@ -1592,6 +2151,149 @@ fn validate_query_options(options: &SteamworksUgcQueryOptions) -> Result<(), Ste
     if let Some(search_text) = &options.search_text {
         validate_steam_string("search_text", search_text)?;
     }
+    Ok(())
+}
+
+fn validate_item_update(update: &SteamworksUgcItemUpdate) -> Result<(), SteamworksUgcError> {
+    if item_update_is_empty(update) {
+        return Err(SteamworksUgcError::EmptyItemUpdate);
+    }
+
+    if let Some(title) = &update.title {
+        validate_bounded_steam_string("title", title, STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES)?;
+    }
+    if let Some(description) = &update.description {
+        validate_bounded_steam_string(
+            "description",
+            description,
+            STEAMWORKS_UGC_MAX_UPDATE_DESCRIPTION_BYTES,
+        )?;
+    }
+    if let Some(language) = &update.language {
+        validate_steam_string("language", language)?;
+    }
+    if let Some(path) = &update.preview_path {
+        validate_update_path("preview_path", path)?;
+    }
+    if let Some(path) = &update.content_path {
+        validate_update_path("content_path", path)?;
+    }
+    if let Some(metadata) = &update.metadata {
+        validate_bounded_steam_string(
+            "metadata",
+            metadata,
+            STEAMWORKS_UGC_MAX_UPDATE_METADATA_BYTES,
+        )?;
+    }
+    if let Some(tags) = &update.tags {
+        for tag in &tags.tags {
+            validate_update_tag(tag)?;
+        }
+    }
+    if update.add_key_value_tags.len() > STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS {
+        return Err(SteamworksUgcError::TooManyKeyValueTags {
+            requested: update.add_key_value_tags.len(),
+            max_supported: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS,
+        });
+    }
+    for (key, value) in &update.add_key_value_tags {
+        validate_key_value_tag_key(key)?;
+        validate_bounded_steam_string(
+            "key_value_tag.value",
+            value,
+            STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES,
+        )?;
+    }
+    if update.remove_key_value_tags.len() > STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS {
+        return Err(SteamworksUgcError::TooManyKeyValueTagRemovals {
+            requested: update.remove_key_value_tags.len(),
+            max_supported: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS,
+        });
+    }
+    for key in &update.remove_key_value_tags {
+        validate_steam_string("remove_key_value_tag", key)?;
+    }
+    if let Some(change_note) = &update.change_note {
+        validate_steam_string("change_note", change_note)?;
+    }
+
+    Ok(())
+}
+
+fn item_update_is_empty(update: &SteamworksUgcItemUpdate) -> bool {
+    update.title.is_none()
+        && update.description.is_none()
+        && update.language.is_none()
+        && update.preview_path.is_none()
+        && update.content_path.is_none()
+        && update.metadata.is_none()
+        && update.visibility.is_none()
+        && update.tags.is_none()
+        && update.add_key_value_tags.is_empty()
+        && update.remove_key_value_tags.is_empty()
+        && !update.remove_all_key_value_tags
+        && update.add_content_descriptors.is_empty()
+        && update.remove_content_descriptors.is_empty()
+        && update.change_note.is_none()
+}
+
+fn validate_bounded_steam_string(
+    field: &'static str,
+    value: &str,
+    max_supported: usize,
+) -> Result<(), SteamworksUgcError> {
+    validate_steam_string(field, value)?;
+    if value.len() > max_supported {
+        Err(SteamworksUgcError::StringTooLong {
+            field,
+            requested: value.len(),
+            max_supported,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_update_path(field: &'static str, path: &Path) -> Result<(), SteamworksUgcError> {
+    let path = path
+        .canonicalize()
+        .map_err(|_| SteamworksUgcError::InvalidPath {
+            field,
+            path: path.to_path_buf(),
+        })?;
+    validate_steam_string(field, &path.to_string_lossy())
+}
+
+fn validate_update_tag(tag: &str) -> Result<(), SteamworksUgcError> {
+    validate_steam_string("tag", tag)?;
+    if tag.len() > STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES
+        || tag.contains(',')
+        || !tag.bytes().all(|byte| (0x20..=0x7e).contains(&byte))
+    {
+        return Err(SteamworksUgcError::InvalidTagText {
+            tag: tag.to_owned(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_key_value_tag_key(key: &str) -> Result<(), SteamworksUgcError> {
+    validate_bounded_steam_string(
+        "key_value_tag.key",
+        key,
+        STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES,
+    )?;
+    if key.is_empty()
+        || !key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err(SteamworksUgcError::InvalidKeyValueTagKey {
+            key: key.to_owned(),
+        });
+    }
+
     Ok(())
 }
 
@@ -1641,6 +2343,9 @@ mod tests {
         app.add_plugins(SteamworksUgcPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksUgcState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksUgcUpdateWatches>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksUgcCommand>>());
@@ -1755,6 +2460,83 @@ mod tests {
                 Err(SteamworksUgcError::InvalidString { field })
             );
         }
+
+        assert_eq!(
+            validate_item_update(&SteamworksUgcItemUpdate::new()),
+            Err(SteamworksUgcError::EmptyItemUpdate)
+        );
+        assert_eq!(
+            validate_item_update(
+                &SteamworksUgcItemUpdate::new()
+                    .with_title("x".repeat(STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES + 1)),
+            ),
+            Err(SteamworksUgcError::StringTooLong {
+                field: "title",
+                requested: STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES + 1,
+                max_supported: STEAMWORKS_UGC_MAX_UPDATE_TITLE_BYTES,
+            })
+        );
+        assert_eq!(
+            validate_item_update(&SteamworksUgcItemUpdate::new().with_tags(["bad,tag"], false),),
+            Err(SteamworksUgcError::InvalidTagText {
+                tag: "bad,tag".to_owned(),
+            })
+        );
+        assert_eq!(
+            validate_item_update(&SteamworksUgcItemUpdate {
+                remove_key_value_tags: vec![
+                    "key".to_owned();
+                    STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS + 1
+                ],
+                ..SteamworksUgcItemUpdate::new().with_title("Title")
+            }),
+            Err(SteamworksUgcError::TooManyKeyValueTagRemovals {
+                requested: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS + 1,
+                max_supported: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAG_REMOVALS,
+            })
+        );
+        assert_eq!(
+            validate_item_update(
+                &SteamworksUgcItemUpdate::new().with_key_value_tag("bad-key", "value"),
+            ),
+            Err(SteamworksUgcError::InvalidKeyValueTagKey {
+                key: "bad-key".to_owned(),
+            })
+        );
+        assert_eq!(
+            validate_item_update(&SteamworksUgcItemUpdate::new().with_key_value_tag(
+                "key",
+                "x".repeat(STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES + 1),
+            )),
+            Err(SteamworksUgcError::StringTooLong {
+                field: "key_value_tag.value",
+                requested: STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES + 1,
+                max_supported: STEAMWORKS_UGC_MAX_UPDATE_TAG_BYTES,
+            })
+        );
+        assert_eq!(
+            validate_item_update(&SteamworksUgcItemUpdate {
+                add_key_value_tags: vec![
+                    ("key".to_owned(), "value".to_owned());
+                    STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS + 1
+                ],
+                ..SteamworksUgcItemUpdate::new().with_title("Title")
+            }),
+            Err(SteamworksUgcError::TooManyKeyValueTags {
+                requested: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS + 1,
+                max_supported: STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS,
+            })
+        );
+        let missing_path = PathBuf::from("target/__missing_bevy_steamworks_ugc_update_path__");
+        assert_eq!(
+            validate_item_update(
+                &SteamworksUgcItemUpdate::new().with_content_path(missing_path.clone()),
+            ),
+            Err(SteamworksUgcError::InvalidPath {
+                field: "content_path",
+                path: missing_path,
+            })
+        );
     }
 
     #[test]
@@ -1778,6 +2560,17 @@ mod tests {
                 &mut state,
             ),
             Some(2)
+        );
+        assert_eq!(
+            async_command_request_id(
+                &SteamworksUgcCommand::submit_item_update(
+                    steamworks::AppId(480),
+                    steamworks::PublishedFileId(1),
+                    SteamworksUgcItemUpdate::new().with_title("Title"),
+                ),
+                &mut state,
+            ),
+            Some(3)
         );
     }
 
@@ -1826,6 +2619,35 @@ mod tests {
                 app_id: steamworks::AppId(480),
                 file_type: steamworks::FileType::Community,
             }
+        );
+        let update = SteamworksUgcItemUpdate::new()
+            .with_title("Title")
+            .with_description("Description")
+            .with_language("english")
+            .with_metadata("metadata")
+            .with_visibility(steamworks::PublishedFileVisibility::Private)
+            .with_tags(["tag"], false)
+            .with_key_value_tag("mode", "arena")
+            .with_removed_key_value_tag("old")
+            .with_remove_all_key_value_tags()
+            .with_added_content_descriptor(SteamworksUgcContentDescriptor::AnyMatureContent)
+            .with_removed_content_descriptor(SteamworksUgcContentDescriptor::FrequentViolenceOrGore)
+            .with_change_note("Updated metadata");
+        assert_eq!(
+            SteamworksUgcCommand::submit_item_update(steamworks::AppId(480), item, update.clone(),),
+            SteamworksUgcCommand::SubmitItemUpdate {
+                app_id: steamworks::AppId(480),
+                item,
+                update,
+            }
+        );
+        assert_eq!(
+            SteamworksUgcCommand::get_item_update_progress(9),
+            SteamworksUgcCommand::GetItemUpdateProgress { request_id: 9 }
+        );
+        assert_eq!(
+            SteamworksUgcCommand::forget_item_update(9),
+            SteamworksUgcCommand::ForgetItemUpdate { request_id: 9 }
         );
         assert_eq!(
             SteamworksUgcCommand::delete_item(item),
@@ -1886,6 +2708,19 @@ mod tests {
             request_id: 2,
             item,
         });
+        state.record_operation(&SteamworksUgcOperation::ItemUpdated {
+            request_id: 4,
+            item,
+            user_needs_to_accept_workshop_legal_agreement: false,
+        });
+        state.record_operation(&SteamworksUgcOperation::ItemUpdateProgressRead {
+            progress: SteamworksUgcItemUpdateProgress {
+                request_id: 4,
+                status: steamworks::UpdateStatus::UploadingContent,
+                processed_bytes: 10,
+                total_bytes: 100,
+            },
+        });
         state.record_operation(&SteamworksUgcOperation::ItemUnsubscribed {
             request_id: 3,
             item,
@@ -1901,9 +2736,18 @@ mod tests {
             })
         );
         assert_eq!(state.submitted_downloads(), 1);
-        assert_eq!(state.successful_async_operations(), 4);
+        assert_eq!(state.successful_async_operations(), 5);
         assert_eq!(state.failed_async_operations(), 0);
-        assert_eq!(state.completed_async_operations(), 4);
+        assert_eq!(state.completed_async_operations(), 5);
+        assert_eq!(
+            state.last_item_update_progress(),
+            Some(&SteamworksUgcItemUpdateProgress {
+                request_id: 4,
+                status: steamworks::UpdateStatus::UploadingContent,
+                processed_bytes: 10,
+                total_bytes: 100,
+            })
+        );
     }
 
     #[test]
