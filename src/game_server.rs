@@ -6,6 +6,8 @@
 //! mirrors relevant callback confirmations into [`SteamworksServerResult`].
 
 use std::{
+    cell::RefCell,
+    fmt,
     net::{Ipv4Addr, SocketAddrV4},
     ops::Deref,
     sync::Mutex,
@@ -26,6 +28,9 @@ use crate::{
     },
     SteamworksEvent, SteamworksFailurePolicy, SteamworksSystem,
 };
+
+/// Required buffer size for Steam Game Server shared-query outgoing packets.
+pub const STEAMWORKS_SERVER_QUERY_PACKET_BUFFER_BYTES: usize = 16 * 1024;
 
 /// Configuration used to initialize [`steamworks::Server`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -165,6 +170,7 @@ pub struct SteamworksServerState {
     game_data: Option<String>,
     dedicated: Option<bool>,
     anonymous_logon_submitted: bool,
+    token_logon_submitted: bool,
     advertise_server_active: Option<bool>,
     mod_dir: Option<String>,
     map_name: Option<String>,
@@ -174,6 +180,7 @@ pub struct SteamworksServerState {
     key_values: Vec<(String, String)>,
     password_protected: Option<bool>,
     bot_player_count: Option<i32>,
+    last_outgoing_packets: Vec<SteamworksServerOutgoingPacket>,
 }
 
 impl SteamworksServerState {
@@ -274,6 +281,16 @@ impl SteamworksServerState {
         self.anonymous_logon_submitted
     }
 
+    /// Returns whether token-based logon was submitted through this command layer.
+    pub fn token_logon_submitted(&self) -> bool {
+        self.token_logon_submitted
+    }
+
+    /// Returns whether any server logon command was submitted through this command layer.
+    pub fn logon_submitted(&self) -> bool {
+        self.anonymous_logon_submitted || self.token_logon_submitted
+    }
+
     /// Returns the most recent advertise-server-active flag submitted through this command layer.
     pub fn advertise_server_active(&self) -> Option<bool> {
         self.advertise_server_active
@@ -317,6 +334,11 @@ impl SteamworksServerState {
     /// Returns the most recent bot player count submitted through this command layer.
     pub fn bot_player_count(&self) -> Option<i32> {
         self.bot_player_count
+    }
+
+    /// Returns packets returned by the most recent outgoing packet drain command.
+    pub fn last_outgoing_packets(&self) -> &[SteamworksServerOutgoingPacket] {
+        &self.last_outgoing_packets
     }
 
     fn record_error(&mut self, error: SteamworksServerError) {
@@ -398,6 +420,9 @@ impl SteamworksServerState {
             SteamworksServerOperation::AnonymousLogonSubmitted => {
                 self.anonymous_logon_submitted = true;
             }
+            SteamworksServerOperation::TokenLogonSubmitted => {
+                self.token_logon_submitted = true;
+            }
             SteamworksServerOperation::AdvertiseServerActiveSet { active } => {
                 self.advertise_server_active = Some(*active);
             }
@@ -437,12 +462,11 @@ impl SteamworksServerState {
                 self.bot_player_count = Some(*count);
             }
             SteamworksServerOperation::IncomingPacketHandled { .. } => {}
+            SteamworksServerOperation::OutgoingPacketsDrained { packets } => {
+                self.last_outgoing_packets = packets.clone();
+            }
             _ => {}
         }
-    }
-
-    fn logon_submitted(&self) -> bool {
-        self.anonymous_logon_submitted
     }
 }
 
@@ -486,6 +510,50 @@ pub struct SteamworksServerClientGroupStatus {
     pub member: bool,
     /// Whether the user is an officer of the group.
     pub officer: bool,
+}
+
+/// Login token for [`SteamworksServerCommand::LogOn`].
+///
+/// The token is redacted from [`Debug`] output so command tracing does not leak it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksServerLoginToken(String);
+
+impl SteamworksServerLoginToken {
+    /// Creates a login token wrapper.
+    pub fn new(token: impl Into<String>) -> Self {
+        Self(token.into())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SteamworksServerLoginToken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("SteamworksServerLoginToken(<redacted>)")
+    }
+}
+
+impl From<String> for SteamworksServerLoginToken {
+    fn from(token: String) -> Self {
+        Self::new(token)
+    }
+}
+
+impl From<&str> for SteamworksServerLoginToken {
+    fn from(token: &str) -> Self {
+        Self::new(token)
+    }
+}
+
+/// A shared-query outgoing packet produced by Steam Game Server.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerOutgoingPacket {
+    /// Destination address for this packet.
+    pub addr: SocketAddrV4,
+    /// Packet bytes to send to `addr`.
+    pub data: Vec<u8>,
 }
 
 /// A high-level command for Steam Game Server operations.
@@ -544,6 +612,11 @@ pub enum SteamworksServerCommand {
     },
     /// Submit anonymous server logon.
     LogOnAnonymous,
+    /// Submit token-based server logon.
+    LogOn {
+        /// Redacted login token.
+        token: SteamworksServerLoginToken,
+    },
     /// Set whether Steam should advertise this server.
     SetAdvertiseServerActive {
         /// Whether this server should be advertised.
@@ -593,6 +666,8 @@ pub enum SteamworksServerCommand {
         /// Bot player count.
         count: i32,
     },
+    /// Drain queued shared-query outgoing packets from Steam.
+    DrainOutgoingPackets,
 }
 
 impl SteamworksServerCommand {
@@ -654,6 +729,13 @@ impl SteamworksServerCommand {
         Self::SetDedicatedServer { dedicated }
     }
 
+    /// Creates a [`SteamworksServerCommand::LogOn`] command.
+    pub fn log_on(token: impl Into<SteamworksServerLoginToken>) -> Self {
+        Self::LogOn {
+            token: token.into(),
+        }
+    }
+
     /// Creates a [`SteamworksServerCommand::SetAdvertiseServerActive`] command.
     pub fn set_advertise_server_active(active: bool) -> Self {
         Self::SetAdvertiseServerActive { active }
@@ -706,6 +788,11 @@ impl SteamworksServerCommand {
     /// Creates a [`SteamworksServerCommand::SetBotPlayerCount`] command.
     pub fn set_bot_player_count(count: i32) -> Self {
         Self::SetBotPlayerCount { count }
+    }
+
+    /// Creates a [`SteamworksServerCommand::DrainOutgoingPackets`] command.
+    pub fn drain_outgoing_packets() -> Self {
+        Self::DrainOutgoingPackets
     }
 }
 
@@ -807,6 +894,8 @@ pub enum SteamworksServerOperation {
     },
     /// Anonymous server logon was submitted.
     AnonymousLogonSubmitted,
+    /// Token-based server logon was submitted.
+    TokenLogonSubmitted,
     /// Server advertisement flag was submitted.
     AdvertiseServerActiveSet {
         /// Whether this server should be advertised.
@@ -856,6 +945,11 @@ pub enum SteamworksServerOperation {
         /// Bot player count.
         count: i32,
     },
+    /// Shared-query outgoing packets were drained from Steam.
+    OutgoingPacketsDrained {
+        /// Packets to send through the game server socket.
+        packets: Vec<SteamworksServerOutgoingPacket>,
+    },
 }
 
 /// Result message emitted by [`SteamworksServerPlugin`].
@@ -887,6 +981,9 @@ pub enum SteamworksServerError {
     /// A remote authentication session was requested with no ticket bytes.
     #[error("Steam Game Server command requires a non-empty authentication ticket")]
     EmptyTicket,
+    /// Token-based server logon was requested with no token.
+    #[error("Steam Game Server token logon requires a non-empty token")]
+    EmptyLogonToken,
     /// A count field must be non-negative.
     #[error("Steam Game Server command field {field} must be non-negative, got {value}")]
     InvalidCount {
@@ -904,6 +1001,9 @@ pub enum SteamworksServerError {
         /// Command that must run before logon.
         command: &'static str,
     },
+    /// A server logon command was submitted after logon had already been submitted.
+    #[error("Steam Game Server logon has already been submitted")]
+    LogonAlreadySubmitted,
     /// The upstream Steamworks API rejected an authentication session.
     #[error("Steam Game Server authentication session failed: {source}")]
     AuthSession {
@@ -1351,6 +1451,10 @@ fn handle_server_command(
             server.log_on_anonymous();
             SteamworksServerOperation::AnonymousLogonSubmitted
         }
+        SteamworksServerCommand::LogOn { token } => {
+            server.log_on(token.as_str());
+            SteamworksServerOperation::TokenLogonSubmitted
+        }
         SteamworksServerCommand::SetAdvertiseServerActive { active } => {
             server.set_advertise_server_active(*active);
             SteamworksServerOperation::AdvertiseServerActiveSet { active: *active }
@@ -1402,7 +1506,26 @@ fn handle_server_command(
             server.set_bot_player_count(*count);
             SteamworksServerOperation::BotPlayerCountSet { count: *count }
         }
+        SteamworksServerCommand::DrainOutgoingPackets => {
+            SteamworksServerOperation::OutgoingPacketsDrained {
+                packets: drain_outgoing_packets(server),
+            }
+        }
     })
+}
+
+fn drain_outgoing_packets(server: &SteamworksServer) -> Vec<SteamworksServerOutgoingPacket> {
+    let mut buffer = vec![0; STEAMWORKS_SERVER_QUERY_PACKET_BUFFER_BYTES];
+    let packets = RefCell::new(Vec::new());
+
+    server.get_next_outgoing_packet(&mut buffer, |addr, data| {
+        packets.borrow_mut().push(SteamworksServerOutgoingPacket {
+            addr,
+            data: data.to_vec(),
+        });
+    });
+
+    packets.into_inner()
 }
 
 fn run_steam_server_callbacks(
@@ -1434,6 +1557,13 @@ fn validate_server_command(command: &SteamworksServerCommand) -> Result<(), Stea
             validate_steam_string("description", description)
         }
         SteamworksServerCommand::SetGameData { data } => validate_steam_string("data", data),
+        SteamworksServerCommand::LogOn { token } => {
+            if token.as_str().is_empty() {
+                Err(SteamworksServerError::EmptyLogonToken)
+            } else {
+                validate_steam_string("token", token.as_str())
+            }
+        }
         SteamworksServerCommand::SetModDir { mod_dir } => validate_steam_string("mod_dir", mod_dir),
         SteamworksServerCommand::SetMapName { map_name } => {
             validate_steam_string("map_name", map_name)
@@ -1470,6 +1600,13 @@ fn validate_server_command_for_state(
     validate_server_command(command)?;
 
     if state.logon_submitted() {
+        if matches!(
+            command,
+            SteamworksServerCommand::LogOnAnonymous | SteamworksServerCommand::LogOn { .. }
+        ) {
+            return Err(SteamworksServerError::LogonAlreadySubmitted);
+        }
+
         if let Some(command_name) = pre_logon_only_command_name(command) {
             return Err(SteamworksServerError::command_requires_pre_logon(
                 command_name,
@@ -1799,6 +1936,20 @@ mod tests {
                 value: "arena".to_string(),
             }
         );
+        assert_eq!(
+            SteamworksServerCommand::log_on("secret-token"),
+            SteamworksServerCommand::LogOn {
+                token: SteamworksServerLoginToken::new("secret-token"),
+            }
+        );
+        assert_eq!(
+            format!("{:?}", SteamworksServerCommand::log_on("secret-token")),
+            "LogOn { token: SteamworksServerLoginToken(<redacted>) }"
+        );
+        assert_eq!(
+            SteamworksServerCommand::drain_outgoing_packets(),
+            SteamworksServerCommand::DrainOutgoingPackets
+        );
     }
 
     #[test]
@@ -1844,6 +1995,14 @@ mod tests {
             )),
             Err(SteamworksServerError::EmptyTicket)
         );
+        assert_eq!(
+            validate_server_command(&SteamworksServerCommand::log_on("")),
+            Err(SteamworksServerError::EmptyLogonToken)
+        );
+        assert_eq!(
+            validate_server_command(&SteamworksServerCommand::log_on("bad\0token")),
+            Err(SteamworksServerError::InvalidString { field: "token" })
+        );
     }
 
     #[test]
@@ -1879,6 +2038,14 @@ mod tests {
             ),
             Ok(())
         );
+        assert_eq!(
+            validate_server_command_for_state(&SteamworksServerCommand::LogOnAnonymous, &state),
+            Err(SteamworksServerError::LogonAlreadySubmitted)
+        );
+        assert_eq!(
+            validate_server_command_for_state(&SteamworksServerCommand::log_on("token"), &state),
+            Err(SteamworksServerError::LogonAlreadySubmitted)
+        );
     }
 
     #[test]
@@ -1886,6 +2053,10 @@ mod tests {
         let mut state = SteamworksServerState::default();
         let steam_id = steamworks::SteamId::from_raw(1);
         let user = steamworks::SteamId::from_raw(2);
+        let packet = SteamworksServerOutgoingPacket {
+            addr: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 27015),
+            data: vec![1, 2, 3],
+        };
 
         state.record_operation(&SteamworksServerOperation::SteamIdRead { steam_id });
         state.record_operation(&SteamworksServerOperation::AuthenticationSessionStarted { user });
@@ -1900,6 +2071,7 @@ mod tests {
         });
         state.record_operation(&SteamworksServerOperation::DedicatedServerSet { dedicated: true });
         state.record_operation(&SteamworksServerOperation::AnonymousLogonSubmitted);
+        state.record_operation(&SteamworksServerOperation::TokenLogonSubmitted);
         state.record_operation(&SteamworksServerOperation::AdvertiseServerActiveSet {
             active: true,
         });
@@ -1928,6 +2100,9 @@ mod tests {
             protected: false,
         });
         state.record_operation(&SteamworksServerOperation::BotPlayerCountSet { count: 2 });
+        state.record_operation(&SteamworksServerOperation::OutgoingPacketsDrained {
+            packets: vec![packet.clone()],
+        });
 
         assert_eq!(state.steam_id(), Some(steam_id));
         assert_eq!(state.authenticated_users(), &[user]);
@@ -1936,6 +2111,8 @@ mod tests {
         assert_eq!(state.game_data(), Some("mode=arena"));
         assert_eq!(state.dedicated(), Some(true));
         assert!(state.anonymous_logon_submitted());
+        assert!(state.token_logon_submitted());
+        assert!(state.logon_submitted());
         assert_eq!(state.advertise_server_active(), Some(true));
         assert_eq!(state.mod_dir(), Some("spacewar"));
         assert_eq!(state.map_name(), Some("arena"));
@@ -1948,6 +2125,7 @@ mod tests {
         );
         assert_eq!(state.password_protected(), Some(false));
         assert_eq!(state.bot_player_count(), Some(2));
+        assert_eq!(state.last_outgoing_packets(), &[packet]);
 
         state.record_operation(&SteamworksServerOperation::AuthenticationSessionEnded { user });
         state.record_operation(&SteamworksServerOperation::AllKeyValuesCleared);
