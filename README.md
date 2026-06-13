@@ -220,7 +220,7 @@ cargo run --example matchmaking_servers
 
 ## User Identity and Authentication
 
-`SteamworksUserPlugin` adds command/result messages for current-user identity, Steam server connection state, auth session tickets, Web API auth tickets, remote ticket validation sessions, and license checks for authenticated users.
+`SteamworksUserPlugin` adds command/result messages for current-user identity, Steam server connection state, auth session tickets, Web API auth tickets, remote ticket validation sessions, license checks for authenticated users, and microtransaction authorization callbacks.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -248,6 +248,8 @@ fn main() {
 ```
 
 `SteamworksUserCommand::GetAuthenticationSessionTicket` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through both `SteamworksEvent::AuthSessionTicketResponse` and `SteamworksUserOperation::AuthenticationSessionTicketResponse`. `SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse` and `SteamworksUserOperation::WebApiAuthenticationTicketReceived`. Remote ticket validation callbacks are also mirrored as `SteamworksUserOperation::AuthenticationTicketValidationReceived` with an owned, comparable validation result.
+
+Steam server connection callbacks are mirrored as `SteamworksUserOperation::SteamServerConnectionEventReceived` and update `SteamworksUserState::steam_server_connected()`. `SteamworksEvent::MicroTxnAuthorizationResponse` is mirrored as `SteamworksUserOperation::MicroTxnAuthorizationResponseReceived` with app ID, order ID, and authorization state.
 
 Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and sessions started through its own commands in `SteamworksUserState`; validation failure callbacks prune matching started sessions without creating new ones from unrelated global events.
 

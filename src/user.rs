@@ -54,8 +54,11 @@ impl Plugin for SteamworksUserPlugin {
 pub struct SteamworksUserState {
     last_error: Option<SteamworksUserError>,
     current_user: Option<SteamworksUserInfo>,
+    steam_server_connected: Option<bool>,
     active_auth_tickets: Vec<steamworks::AuthTicket>,
     authenticated_users: Vec<steamworks::SteamId>,
+    last_steam_server_connection_event: Option<SteamworksSteamServerConnectionEvent>,
+    last_micro_txn_authorization_response: Option<SteamworksMicroTxnAuthorizationResponse>,
     last_auth_ticket_response: Option<SteamworksAuthSessionTicketResponse>,
     last_web_api_ticket_response: Option<SteamworksWebApiTicketResponse>,
     last_auth_ticket_validation: Option<SteamworksAuthTicketValidation>,
@@ -70,6 +73,15 @@ impl SteamworksUserState {
     /// Returns the most recent current-user snapshot read through the plugin.
     pub fn current_user(&self) -> Option<&SteamworksUserInfo> {
         self.current_user.as_ref()
+    }
+
+    /// Returns the latest known Steam server connection state.
+    ///
+    /// This is updated by [`SteamworksUserCommand::IsLoggedOn`],
+    /// [`SteamworksUserCommand::GetCurrentUserInfo`], and Steam server
+    /// connection callbacks.
+    pub fn steam_server_connected(&self) -> Option<bool> {
+        self.steam_server_connected
     }
 
     /// Returns authentication ticket handles issued through this command layer.
@@ -87,6 +99,20 @@ impl SteamworksUserState {
     /// for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns the most recent Steam server connection callback snapshot.
+    pub fn last_steam_server_connection_event(
+        &self,
+    ) -> Option<&SteamworksSteamServerConnectionEvent> {
+        self.last_steam_server_connection_event.as_ref()
+    }
+
+    /// Returns the most recent microtransaction authorization callback snapshot.
+    pub fn last_micro_txn_authorization_response(
+        &self,
+    ) -> Option<&SteamworksMicroTxnAuthorizationResponse> {
+        self.last_micro_txn_authorization_response.as_ref()
     }
 
     /// Returns the most recent auth session ticket response callback snapshot.
@@ -112,6 +138,13 @@ impl SteamworksUserState {
         match operation {
             SteamworksUserOperation::CurrentUserInfoRead { info } => {
                 self.current_user = Some(info.clone());
+                self.steam_server_connected = Some(info.logged_on);
+            }
+            SteamworksUserOperation::LoggedOnRead { logged_on } => {
+                self.steam_server_connected = Some(*logged_on);
+                if let Some(info) = &mut self.current_user {
+                    info.logged_on = *logged_on;
+                }
             }
             SteamworksUserOperation::AuthenticationSessionTicketIssued { ticket, .. }
             | SteamworksUserOperation::WebApiAuthenticationTicketRequested { ticket, .. }
@@ -150,6 +183,17 @@ impl SteamworksUserState {
                         .retain(|known| *known != validation.steam_id);
                 }
                 self.last_auth_ticket_validation = Some(validation.clone());
+            }
+            SteamworksUserOperation::SteamServerConnectionEventReceived { event } => {
+                let connected = matches!(event, SteamworksSteamServerConnectionEvent::Connected);
+                self.steam_server_connected = Some(connected);
+                if let Some(info) = &mut self.current_user {
+                    info.logged_on = connected;
+                }
+                self.last_steam_server_connection_event = Some(event.clone());
+            }
+            SteamworksUserOperation::MicroTxnAuthorizationResponseReceived { response } => {
+                self.last_micro_txn_authorization_response = Some(response.clone());
             }
             _ => {}
         }
@@ -196,6 +240,36 @@ pub struct SteamworksAuthTicketValidation {
     pub owner_steam_id: steamworks::SteamId,
     /// Validation result.
     pub response: Result<(), SteamworksAuthSessionValidateError>,
+}
+
+/// Steam server connection callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SteamworksSteamServerConnectionEvent {
+    /// The local Steam client connected to Steam servers.
+    Connected,
+    /// The local Steam client disconnected from Steam servers.
+    Disconnected {
+        /// Reason reported by Steam.
+        reason: steamworks::SteamError,
+    },
+    /// The local Steam client failed to connect to Steam servers.
+    ConnectFailure {
+        /// Reason reported by Steam.
+        reason: steamworks::SteamError,
+        /// Whether Steam is still retrying the connection.
+        still_retrying: bool,
+    },
+}
+
+/// Microtransaction authorization callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksMicroTxnAuthorizationResponse {
+    /// App ID reported by Steam.
+    pub app_id: steamworks::AppId,
+    /// Order ID supplied by the Steam microtransaction flow.
+    pub order_id: u64,
+    /// Whether the user authorized the transaction.
+    pub authorized: bool,
 }
 
 /// A high-level command for Steam user identity and authentication workflows.
@@ -389,6 +463,16 @@ pub enum SteamworksUserOperation {
         /// Callback snapshot.
         validation: SteamworksAuthTicketValidation,
     },
+    /// Steam server connection state callback was observed.
+    SteamServerConnectionEventReceived {
+        /// Callback snapshot.
+        event: SteamworksSteamServerConnectionEvent,
+    },
+    /// Microtransaction authorization callback was observed.
+    MicroTxnAuthorizationResponseReceived {
+        /// Callback snapshot.
+        response: SteamworksMicroTxnAuthorizationResponse,
+    },
 }
 
 /// Result message emitted by [`SteamworksUserPlugin`].
@@ -542,8 +626,8 @@ fn process_user_commands(
 
     let Some(client) = client else {
         let error = SteamworksUserError::ClientUnavailable;
-        state.record_error(error.clone());
         for command in commands.drain() {
+            state.record_error(error.clone());
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -609,6 +693,35 @@ fn process_user_steam_events(
                         steam_id: event.steam_id,
                         owner_steam_id: event.owner_steam_id,
                         response: event.response.clone().map_err(Into::into),
+                    },
+                }
+            }
+            SteamworksEvent::SteamServersConnected(_) => {
+                SteamworksUserOperation::SteamServerConnectionEventReceived {
+                    event: SteamworksSteamServerConnectionEvent::Connected,
+                }
+            }
+            SteamworksEvent::SteamServersDisconnected(event) => {
+                SteamworksUserOperation::SteamServerConnectionEventReceived {
+                    event: SteamworksSteamServerConnectionEvent::Disconnected {
+                        reason: event.reason,
+                    },
+                }
+            }
+            SteamworksEvent::SteamServerConnectFailure(event) => {
+                SteamworksUserOperation::SteamServerConnectionEventReceived {
+                    event: SteamworksSteamServerConnectionEvent::ConnectFailure {
+                        reason: event.reason,
+                        still_retrying: event.still_retrying,
+                    },
+                }
+            }
+            SteamworksEvent::MicroTxnAuthorizationResponse(event) => {
+                SteamworksUserOperation::MicroTxnAuthorizationResponseReceived {
+                    response: SteamworksMicroTxnAuthorizationResponse {
+                        app_id: event.app_id,
+                        order_id: event.order_id,
+                        authorized: event.authorized,
                     },
                 }
             }
@@ -965,6 +1078,139 @@ mod tests {
             })
         );
         assert!(state.authenticated_users().is_empty());
+        assert_eq!(state.last_error(), None);
+    }
+
+    #[test]
+    fn connection_and_microtxn_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let app_id = steamworks::AppId(480);
+
+        app.add_plugins(SteamworksUserPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::SteamServersConnected(
+                steamworks::SteamServersConnected,
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::SteamServersDisconnected(
+                steamworks::SteamServersDisconnected {
+                    reason: steamworks::SteamError::NoConnection,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::SteamServerConnectFailure(
+                steamworks::SteamServerConnectFailure {
+                    reason: steamworks::SteamError::Timeout,
+                    still_retrying: true,
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::MicroTxnAuthorizationResponse(
+                steamworks::MicroTxnAuthorizationResponse {
+                    app_id,
+                    order_id: 99,
+                    authorized: true,
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksUserResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        let disconnected = SteamworksSteamServerConnectionEvent::Disconnected {
+            reason: steamworks::SteamError::NoConnection,
+        };
+        let failed = SteamworksSteamServerConnectionEvent::ConnectFailure {
+            reason: steamworks::SteamError::Timeout,
+            still_retrying: true,
+        };
+        let micro_txn = SteamworksMicroTxnAuthorizationResponse {
+            app_id,
+            order_id: 99,
+            authorized: true,
+        };
+
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::SteamServerConnectionEventReceived {
+                        event: SteamworksSteamServerConnectionEvent::Connected,
+                    },
+                ),
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::SteamServerConnectionEventReceived {
+                        event: disconnected,
+                    },
+                ),
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::SteamServerConnectionEventReceived {
+                        event: failed.clone(),
+                    },
+                ),
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::MicroTxnAuthorizationResponseReceived {
+                        response: micro_txn.clone(),
+                    },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksUserState>();
+        assert_eq!(state.steam_server_connected(), Some(false));
+        assert_eq!(state.last_steam_server_connection_event(), Some(&failed));
+        assert_eq!(
+            state.last_micro_txn_authorization_response(),
+            Some(&micro_txn)
+        );
+        assert_eq!(state.last_error(), None);
+    }
+
+    #[test]
+    fn state_updates_cached_logged_on_from_connection_operations() {
+        let mut state = SteamworksUserState::default();
+        let steam_id = steamworks::SteamId::from_raw(1);
+
+        state.record_operation(&SteamworksUserOperation::CurrentUserInfoRead {
+            info: SteamworksUserInfo {
+                steam_id,
+                level: 7,
+                logged_on: false,
+            },
+        });
+        state.record_operation(
+            &SteamworksUserOperation::SteamServerConnectionEventReceived {
+                event: SteamworksSteamServerConnectionEvent::Connected,
+            },
+        );
+
+        assert_eq!(state.steam_server_connected(), Some(true));
+        assert_eq!(
+            state.current_user(),
+            Some(&SteamworksUserInfo {
+                steam_id,
+                level: 7,
+                logged_on: true,
+            })
+        );
+
+        state.record_operation(&SteamworksUserOperation::LoggedOnRead { logged_on: false });
+
+        assert_eq!(state.steam_server_connected(), Some(false));
+        assert_eq!(
+            state.current_user(),
+            Some(&SteamworksUserInfo {
+                steam_id,
+                level: 7,
+                logged_on: false,
+            })
+        );
     }
 
     #[test]

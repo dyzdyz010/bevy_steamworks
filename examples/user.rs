@@ -43,23 +43,6 @@ fn log_user_results(mut results: MessageReader<SteamworksUserResult>) {
     }
 }
 
-fn log_auth_callbacks(mut events: MessageReader<SteamworksEvent>) {
-    for event in events.read() {
-        match event {
-            SteamworksEvent::AuthSessionTicketResponse(event) => {
-                println!("AuthSessionTicketResponse: {event:?}");
-            }
-            SteamworksEvent::TicketForWebApiResponse(event) => {
-                println!("TicketForWebApiResponse: {event:?}");
-            }
-            SteamworksEvent::ValidateAuthTicketResponse(event) => {
-                println!("ValidateAuthTicketResponse: {event:?}");
-            }
-            _ => {}
-        }
-    }
-}
-
 fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: MessageWriter<AppExit>) {
     if frames.0 == 0 {
         exit.write(AppExit::Success);
@@ -75,9 +58,6 @@ fn main() {
         .add_plugins(SteamworksUserPlugin::new())
         .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_millis(16)))
         .add_systems(Startup, request_user_info)
-        .add_systems(
-            Update,
-            (log_user_results, log_auth_callbacks, exit_after_a_short_run),
-        )
+        .add_systems(Update, (log_user_results, exit_after_a_short_run))
         .run();
 }
