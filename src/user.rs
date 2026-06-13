@@ -1,18 +1,19 @@
 //! High-level Bevy ECS integration for Steam user identity and authentication.
 //!
 //! This module builds on top of the upstream [`steamworks::User`] API. It keeps
-//! common authentication flows in Bevy messages while leaving low-level callback
-//! confirmation in [`crate::SteamworksEvent`].
+//! common authentication flows in Bevy messages while mirroring relevant
+//! low-level callback confirmations from [`crate::SteamworksEvent`] into
+//! [`SteamworksUserResult`].
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
-    message::{Message, MessageWriter, Messages},
+    message::{Message, MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut, Resource},
     schedule::IntoScheduleConfigs,
 };
 use thiserror::Error;
 
-use crate::{SteamworksClient, SteamworksSystem};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
 /// Bevy plugin for high-level Steam user identity and authentication commands.
 ///
@@ -32,6 +33,7 @@ impl SteamworksUserPlugin {
 impl Plugin for SteamworksUserPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksUserState>()
+            .add_message::<SteamworksEvent>()
             .add_message::<SteamworksUserCommand>()
             .add_message::<SteamworksUserResult>()
             .configure_sets(
@@ -54,6 +56,9 @@ pub struct SteamworksUserState {
     current_user: Option<SteamworksUserInfo>,
     active_auth_tickets: Vec<steamworks::AuthTicket>,
     authenticated_users: Vec<steamworks::SteamId>,
+    last_auth_ticket_response: Option<SteamworksAuthSessionTicketResponse>,
+    last_web_api_ticket_response: Option<SteamworksWebApiTicketResponse>,
+    last_auth_ticket_validation: Option<SteamworksAuthTicketValidation>,
 }
 
 impl SteamworksUserState {
@@ -78,9 +83,25 @@ impl SteamworksUserState {
     /// Returns users with sessions started through this command layer.
     ///
     /// Entries are removed after [`SteamworksUserCommand::EndAuthenticationSession`]
-    /// is processed for the same user.
+    /// is processed for the same user or after Steam reports validation failure
+    /// for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns the most recent auth session ticket response callback snapshot.
+    pub fn last_auth_ticket_response(&self) -> Option<&SteamworksAuthSessionTicketResponse> {
+        self.last_auth_ticket_response.as_ref()
+    }
+
+    /// Returns the most recent Web API ticket response callback snapshot.
+    pub fn last_web_api_ticket_response(&self) -> Option<&SteamworksWebApiTicketResponse> {
+        self.last_web_api_ticket_response.as_ref()
+    }
+
+    /// Returns the most recent auth ticket validation callback snapshot.
+    pub fn last_auth_ticket_validation(&self) -> Option<&SteamworksAuthTicketValidation> {
+        self.last_auth_ticket_validation.as_ref()
     }
 
     fn record_error(&mut self, error: SteamworksUserError) {
@@ -109,6 +130,27 @@ impl SteamworksUserState {
             SteamworksUserOperation::AuthenticationSessionEnded { user } => {
                 self.authenticated_users.retain(|known| known != user);
             }
+            SteamworksUserOperation::AuthenticationSessionTicketResponse { response } => {
+                if response.result.is_err() {
+                    self.active_auth_tickets
+                        .retain(|known| *known != response.ticket);
+                }
+                self.last_auth_ticket_response = Some(response.clone());
+            }
+            SteamworksUserOperation::WebApiAuthenticationTicketReceived { response } => {
+                if response.result.is_err() {
+                    self.active_auth_tickets
+                        .retain(|known| *known != response.ticket_handle);
+                }
+                self.last_web_api_ticket_response = Some(response.clone());
+            }
+            SteamworksUserOperation::AuthenticationTicketValidationReceived { validation } => {
+                if validation.response.is_err() {
+                    self.authenticated_users
+                        .retain(|known| *known != validation.steam_id);
+                }
+                self.last_auth_ticket_validation = Some(validation.clone());
+            }
             _ => {}
         }
     }
@@ -125,6 +167,37 @@ pub struct SteamworksUserInfo {
     pub logged_on: bool,
 }
 
+/// Auth session ticket creation callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksAuthSessionTicketResponse {
+    /// Ticket handle reported by Steam.
+    pub ticket: steamworks::AuthTicket,
+    /// Steam result for ticket creation.
+    pub result: Result<(), steamworks::SteamError>,
+}
+
+/// Web API auth ticket callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksWebApiTicketResponse {
+    /// Ticket handle reported by Steam.
+    pub ticket_handle: steamworks::AuthTicket,
+    /// Steam result for ticket creation.
+    pub result: Result<(), steamworks::SteamError>,
+    /// Ticket bytes returned by Steam, truncated to Steam's reported length.
+    pub ticket_bytes: Vec<u8>,
+}
+
+/// Auth ticket validation callback snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksAuthTicketValidation {
+    /// Steam user whose ticket was validated.
+    pub steam_id: steamworks::SteamId,
+    /// Owner of the game license used by the ticket.
+    pub owner_steam_id: steamworks::SteamId,
+    /// Validation result.
+    pub response: Result<(), SteamworksAuthSessionValidateError>,
+}
+
 /// A high-level command for Steam user identity and authentication workflows.
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksUserCommand {
@@ -138,16 +211,18 @@ pub enum SteamworksUserCommand {
     IsLoggedOn,
     /// Request an authentication session ticket for an entity identified by Steam ID.
     ///
-    /// Final ticket creation confirmation arrives later through
-    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`].
+    /// Final ticket creation confirmation arrives later through both
+    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`] and
+    /// [`SteamworksUserOperation::AuthenticationSessionTicketResponse`].
     GetAuthenticationSessionTicket {
         /// Steam ID for the entity that will verify the ticket.
         steam_id: steamworks::SteamId,
     },
     /// Request an authentication ticket for Steam Web API verification.
     ///
-    /// The ticket bytes arrive later through
-    /// [`crate::SteamworksEvent::TicketForWebApiResponse`].
+    /// The ticket bytes arrive later through both
+    /// [`crate::SteamworksEvent::TicketForWebApiResponse`] and
+    /// [`SteamworksUserOperation::WebApiAuthenticationTicketReceived`].
     GetAuthenticationSessionTicketForWebApi {
         /// Identity string for the service that will consume the ticket.
         identity: String,
@@ -249,8 +324,9 @@ pub enum SteamworksUserOperation {
     },
     /// Authentication session ticket bytes were issued.
     ///
-    /// Final creation confirmation arrives later through
-    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`].
+    /// Final creation confirmation arrives later through both
+    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`] and
+    /// [`SteamworksUserOperation::AuthenticationSessionTicketResponse`].
     AuthenticationSessionTicketIssued {
         /// Ticket handle that should be cancelled when no longer needed.
         ticket: steamworks::AuthTicket,
@@ -261,8 +337,9 @@ pub enum SteamworksUserOperation {
     },
     /// A Steam Web API authentication ticket request was submitted.
     ///
-    /// Ticket bytes arrive later through
-    /// [`crate::SteamworksEvent::TicketForWebApiResponse`].
+    /// Ticket bytes arrive later through both
+    /// [`crate::SteamworksEvent::TicketForWebApiResponse`] and
+    /// [`SteamworksUserOperation::WebApiAuthenticationTicketReceived`].
     WebApiAuthenticationTicketRequested {
         /// Ticket handle that should be cancelled when no longer needed.
         ticket: steamworks::AuthTicket,
@@ -276,8 +353,9 @@ pub enum SteamworksUserOperation {
     },
     /// Authentication began for a remote user ticket.
     ///
-    /// Later invalidation can arrive through
-    /// [`crate::SteamworksEvent::ValidateAuthTicketResponse`].
+    /// Later validation callbacks arrive through both
+    /// [`crate::SteamworksEvent::ValidateAuthTicketResponse`] and
+    /// [`SteamworksUserOperation::AuthenticationTicketValidationReceived`].
     AuthenticationSessionStarted {
         /// Steam user whose ticket was accepted for validation.
         user: steamworks::SteamId,
@@ -295,6 +373,21 @@ pub enum SteamworksUserOperation {
         app_id: steamworks::AppId,
         /// License state reported by Steam.
         license: steamworks::UserHasLicense,
+    },
+    /// Auth session ticket creation callback was observed.
+    AuthenticationSessionTicketResponse {
+        /// Callback snapshot.
+        response: SteamworksAuthSessionTicketResponse,
+    },
+    /// Web API auth ticket creation callback was observed.
+    WebApiAuthenticationTicketReceived {
+        /// Callback snapshot.
+        response: SteamworksWebApiTicketResponse,
+    },
+    /// Auth ticket validation callback was observed.
+    AuthenticationTicketValidationReceived {
+        /// Callback snapshot.
+        validation: SteamworksAuthTicketValidation,
     },
 }
 
@@ -380,12 +473,73 @@ impl From<steamworks::AuthSessionError> for SteamworksAuthSessionError {
     }
 }
 
+/// Cloneable, comparable mirror of upstream [`steamworks::AuthSessionValidateError`].
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+pub enum SteamworksAuthSessionValidateError {
+    /// The user is not connected to Steam.
+    #[error("user not connected to Steam")]
+    UserNotConnectedToSteam,
+    /// The user has no license or the license expired.
+    #[error("no license or expired license")]
+    NoLicenseOrExpired,
+    /// The user is VAC banned.
+    #[error("VAC banned")]
+    VacBanned,
+    /// The user is logged in elsewhere.
+    #[error("logged in elsewhere")]
+    LoggedInElseWhere,
+    /// VAC check timed out.
+    #[error("VAC check timed out")]
+    VacCheckTimedOut,
+    /// The auth ticket was cancelled.
+    #[error("auth ticket cancelled")]
+    AuthTicketCancelled,
+    /// The auth ticket was already used.
+    #[error("auth ticket already used")]
+    AuthTicketInvalidAlreadyUsed,
+    /// The auth ticket is invalid.
+    #[error("auth ticket invalid")]
+    AuthTicketInvalid,
+    /// Publisher issued a ban.
+    #[error("publisher issued ban")]
+    PublisherIssuedBan,
+    /// The ticket network identity did not match.
+    #[error("auth ticket network identity failure")]
+    AuthTicketNetworkIdentityFailure,
+}
+
+impl From<steamworks::AuthSessionValidateError> for SteamworksAuthSessionValidateError {
+    fn from(error: steamworks::AuthSessionValidateError) -> Self {
+        match error {
+            steamworks::AuthSessionValidateError::UserNotConnectedToSteam => {
+                Self::UserNotConnectedToSteam
+            }
+            steamworks::AuthSessionValidateError::NoLicenseOrExpired => Self::NoLicenseOrExpired,
+            steamworks::AuthSessionValidateError::VACBanned => Self::VacBanned,
+            steamworks::AuthSessionValidateError::LoggedInElseWhere => Self::LoggedInElseWhere,
+            steamworks::AuthSessionValidateError::VACCheckTimedOut => Self::VacCheckTimedOut,
+            steamworks::AuthSessionValidateError::AuthTicketCancelled => Self::AuthTicketCancelled,
+            steamworks::AuthSessionValidateError::AuthTicketInvalidAlreadyUsed => {
+                Self::AuthTicketInvalidAlreadyUsed
+            }
+            steamworks::AuthSessionValidateError::AuthTicketInvalid => Self::AuthTicketInvalid,
+            steamworks::AuthSessionValidateError::PublisherIssuedBan => Self::PublisherIssuedBan,
+            steamworks::AuthSessionValidateError::AuthTicketNetworkIdentityFailure => {
+                Self::AuthTicketNetworkIdentityFailure
+            }
+        }
+    }
+}
+
 fn process_user_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksUserState>,
     mut commands: ResMut<Messages<SteamworksUserCommand>>,
+    mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksUserResult>,
 ) {
+    process_user_steam_events(&mut state, &mut steam_events, &mut results);
+
     let Some(client) = client else {
         let error = SteamworksUserError::ClientUnavailable;
         state.record_error(error.clone());
@@ -426,6 +580,47 @@ fn process_user_commands(
                 results.write(SteamworksUserResult::Err { command, error });
             }
         }
+    }
+}
+
+fn process_user_steam_events(
+    state: &mut SteamworksUserState,
+    steam_events: &mut MessageReader<SteamworksEvent>,
+    results: &mut MessageWriter<SteamworksUserResult>,
+) {
+    for event in steam_events.read() {
+        let operation = match event {
+            SteamworksEvent::AuthSessionTicketResponse(event) => {
+                SteamworksUserOperation::AuthenticationSessionTicketResponse {
+                    response: SteamworksAuthSessionTicketResponse {
+                        ticket: event.ticket,
+                        result: event.result,
+                    },
+                }
+            }
+            SteamworksEvent::TicketForWebApiResponse(event) => {
+                SteamworksUserOperation::WebApiAuthenticationTicketReceived {
+                    response: snapshot_web_api_ticket_response(event),
+                }
+            }
+            SteamworksEvent::ValidateAuthTicketResponse(event) => {
+                SteamworksUserOperation::AuthenticationTicketValidationReceived {
+                    validation: SteamworksAuthTicketValidation {
+                        steam_id: event.steam_id,
+                        owner_steam_id: event.owner_steam_id,
+                        response: event.response.clone().map_err(Into::into),
+                    },
+                }
+            }
+            _ => continue,
+        };
+        state.record_operation(&operation);
+        tracing::debug!(
+            target: "bevy_steamworks",
+            operation = ?operation,
+            "processed Steamworks user callback"
+        );
+        results.write(SteamworksUserResult::Ok(operation));
     }
 }
 
@@ -501,6 +696,19 @@ fn snapshot_current_user(client: &SteamworksClient) -> SteamworksUserInfo {
     }
 }
 
+fn snapshot_web_api_ticket_response(
+    response: &steamworks::TicketForWebApiResponse,
+) -> SteamworksWebApiTicketResponse {
+    let ticket_len = usize::try_from(response.ticket_len).unwrap_or(0);
+    let mut ticket_bytes = response.ticket.clone();
+    ticket_bytes.truncate(ticket_len.min(ticket_bytes.len()));
+    SteamworksWebApiTicketResponse {
+        ticket_handle: response.ticket_handle,
+        result: response.result,
+        ticket_bytes,
+    }
+}
+
 fn validate_command(command: &SteamworksUserCommand) -> Result<(), SteamworksUserError> {
     match command {
         SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi { identity } => {
@@ -539,6 +747,7 @@ mod tests {
         app.add_plugins(SteamworksUserPlugin::new());
 
         assert!(app.world().contains_resource::<SteamworksUserState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
         assert!(app
             .world()
             .contains_resource::<Messages<SteamworksUserCommand>>());
@@ -623,6 +832,188 @@ mod tests {
         assert_eq!(
             SteamworksAuthSessionError::from(steamworks::AuthSessionError::ExpiredTicket),
             SteamworksAuthSessionError::ExpiredTicket
+        );
+    }
+
+    #[test]
+    fn auth_session_validate_errors_are_cloneable_and_comparable() {
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::UserNotConnectedToSteam,
+            ),
+            SteamworksAuthSessionValidateError::UserNotConnectedToSteam
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::NoLicenseOrExpired,
+            ),
+            SteamworksAuthSessionValidateError::NoLicenseOrExpired
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::VACBanned,
+            ),
+            SteamworksAuthSessionValidateError::VacBanned
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::LoggedInElseWhere,
+            ),
+            SteamworksAuthSessionValidateError::LoggedInElseWhere
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::VACCheckTimedOut,
+            ),
+            SteamworksAuthSessionValidateError::VacCheckTimedOut
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::AuthTicketCancelled,
+            ),
+            SteamworksAuthSessionValidateError::AuthTicketCancelled
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::AuthTicketInvalidAlreadyUsed,
+            ),
+            SteamworksAuthSessionValidateError::AuthTicketInvalidAlreadyUsed
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::AuthTicketInvalid,
+            ),
+            SteamworksAuthSessionValidateError::AuthTicketInvalid
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::PublisherIssuedBan,
+            ),
+            SteamworksAuthSessionValidateError::PublisherIssuedBan
+        );
+        assert_eq!(
+            SteamworksAuthSessionValidateError::from(
+                steamworks::AuthSessionValidateError::AuthTicketNetworkIdentityFailure,
+            ),
+            SteamworksAuthSessionValidateError::AuthTicketNetworkIdentityFailure
+        );
+    }
+
+    #[test]
+    fn auth_validation_callbacks_are_bridged_without_client() {
+        let mut app = App::new();
+        let user = steamworks::SteamId::from_raw(1);
+        let owner = steamworks::SteamId::from_raw(2);
+
+        app.add_plugins(SteamworksUserPlugin::new());
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ValidateAuthTicketResponse(
+                steamworks::ValidateAuthTicketResponse {
+                    steam_id: user,
+                    owner_steam_id: owner,
+                    response: Ok(()),
+                },
+            ));
+        app.world_mut()
+            .resource_mut::<Messages<SteamworksEvent>>()
+            .write(SteamworksEvent::ValidateAuthTicketResponse(
+                steamworks::ValidateAuthTicketResponse {
+                    steam_id: user,
+                    owner_steam_id: owner,
+                    response: Err(steamworks::AuthSessionValidateError::VACBanned),
+                },
+            ));
+
+        app.update();
+
+        let mut results = app
+            .world_mut()
+            .resource_mut::<Messages<SteamworksUserResult>>();
+        let drained = results.drain().collect::<Vec<_>>();
+        assert_eq!(
+            drained,
+            vec![
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::AuthenticationTicketValidationReceived {
+                        validation: SteamworksAuthTicketValidation {
+                            steam_id: user,
+                            owner_steam_id: owner,
+                            response: Ok(()),
+                        },
+                    },
+                ),
+                SteamworksUserResult::Ok(
+                    SteamworksUserOperation::AuthenticationTicketValidationReceived {
+                        validation: SteamworksAuthTicketValidation {
+                            steam_id: user,
+                            owner_steam_id: owner,
+                            response: Err(SteamworksAuthSessionValidateError::VacBanned),
+                        },
+                    },
+                ),
+            ]
+        );
+
+        let state = app.world().resource::<SteamworksUserState>();
+        assert_eq!(
+            state.last_auth_ticket_validation(),
+            Some(&SteamworksAuthTicketValidation {
+                steam_id: user,
+                owner_steam_id: owner,
+                response: Err(SteamworksAuthSessionValidateError::VacBanned),
+            })
+        );
+        assert!(state.authenticated_users().is_empty());
+    }
+
+    #[test]
+    fn validation_callbacks_do_not_create_sessions_but_failures_remove_known_sessions() {
+        let mut state = SteamworksUserState::default();
+        let user = steamworks::SteamId::from_raw(1);
+        let owner = steamworks::SteamId::from_raw(2);
+
+        state.record_operation(
+            &SteamworksUserOperation::AuthenticationTicketValidationReceived {
+                validation: SteamworksAuthTicketValidation {
+                    steam_id: user,
+                    owner_steam_id: owner,
+                    response: Ok(()),
+                },
+            },
+        );
+
+        assert!(state.authenticated_users().is_empty());
+        assert_eq!(
+            state.last_auth_ticket_validation(),
+            Some(&SteamworksAuthTicketValidation {
+                steam_id: user,
+                owner_steam_id: owner,
+                response: Ok(()),
+            })
+        );
+
+        state.record_operation(&SteamworksUserOperation::AuthenticationSessionStarted { user });
+        assert_eq!(state.authenticated_users(), &[user]);
+
+        state.record_operation(
+            &SteamworksUserOperation::AuthenticationTicketValidationReceived {
+                validation: SteamworksAuthTicketValidation {
+                    steam_id: user,
+                    owner_steam_id: owner,
+                    response: Err(SteamworksAuthSessionValidateError::AuthTicketCancelled),
+                },
+            },
+        );
+
+        assert!(state.authenticated_users().is_empty());
+        assert_eq!(
+            state.last_auth_ticket_validation(),
+            Some(&SteamworksAuthTicketValidation {
+                steam_id: user,
+                owner_steam_id: owner,
+                response: Err(SteamworksAuthSessionValidateError::AuthTicketCancelled),
+            })
         );
     }
 }

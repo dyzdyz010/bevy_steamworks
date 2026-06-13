@@ -245,9 +245,9 @@ fn main() {
 }
 ```
 
-`SteamworksUserCommand::GetAuthenticationSessionTicket` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through `SteamworksEvent::AuthSessionTicketResponse`. `SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse`. Remote ticket invalidation still arrives through `SteamworksEvent::ValidateAuthTicketResponse`.
+`SteamworksUserCommand::GetAuthenticationSessionTicket` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through both `SteamworksEvent::AuthSessionTicketResponse` and `SteamworksUserOperation::AuthenticationSessionTicketResponse`. `SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse` and `SteamworksUserOperation::WebApiAuthenticationTicketReceived`. Remote ticket validation callbacks are also mirrored as `SteamworksUserOperation::AuthenticationTicketValidationReceived` with an owned, comparable validation result.
 
-Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and started sessions in `SteamworksUserState`.
+Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and sessions started through its own commands in `SteamworksUserState`; validation failure callbacks prune matching started sessions without creating new ones from unrelated global events.
 
 Run the user/auth example with:
 
