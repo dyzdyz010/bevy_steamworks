@@ -34,6 +34,7 @@ pub mod friends;
 pub mod matchmaking;
 pub mod remote_play;
 pub mod screenshots;
+pub mod timeline;
 pub mod user;
 pub mod user_stats;
 pub mod utils;
@@ -42,6 +43,7 @@ pub use friends::*;
 pub use matchmaking::*;
 pub use remote_play::*;
 pub use screenshots::*;
+pub use timeline::*;
 pub use user::*;
 pub use user_stats::*;
 pub use utils::*;
@@ -69,11 +71,15 @@ pub mod prelude {
         SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
         SteamworksScreenshotsState, SteamworksStatsCommand, SteamworksStatsError,
         SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
-        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksUnavailable,
-        SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo, SteamworksUserOperation,
-        SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
-        SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
-        SteamworksUtilsResult, SteamworksUtilsState,
+        SteamworksStatsSettings, SteamworksStatsState, SteamworksSystem, SteamworksTimelineCommand,
+        SteamworksTimelineError, SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
+        SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+        SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
+        SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserInfo,
+        SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
+        SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsInfo,
+        SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+        SteamworksUtilsState,
     };
     pub use steamworks::*;
     pub use steamworks::{
@@ -607,6 +613,8 @@ pub enum SteamworksSystem {
     ProcessScreenshotsCommands,
     /// Processes high-level Steam Remote Play commands.
     ProcessRemotePlayCommands,
+    /// Processes high-level Steam Timeline commands.
+    ProcessTimelineCommands,
 }
 
 fn run_steam_callbacks(

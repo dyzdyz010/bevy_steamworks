@@ -368,6 +368,62 @@ $env:BEVY_STEAMWORKS_REMOTE_PLAY_FRIEND = "76561198000000000"
 cargo run --example remote_play
 ```
 
+## Timeline
+
+`SteamworksTimelinePlugin` adds command/result messages for Steam Timeline game modes, state descriptions, and event markers.
+
+```rust,no_run
+# use std::time::Duration;
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn request_timeline(mut timeline: MessageWriter<SteamworksTimelineCommand>) {
+    timeline.write(SteamworksTimelineCommand::set_game_mode(
+        SteamworksTimelineGameMode::Playing,
+    ));
+    timeline.write(SteamworksTimelineCommand::set_state_description(
+        "Boss fight",
+        Duration::from_secs(3),
+    ));
+    timeline.write(SteamworksTimelineCommand::add_event(
+        SteamworksTimelineEventInfo {
+            icon: "skull".to_owned(),
+            title: "Boss defeated".to_owned(),
+            description: "The party won the encounter".to_owned(),
+            priority: 10,
+            start_offset_seconds: 0.0,
+            duration: Duration::ZERO,
+            clip_priority: SteamworksTimelineEventClipPriority::Featured,
+        },
+    ));
+}
+
+fn read_timeline(mut results: MessageReader<SteamworksTimelineResult>) {
+    for result in results.read() {
+        info!("{result:?}");
+    }
+}
+
+fn main() {
+    App::new()
+        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksTimelinePlugin::new())
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, request_timeline)
+        .add_systems(Update, read_timeline)
+        .run();
+}
+```
+
+Timeline commands validate strings before calling upstream `steamworks`, so interior NUL bytes become `SteamworksTimelineError::InvalidString` instead of panicking in a C string conversion. Event start offsets must be finite. The upstream Timeline wrapper no-ops when the Steam client API is too old for Timeline support; `SteamworksTimelineResult::Ok` means the command was accepted by this Bevy command layer and submitted to the wrapper.
+
+Run the Timeline example with:
+
+```powershell
+cargo run --example timeline
+$env:BEVY_STEAMWORKS_TIMELINE_EVENT = "1"
+cargo run --example timeline
+```
+
 ## App, Ownership, and Launch Parameters
 
 `SteamworksAppsPlugin` adds command/result messages for application-level Steam checks: current app info, ownership/subscription state, DLC installation, language settings, beta branch name, build ID, install directories, and launch parameters.
