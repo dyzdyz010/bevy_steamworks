@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::Resource;
 
+use super::handles::SteamworksNetworkingSocketsHandleStorage;
 use super::*;
 
 /// Runtime state for [`crate::SteamworksNetworkingSocketsPlugin`].
