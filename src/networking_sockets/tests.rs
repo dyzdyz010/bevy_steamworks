@@ -1,0 +1,828 @@
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    str::FromStr,
+};
+
+use bevy_app::App;
+use bevy_ecs::message::Messages;
+
+use super::*;
+
+fn connection_id() -> SteamworksNetworkingSocketsConnectionId {
+    SteamworksNetworkingSocketsConnectionId::from_raw(42)
+}
+
+fn listen_socket_id() -> SteamworksListenSocketId {
+    SteamworksListenSocketId::from_raw(7)
+}
+
+fn poll_group_id() -> SteamworksNetworkingSocketsPollGroupId {
+    SteamworksNetworkingSocketsPollGroupId::from_raw(9)
+}
+
+fn localhost() -> SocketAddr {
+    SocketAddr::from((Ipv4Addr::LOCALHOST, 27015))
+}
+
+#[test]
+fn networking_sockets_plugin_registers_resources_and_messages() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
+
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingSocketsState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingSocketsHandles>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingSocketsCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingSocketsResult>>());
+}
+
+#[test]
+fn commands_fail_when_client_is_unavailable() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsCommand>>()
+        .write(SteamworksNetworkingSocketsCommand::GetAuthenticationStatus);
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksNetworkingSocketsResult::Err {
+            command: SteamworksNetworkingSocketsCommand::GetAuthenticationStatus,
+            error: SteamworksNetworkingSocketsError::ClientUnavailable,
+        }]
+    );
+
+    let state = app.world().resource::<SteamworksNetworkingSocketsState>();
+    assert_eq!(
+        state.last_error(),
+        Some(&SteamworksNetworkingSocketsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn validation_rejects_invalid_inputs() {
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::poll_connection_events(
+            connection_id(),
+            0,
+        )),
+        Err(SteamworksNetworkingSocketsError::InvalidEventLimit)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::poll_connection_events(
+            connection_id(),
+            STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+        )),
+        Err(SteamworksNetworkingSocketsError::TooManyEvents {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::receive_messages(
+            connection_id(),
+            0,
+        )),
+        Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::receive_messages(
+            connection_id(),
+            STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+        )),
+        Err(SteamworksNetworkingSocketsError::BatchSizeTooLarge {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::receive_poll_group_messages(poll_group_id(), 0,),
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::send_message(
+            connection_id(),
+            steamworks::networking_types::SendFlags::RELIABLE,
+            vec![0; STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES + 1],
+        )),
+        Err(SteamworksNetworkingSocketsError::MessageTooLarge {
+            bytes: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus {
+                connection: connection_id(),
+                lanes: STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES + 1,
+            },
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidLaneCount {
+            lanes: STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::configure_connection_lanes(
+                connection_id(),
+                vec![0, 10],
+                vec![100],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidLaneConfiguration {
+            priorities: 2,
+            weights: 1,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::configure_connection_lanes(
+                connection_id(),
+                Vec::<i32>::new(),
+                Vec::<u16>::new(),
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidLaneConfiguration {
+            priorities: 0,
+            weights: 0,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::configure_connection_lanes(
+                connection_id(),
+                vec![0; STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES + 1],
+                vec![100; STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES + 1],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::TooManyConfiguredLanes {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES,
+        })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::create_listen_socket_p2p(-1,)),
+        Err(SteamworksNetworkingSocketsError::InvalidVirtualPort { port: -1 })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::CloseConnection {
+            connection: connection_id(),
+            reason: steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            debug: Some("bad\0debug".to_owned()),
+            enable_linger: false,
+        }),
+        Err(SteamworksNetworkingSocketsError::InvalidString { field: "debug" })
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let address = localhost();
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_listen_socket_ip(address),
+        SteamworksNetworkingSocketsCommand::CreateListenSocketIp {
+            local_address: address,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::connect_by_ip_address(address),
+        SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::poll_listen_socket_events(
+            listen_socket_id(),
+            8,
+            SteamworksConnectionRequestPolicy::Accept,
+        ),
+        SteamworksNetworkingSocketsCommand::PollListenSocketEvents {
+            listen_socket: listen_socket_id(),
+            max_events: 8,
+            request_policy: SteamworksConnectionRequestPolicy::Accept,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_poll_group(),
+        SteamworksNetworkingSocketsCommand::CreatePollGroup
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::get_realtime_connection_status(connection_id(), 4),
+        SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus {
+            connection: connection_id(),
+            lanes: 4,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::receive_poll_group_messages(poll_group_id(), 16),
+        SteamworksNetworkingSocketsCommand::ReceivePollGroupMessages {
+            poll_group: poll_group_id(),
+            batch_size: 16,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::flush_messages(connection_id()),
+        SteamworksNetworkingSocketsCommand::FlushMessages {
+            connection: connection_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::set_connection_poll_group(
+            connection_id(),
+            poll_group_id(),
+        ),
+        SteamworksNetworkingSocketsCommand::SetConnectionPollGroup {
+            connection: connection_id(),
+            poll_group: poll_group_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::clear_connection_poll_group(connection_id()),
+        SteamworksNetworkingSocketsCommand::ClearConnectionPollGroup {
+            connection: connection_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::configure_connection_lanes(
+            connection_id(),
+            vec![0, 10],
+            vec![100, 20],
+        ),
+        SteamworksNetworkingSocketsCommand::ConfigureConnectionLanes {
+            connection: connection_id(),
+            lane_priorities: vec![0, 10],
+            lane_weights: vec![100, 20],
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::set_connection_user_data(connection_id(), 11),
+        SteamworksNetworkingSocketsCommand::SetConnectionUserData {
+            connection: connection_id(),
+            user_data: 11,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_listen_socket(listen_socket_id()),
+        SteamworksNetworkingSocketsCommand::CloseListenSocket {
+            listen_socket: listen_socket_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_poll_group(poll_group_id()),
+        SteamworksNetworkingSocketsCommand::ClosePollGroup {
+            poll_group: poll_group_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_connection(connection_id()),
+        SteamworksNetworkingSocketsCommand::CloseConnection {
+            connection: connection_id(),
+            reason: steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            debug: None,
+            enable_linger: false,
+        }
+    );
+}
+
+#[test]
+fn debug_redacts_message_payload_bytes() {
+    let peer = steamworks::networking_types::NetworkingIdentity::new_ip(localhost());
+    let command = SteamworksNetworkingSocketsCommand::send_message(
+        connection_id(),
+        steamworks::networking_types::SendFlags::RELIABLE,
+        vec![1, 2, 3],
+    );
+    let message = SteamworksNetworkingSocketsMessage {
+        connection: connection_id(),
+        peer: peer.clone(),
+        data: vec![4, 5, 6],
+        channel: 0,
+        send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+        message_number: 1,
+        connection_user_data: 0,
+    };
+    let poll_group_message = SteamworksNetworkingSocketsPollGroupMessage {
+        poll_group: poll_group_id(),
+        peer,
+        data: vec![7, 8, 9],
+        channel: 1,
+        send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
+        message_number: 2,
+        connection_user_data: 99,
+    };
+    let operation = SteamworksNetworkingSocketsOperation::MessagesReceived {
+        connection: connection_id(),
+        messages: vec![message.clone()],
+    };
+    let result = SteamworksNetworkingSocketsResult::Ok(
+        SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
+            poll_group: poll_group_id(),
+            messages: vec![poll_group_message.clone()],
+        },
+    );
+
+    let command_debug = format!("{command:?}");
+    let message_debug = format!("{message:?}");
+    let poll_group_debug = format!("{poll_group_message:?}");
+    let operation_debug = format!("{operation:?}");
+    let result_debug = format!("{result:?}");
+
+    assert!(command_debug.contains("data_len: 3"));
+    assert!(!command_debug.contains("[1, 2, 3]"));
+    assert!(message_debug.contains("data_len: 3"));
+    assert!(!message_debug.contains("[4, 5, 6]"));
+    assert!(poll_group_debug.contains("data_len: 3"));
+    assert!(!poll_group_debug.contains("[7, 8, 9]"));
+    assert!(operation_debug.contains("data_len: 3"));
+    assert!(!operation_debug.contains("[4, 5, 6]"));
+    assert!(result_debug.contains("data_len: 3"));
+    assert!(!result_debug.contains("[7, 8, 9]"));
+}
+
+#[test]
+fn state_records_operations_without_unbounded_message_history() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+    let endpoint = SteamworksNetworkingSocketsListenEndpoint::Ip(localhost());
+    let target = SteamworksNetworkingSocketsConnectionTarget::Ip(localhost());
+    let peer = steamworks::networking_types::NetworkingIdentity::new_ip(localhost());
+    let listen_event = SteamworksListenSocketEventInfo::ConnectionRejected {
+        listen_socket: listen_socket_id(),
+        remote: peer.clone(),
+        user_data: 17,
+    };
+    let connection_event = SteamworksNetworkingSocketsConnectionEventInfo {
+        connection: connection_id(),
+        new_state: steamworks::networking_types::NetworkingConnectionState::ClosedByPeer,
+        old_state: steamworks::networking_types::NetworkingConnectionState::Connecting,
+    };
+    let info = SteamworksNetworkingSocketsConnectionInfo {
+        connection: connection_id(),
+        state: steamworks::networking_types::NetworkingConnectionState::Connected,
+        remote: Some(peer.clone()),
+        user_data: 21,
+        end_reason: None,
+    };
+    let realtime_status = SteamworksNetworkingSocketsRealtimeStatus {
+        connection: connection_id(),
+        connection_state: steamworks::networking_types::NetworkingConnectionState::Connected,
+        ping: 42,
+        connection_quality_local: 0.95,
+        connection_quality_remote: 0.9,
+        out_packets_per_sec: 10.0,
+        out_bytes_per_sec: 1000.0,
+        in_packets_per_sec: 11.0,
+        in_bytes_per_sec: 1100.0,
+        send_rate_bytes_per_sec: 1200,
+        pending_unreliable: 1,
+        pending_reliable: 2,
+        sent_unacked_reliable: 3,
+        queued_send_bytes: 4,
+        lanes: vec![SteamworksNetworkingSocketsRealtimeLaneStatus {
+            pending_unreliable: 5,
+            pending_reliable: 6,
+            sent_unacked_reliable: 7,
+            queued_send_bytes: 8,
+        }],
+    };
+
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AuthenticationInitialized {
+            availability: Ok(steamworks::networking_types::NetworkingAvailability::Attempting),
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AuthenticationStatusRead {
+            availability: Ok(steamworks::networking_types::NetworkingAvailability::Current),
+        },
+    );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ListenSocketCreated {
+        listen_socket: listen_socket_id(),
+        endpoint: endpoint.clone(),
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionCreated {
+        connection: connection_id(),
+        target: target.clone(),
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::PollGroupCreated {
+        poll_group: poll_group_id(),
+    });
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ListenSocketEventsPolled {
+            listen_socket: listen_socket_id(),
+            events: vec![listen_event.clone()],
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionEventsPolled {
+            connection: connection_id(),
+            events: vec![connection_event.clone()],
+            connection_removed: true,
+        },
+    );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionInfoRead {
+        info: info.clone(),
+    });
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::RealtimeConnectionStatusRead {
+            status: realtime_status.clone(),
+        },
+    );
+    let first = SteamworksNetworkingSocketsMessage {
+        connection: connection_id(),
+        peer: peer.clone(),
+        data: vec![1],
+        channel: 0,
+        send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+        message_number: 1,
+        connection_user_data: 0,
+    };
+    let second = SteamworksNetworkingSocketsMessage {
+        data: vec![2, 3],
+        message_number: 2,
+        ..first.clone()
+    };
+
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesReceived {
+        connection: connection_id(),
+        messages: vec![first],
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesReceived {
+        connection: connection_id(),
+        messages: vec![second.clone()],
+    });
+    let poll_group_message = SteamworksNetworkingSocketsPollGroupMessage {
+        poll_group: poll_group_id(),
+        peer,
+        data: vec![9],
+        channel: 1,
+        send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
+        message_number: 4,
+        connection_user_data: 99,
+    };
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
+            poll_group: poll_group_id(),
+            messages: vec![poll_group_message.clone()],
+        },
+    );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessageSent {
+        connection: connection_id(),
+        message_number: 3,
+        bytes: 2,
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesFlushed {
+        connection: connection_id(),
+    });
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionPollGroupSet {
+            connection: connection_id(),
+            poll_group: poll_group_id(),
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionPollGroupCleared {
+            connection: connection_id(),
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionLanesConfigured {
+            connection: connection_id(),
+            lanes: 2,
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionUserDataSet {
+            connection: connection_id(),
+            user_data: 123,
+        },
+    );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionClosed {
+        connection: connection_id(),
+        close_succeeded: false,
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ListenSocketClosed {
+        listen_socket: listen_socket_id(),
+        closed_connections: vec![connection_id()],
+    });
+    state.record_operation(&SteamworksNetworkingSocketsOperation::PollGroupClosed {
+        poll_group: poll_group_id(),
+    });
+
+    assert_eq!(
+        state.last_authentication_status(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(
+        state.last_created_listen_socket(),
+        Some(&SteamworksNetworkingSocketsListenSocketCreated {
+            listen_socket: listen_socket_id(),
+            endpoint,
+        })
+    );
+    assert_eq!(
+        state.last_created_connection(),
+        Some(&SteamworksNetworkingSocketsConnectionCreated {
+            connection: connection_id(),
+            target,
+        })
+    );
+    assert_eq!(state.last_created_poll_group(), Some(poll_group_id()));
+    assert_eq!(
+        state.last_listen_socket_events(),
+        Some(&SteamworksNetworkingSocketsListenSocketEvents {
+            listen_socket: listen_socket_id(),
+            events: vec![listen_event],
+        })
+    );
+    assert_eq!(
+        state.last_connection_events(),
+        Some(&SteamworksNetworkingSocketsConnectionEvents {
+            connection: connection_id(),
+            events: vec![connection_event],
+            connection_removed: true,
+        })
+    );
+    assert_eq!(state.last_connection_info(), Some(&info));
+    assert_eq!(state.last_realtime_status(), Some(&realtime_status));
+    assert_eq!(state.received_count(), 3);
+    assert_eq!(state.sent_count(), 1);
+    assert_eq!(
+        state.last_sent_message(),
+        Some(&SteamworksNetworkingSocketsSentMessage {
+            connection: connection_id(),
+            message_number: 3,
+            bytes: 2,
+        })
+    );
+    assert_eq!(state.last_received_messages(), &[second]);
+    assert_eq!(state.last_poll_group_messages(), &[poll_group_message]);
+    assert_eq!(state.last_flushed_connection(), Some(connection_id()));
+    assert_eq!(
+        state.last_connection_poll_group_set(),
+        Some(&SteamworksNetworkingSocketsPollGroupAssignment {
+            connection: connection_id(),
+            poll_group: poll_group_id(),
+        })
+    );
+    assert_eq!(
+        state.last_connection_poll_group_cleared(),
+        Some(connection_id())
+    );
+    assert_eq!(
+        state.last_connection_lanes_configured(),
+        Some(&SteamworksNetworkingSocketsLaneConfiguration {
+            connection: connection_id(),
+            lanes: 2,
+        })
+    );
+    assert_eq!(
+        state.last_connection_user_data(),
+        Some(&SteamworksNetworkingSocketsConnectionUserData {
+            connection: connection_id(),
+            user_data: 123,
+        })
+    );
+    assert_eq!(
+        state.last_closed_connection(),
+        Some(&SteamworksNetworkingSocketsConnectionClosed {
+            connection: connection_id(),
+            close_succeeded: false,
+        })
+    );
+    assert_eq!(
+        state.last_closed_listen_socket(),
+        Some(&SteamworksNetworkingSocketsListenSocketClosed {
+            listen_socket: listen_socket_id(),
+            closed_connections: vec![connection_id()],
+        })
+    );
+    assert_eq!(state.last_closed_poll_group(), Some(poll_group_id()));
+}
+
+#[test]
+fn id_round_trips_raw_values() {
+    assert_eq!(SteamworksListenSocketId::from_raw(5).raw(), 5);
+    assert_eq!(
+        SteamworksNetworkingSocketsConnectionId::from_raw(6).raw(),
+        6
+    );
+    assert_eq!(SteamworksNetworkingSocketsPollGroupId::from_raw(8).raw(), 8);
+}
+
+#[test]
+fn handle_storage_starts_ids_at_one() {
+    let storage = SteamworksNetworkingSocketsHandleStorage::default();
+
+    assert_eq!(storage.next_listen_socket_id, 1);
+    assert_eq!(storage.next_connection_id, 1);
+    assert_eq!(storage.next_poll_group_id, 1);
+}
+
+#[test]
+fn connection_metadata_tracks_poll_group_membership() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+
+    storage.connection_metadata.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsConnectionMetadata::independent(),
+    );
+
+    storage.set_connection_poll_group(connection_id(), poll_group_id());
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&connection_id())
+            .and_then(|metadata| metadata.poll_group),
+        Some(poll_group_id())
+    );
+
+    storage.clear_connection_poll_group(connection_id());
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&connection_id())
+            .and_then(|metadata| metadata.poll_group),
+        None
+    );
+}
+
+#[test]
+fn poll_group_metadata_cleanup_clears_all_matching_connections() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+    let first = SteamworksNetworkingSocketsConnectionId::from_raw(1);
+    let second = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+    let other = SteamworksNetworkingSocketsConnectionId::from_raw(3);
+    let other_poll_group = SteamworksNetworkingSocketsPollGroupId::from_raw(10);
+
+    for connection in [first, second, other] {
+        storage.connection_metadata.insert(
+            connection,
+            SteamworksNetworkingSocketsConnectionMetadata::independent(),
+        );
+    }
+    storage.set_connection_poll_group(first, poll_group_id());
+    storage.set_connection_poll_group(second, poll_group_id());
+    storage.set_connection_poll_group(other, other_poll_group);
+
+    assert_eq!(storage.clear_poll_group_metadata(poll_group_id()), 2);
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&first)
+            .and_then(|metadata| metadata.poll_group),
+        None
+    );
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&second)
+            .and_then(|metadata| metadata.poll_group),
+        None
+    );
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&other)
+            .and_then(|metadata| metadata.poll_group),
+        Some(other_poll_group)
+    );
+}
+
+#[test]
+fn missing_poll_group_remove_does_not_clear_connection_metadata() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+
+    storage.connection_metadata.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsConnectionMetadata::independent(),
+    );
+    storage.set_connection_poll_group(connection_id(), poll_group_id());
+
+    assert!(storage.remove_poll_group(&poll_group_id()).is_none());
+    assert_eq!(
+        storage
+            .connection_metadata
+            .get(&connection_id())
+            .and_then(|metadata| metadata.poll_group),
+        Some(poll_group_id())
+    );
+}
+
+#[test]
+fn connection_metadata_matches_listen_socket_disconnects() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+    let remote = steamworks::networking_types::NetworkingIdentity::new_ip(localhost());
+    let end_reason = steamworks::networking_types::NetConnectionEnd::App(
+        steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+    );
+    let first = SteamworksNetworkingSocketsConnectionId::from_raw(1);
+    let second = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+
+    storage.connection_metadata.insert(
+        first,
+        SteamworksNetworkingSocketsConnectionMetadata::listen_socket(
+            listen_socket_id(),
+            remote.clone(),
+            10,
+        ),
+    );
+    storage.connection_metadata.insert(
+        second,
+        SteamworksNetworkingSocketsConnectionMetadata::listen_socket(
+            listen_socket_id(),
+            remote.clone(),
+            20,
+        ),
+    );
+
+    assert_eq!(
+        storage.remove_listen_connection_by_event(listen_socket_id(), &remote, 20, end_reason),
+        Some(second)
+    );
+    assert!(storage.connection_metadata.contains_key(&first));
+    assert!(!storage.connection_metadata.contains_key(&second));
+}
+
+#[test]
+fn duplicate_listen_socket_disconnect_metadata_is_not_removed_without_terminal_info() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+    let remote = steamworks::networking_types::NetworkingIdentity::new_ip(localhost());
+    let end_reason = steamworks::networking_types::NetConnectionEnd::App(
+        steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+    );
+    let first = SteamworksNetworkingSocketsConnectionId::from_raw(1);
+    let second = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+
+    for connection in [first, second] {
+        storage.connection_metadata.insert(
+            connection,
+            SteamworksNetworkingSocketsConnectionMetadata::listen_socket(
+                listen_socket_id(),
+                remote.clone(),
+                10,
+            ),
+        );
+    }
+
+    assert_eq!(
+        storage.remove_listen_connection_by_event(listen_socket_id(), &remote, 10, end_reason),
+        None
+    );
+    assert!(storage.connection_metadata.contains_key(&first));
+    assert!(storage.connection_metadata.contains_key(&second));
+}
+
+#[test]
+fn p2p_connect_constructor_accepts_steam_id() {
+    let command = SteamworksNetworkingSocketsCommand::connect_p2p_steam_id(
+        steamworks::SteamId::from_raw(123),
+        0,
+    );
+
+    let SteamworksNetworkingSocketsCommand::ConnectP2p {
+        identity,
+        remote_virtual_port,
+    } = command
+    else {
+        panic!("expected ConnectP2p command");
+    };
+
+    assert_eq!(identity.debug_string(), "steamid:123");
+    assert_eq!(remote_virtual_port, 0);
+}
+
+#[test]
+fn request_policy_default_rejects() {
+    assert!(matches!(
+        SteamworksConnectionRequestPolicy::default(),
+        SteamworksConnectionRequestPolicy::Reject { .. }
+    ));
+}
+
+#[test]
+fn socket_addr_from_str_is_tested_for_ipv6_coverage() {
+    assert!(SocketAddr::from_str("[::1]:27015").is_ok());
+}
