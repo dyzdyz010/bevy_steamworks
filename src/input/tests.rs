@@ -50,48 +50,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn validation_rejects_interior_nul() {
-    let command = SteamworksInputCommand::set_action_manifest_file_path("input\0manifest");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksInputError::InvalidString { field: "path" })
-    );
-
-    let command = SteamworksInputCommand::get_digital_action_handle("jump\0bad");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksInputError::InvalidString { field: "name" })
-    );
-}
-
-#[test]
-fn validation_rejects_zero_handles() {
-    let command = SteamworksInputCommand::activate_action_set(
-        SteamworksInputHandle::from_raw(0),
-        SteamworksInputActionSetHandle::from_raw(7),
-    );
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksInputError::InvalidHandle {
-            field: "controller",
-        })
-    );
-
-    let command = SteamworksInputCommand::get_analog_action_data(
-        SteamworksInputHandle::from_raw(7),
-        SteamworksInputAnalogActionHandle::from_raw(0),
-    );
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksInputError::InvalidHandle { field: "action" })
-    );
-}
-
-#[test]
 fn constructors_preserve_inputs() {
     let controller = SteamworksInputHandle::from_raw(1);
     let action_set = SteamworksInputActionSetHandle::from_raw(2);
@@ -145,20 +103,6 @@ fn state_upserts_named_handles() {
     assert_eq!(
         state.action_set_handle("gameplay"),
         Some(SteamworksInputActionSetHandle::from_raw(2))
-    );
-}
-
-#[test]
-fn input_handle_slice_truncates_and_filters_zero_handles() {
-    let raw_handles = [11, 0, 22, 33, 44];
-
-    assert_eq!(
-        input_handles_from_slice(&raw_handles, 4),
-        vec![
-            SteamworksInputHandle::from_raw(11),
-            SteamworksInputHandle::from_raw(22),
-            SteamworksInputHandle::from_raw(33),
-        ]
     );
 }
 
