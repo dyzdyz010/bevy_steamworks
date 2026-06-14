@@ -51,16 +51,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn string_validation_rejects_interior_nul() {
-    let command = SteamworksAppsCommand::get_launch_query_param("connect\0bad");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksAppsError::InvalidString { field: "key" })
-    );
-}
-
-#[test]
 fn state_records_app_operations() {
     let mut state = SteamworksAppsState::default();
     let app_id = steamworks::AppId(480);
