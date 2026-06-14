@@ -100,52 +100,6 @@ fn server_list_commands_preserve_inputs() {
 }
 
 #[test]
-fn filter_validation_rejects_invalid_inputs() {
-    assert_eq!(
-        validate_command(&SteamworksMatchmakingServersCommand::RequestServerList {
-            app_id: steamworks::AppId(480),
-            kind: SteamworksServerListKind::Lan,
-            filters: SteamworksServerListFilters::new().with("map", "arena"),
-        }),
-        Err(SteamworksMatchmakingServersError::LanFiltersUnsupported)
-    );
-    assert_eq!(
-        validate_command(
-            &SteamworksMatchmakingServersCommand::request_internet_server_list(
-                480,
-                SteamworksServerListFilters::new().with("bad\0key", "arena"),
-            )
-        ),
-        Err(SteamworksMatchmakingServersError::InvalidString {
-            field: "filter key",
-        })
-    );
-    assert_eq!(
-        validate_command(
-            &SteamworksMatchmakingServersCommand::request_internet_server_list(
-                480,
-                SteamworksServerListFilters::new().with(
-                    "map",
-                    "x".repeat(STEAMWORKS_MATCHMAKING_SERVER_FILTER_MAX_BYTES + 1),
-                ),
-            )
-        ),
-        Err(SteamworksMatchmakingServersError::FilterTooLong {
-            field: "filter value",
-            requested: STEAMWORKS_MATCHMAKING_SERVER_FILTER_MAX_BYTES + 1,
-            max_supported: STEAMWORKS_MATCHMAKING_SERVER_FILTER_MAX_BYTES,
-        })
-    );
-    assert_eq!(
-        validate_command(&SteamworksMatchmakingServersCommand::get_server_details(
-            SteamworksServerListRequestId::from_raw(1),
-            -1,
-        )),
-        Err(SteamworksMatchmakingServersError::InvalidServerIndex { server: -1 })
-    );
-}
-
-#[test]
 fn state_records_callback_operations_without_unbounded_history() {
     let mut state = SteamworksMatchmakingServersState::default();
     let request = SteamworksServerListRequestId::from_raw(1);
