@@ -72,12 +72,17 @@ App::new()
     .add_plugins(SteamworksPlugins::app_id(480).log_and_continue())
     .add_systems(Startup, |error: Option<Res<SteamworksUnavailable>>| {
         if let Some(error) = error {
-            warn!("Steamworks unavailable: {}", &*error);
+            warn!(
+                mode = ?error.init_mode(),
+                app_id = ?error.raw_app_id(),
+                error = %*error,
+                "Steamworks unavailable"
+            );
         }
     });
 ```
 
-In this mode the plugin writes a structured `tracing` error and inserts `SteamworksUnavailable`.
+In this mode the plugin writes a structured `tracing` error and inserts `SteamworksUnavailable`. The resource exposes `init_mode()`, `raw_app_id()`, and `init_error()` helpers for diagnostics and in-game fallback UI.
 
 ## Reading Typed Callbacks
 

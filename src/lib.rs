@@ -240,7 +240,16 @@ pub enum SteamworksInitMode {
 }
 
 impl SteamworksInitMode {
-    fn app_id(self) -> Option<u32> {
+    /// Returns the configured Steam app id, when this mode forces one.
+    pub fn app_id(self) -> Option<AppId> {
+        match self {
+            Self::Automatic | Self::Manual => None,
+            Self::AppId(app_id) => Some(app_id),
+        }
+    }
+
+    /// Returns the configured raw Steam app id, when this mode forces one.
+    pub fn raw_app_id(self) -> Option<u32> {
         match self {
             Self::Automatic | Self::Manual => None,
             Self::AppId(app_id) => Some(app_id.0),
@@ -282,6 +291,42 @@ pub enum SteamworksUnavailable {
 impl SteamworksUnavailable {
     fn init_failed(mode: SteamworksInitMode, source: SteamAPIInitError) -> Self {
         Self::InitFailed { mode, source }
+    }
+
+    /// Returns true when manual initialization was selected without inserting a client resource.
+    pub fn is_manual_client_missing(&self) -> bool {
+        matches!(self, Self::ManualClientMissing)
+    }
+
+    /// Returns true when an upstream Steamworks initialization call failed.
+    pub fn is_init_failed(&self) -> bool {
+        matches!(self, Self::InitFailed { .. })
+    }
+
+    /// Returns the initialization mode used for a failed Steamworks initialization call.
+    pub fn init_mode(&self) -> Option<SteamworksInitMode> {
+        match self {
+            Self::ManualClientMissing => None,
+            Self::InitFailed { mode, .. } => Some(*mode),
+        }
+    }
+
+    /// Returns the configured Steam app id for a failed initialization call, when one was forced.
+    pub fn app_id(&self) -> Option<AppId> {
+        self.init_mode().and_then(SteamworksInitMode::app_id)
+    }
+
+    /// Returns the configured raw Steam app id for a failed initialization call, when one was forced.
+    pub fn raw_app_id(&self) -> Option<u32> {
+        self.init_mode().and_then(SteamworksInitMode::raw_app_id)
+    }
+
+    /// Returns the upstream Steamworks initialization error, when initialization failed.
+    pub fn init_error(&self) -> Option<&SteamAPIInitError> {
+        match self {
+            Self::ManualClientMissing => None,
+            Self::InitFailed { source, .. } => Some(source),
+        }
     }
 }
 
@@ -669,7 +714,7 @@ impl SteamworksPlugin {
                 tracing::error!(
                     target: "bevy_steamworks",
                     init_mode = ?self.mode,
-                    app_id = ?self.mode.app_id(),
+                    app_id = ?self.mode.raw_app_id(),
                     error = %error,
                     "Steamworks unavailable"
                 );
@@ -714,7 +759,7 @@ impl Plugin for SteamworksPlugin {
                 tracing::info!(
                     target: "bevy_steamworks",
                     init_mode = ?self.mode,
-                    app_id = ?self.mode.app_id(),
+                    app_id = ?self.mode.raw_app_id(),
                     "Steamworks initialized"
                 );
                 app.insert_resource(SteamworksClient::new(client));
@@ -793,6 +838,13 @@ mod tests {
         app.add_plugins(SteamworksPlugin::manual().log_and_continue());
 
         assert!(app.world().contains_resource::<SteamworksUnavailable>());
+        let unavailable = app.world().resource::<SteamworksUnavailable>();
+        assert!(unavailable.is_manual_client_missing());
+        assert!(!unavailable.is_init_failed());
+        assert_eq!(unavailable.init_mode(), None);
+        assert_eq!(unavailable.app_id(), None);
+        assert_eq!(unavailable.raw_app_id(), None);
+        assert_eq!(unavailable.init_error(), None);
         assert!(app
             .world()
             .contains_resource::<SteamworksCallbackRegistry>());
@@ -815,5 +867,30 @@ mod tests {
 
         assert!(registry.is_empty());
         assert_eq!(registry.len(), 0);
+    }
+
+    #[test]
+    fn init_mode_and_unavailable_accessors_expose_structured_status() {
+        let app_id = AppId(480);
+        let mode = SteamworksInitMode::AppId(app_id);
+        let source = SteamAPIInitError::NoSteamClient("Steam is not running".to_string());
+        let unavailable = SteamworksUnavailable::InitFailed {
+            mode,
+            source: source.clone(),
+        };
+
+        assert_eq!(SteamworksInitMode::Automatic.app_id(), None);
+        assert_eq!(SteamworksInitMode::Automatic.raw_app_id(), None);
+        assert_eq!(SteamworksInitMode::Manual.app_id(), None);
+        assert_eq!(SteamworksInitMode::Manual.raw_app_id(), None);
+        assert_eq!(mode.app_id(), Some(app_id));
+        assert_eq!(mode.raw_app_id(), Some(480));
+
+        assert!(!unavailable.is_manual_client_missing());
+        assert!(unavailable.is_init_failed());
+        assert_eq!(unavailable.init_mode(), Some(mode));
+        assert_eq!(unavailable.app_id(), Some(app_id));
+        assert_eq!(unavailable.raw_app_id(), Some(480));
+        assert_eq!(unavailable.init_error(), Some(&source));
     }
 }

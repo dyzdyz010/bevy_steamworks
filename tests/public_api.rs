@@ -1,14 +1,15 @@
 use bevy_app::PluginGroup;
 use bevy_steamworks::{
     prelude::{
-        SteamworksAppsCommand as PreludeAppsCommand, SteamworksAppsError as PreludeAppsError,
-        SteamworksAppsOperation as PreludeAppsOperation, SteamworksAppsPlugin as PreludeAppsPlugin,
-        SteamworksAppsResult as PreludeAppsResult, SteamworksClientPlugins as PreludeClientPlugins,
+        SteamAPIInitError as PreludeInitError, SteamworksAppsCommand as PreludeAppsCommand,
+        SteamworksAppsError as PreludeAppsError, SteamworksAppsOperation as PreludeAppsOperation,
+        SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
+        SteamworksClientPlugins as PreludeClientPlugins,
         SteamworksFriendsCommand as PreludeFriendsCommand,
         SteamworksFriendsError as PreludeFriendsError,
         SteamworksFriendsOperation as PreludeFriendsOperation,
         SteamworksFriendsPlugin as PreludeFriendsPlugin,
-        SteamworksFriendsResult as PreludeFriendsResult,
+        SteamworksFriendsResult as PreludeFriendsResult, SteamworksInitMode as PreludeInitMode,
         SteamworksInputCommand as PreludeInputCommand, SteamworksInputError as PreludeInputError,
         SteamworksInputOperation as PreludeInputOperation,
         SteamworksInputPlugin as PreludeInputPlugin, SteamworksInputResult as PreludeInputResult,
@@ -80,17 +81,18 @@ use bevy_steamworks::{
         SteamworksTimelineResult as PreludeTimelineResult,
         SteamworksUgcCommand as PreludeUgcCommand, SteamworksUgcError as PreludeUgcError,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
-        SteamworksUgcResult as PreludeUgcResult, SteamworksUserCommand as PreludeUserCommand,
-        SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
-        SteamworksUserPlugin as PreludeUserPlugin, SteamworksUserResult as PreludeUserResult,
-        SteamworksUtilsCommand as PreludeUtilsCommand, SteamworksUtilsError as PreludeUtilsError,
+        SteamworksUgcResult as PreludeUgcResult, SteamworksUnavailable as PreludeUnavailable,
+        SteamworksUserCommand as PreludeUserCommand, SteamworksUserError as PreludeUserError,
+        SteamworksUserOperation as PreludeUserOperation, SteamworksUserPlugin as PreludeUserPlugin,
+        SteamworksUserResult as PreludeUserResult, SteamworksUtilsCommand as PreludeUtilsCommand,
+        SteamworksUtilsError as PreludeUtilsError,
         SteamworksUtilsOperation as PreludeUtilsOperation,
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
-    SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin,
-    SteamworksAppsResult, SteamworksClientPlugins, SteamworksFriendsCommand,
+    SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
+    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksClientPlugins, SteamworksFriendsCommand,
     SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
-    SteamworksFriendsResult, SteamworksInputCommand, SteamworksInputError,
+    SteamworksFriendsResult, SteamworksInitMode, SteamworksInputCommand, SteamworksInputError,
     SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
     SteamworksLobbyListFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
     SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
@@ -118,11 +120,49 @@ use bevy_steamworks::{
     SteamworksStatsPlugin, SteamworksStatsResult, SteamworksTimelineCommand,
     SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
     SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError,
-    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
-    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
-    SteamworksUtilsResult,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable,
+    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
+    SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
+    SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
+
+#[test]
+fn availability_status_api_is_exported_from_root_and_prelude() {
+    let mode = SteamworksInitMode::AppId(480.into());
+    let source = SteamAPIInitError::NoSteamClient("offline".into());
+    let unavailable = SteamworksUnavailable::InitFailed {
+        mode,
+        source: source.clone(),
+    };
+
+    assert_eq!(mode.raw_app_id(), Some(480));
+    assert_eq!(mode.app_id(), Some(480.into()));
+    assert!(unavailable.is_init_failed());
+    assert!(!unavailable.is_manual_client_missing());
+    assert_eq!(unavailable.init_mode(), Some(mode));
+    assert_eq!(unavailable.raw_app_id(), Some(480));
+    assert_eq!(unavailable.app_id(), Some(480.into()));
+    assert_eq!(unavailable.init_error(), Some(&source));
+
+    let mode = PreludeInitMode::AppId(480.into());
+    let source = PreludeInitError::NoSteamClient("offline".into());
+    let unavailable = PreludeUnavailable::InitFailed {
+        mode,
+        source: source.clone(),
+    };
+
+    assert_eq!(mode.raw_app_id(), Some(480));
+    assert_eq!(mode.app_id(), Some(480.into()));
+    assert!(unavailable.is_init_failed());
+    assert!(!unavailable.is_manual_client_missing());
+    assert_eq!(unavailable.init_mode(), Some(mode));
+    assert_eq!(unavailable.raw_app_id(), Some(480));
+    assert_eq!(unavailable.app_id(), Some(480.into()));
+    assert_eq!(unavailable.init_error(), Some(&source));
+
+    assert!(SteamworksUnavailable::ManualClientMissing.is_manual_client_missing());
+    assert!(PreludeUnavailable::ManualClientMissing.is_manual_client_missing());
+}
 
 #[test]
 fn client_plugin_bundle_api_is_exported_from_root_and_prelude() {

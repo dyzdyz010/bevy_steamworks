@@ -9,7 +9,12 @@ fn report_steam_status(
     if let Some(steam) = steam {
         println!("Steam user: {}", steam.friends().name());
     } else if let Some(unavailable) = unavailable {
-        eprintln!("Steamworks unavailable: {}", &*unavailable);
+        eprintln!(
+            "Steamworks unavailable (mode: {:?}, app id: {:?}): {}",
+            unavailable.init_mode(),
+            unavailable.raw_app_id(),
+            &*unavailable
+        );
     }
 }
 
