@@ -31,6 +31,11 @@ use bevy_steamworks::{
         SteamworksRemoteStorageOperation as PreludeRemoteStorageOperation,
         SteamworksRemoteStoragePlugin as PreludeRemoteStoragePlugin,
         SteamworksRemoteStorageResult as PreludeRemoteStorageResult,
+        SteamworksScreenshotsCommand as PreludeScreenshotsCommand,
+        SteamworksScreenshotsError as PreludeScreenshotsError,
+        SteamworksScreenshotsOperation as PreludeScreenshotsOperation,
+        SteamworksScreenshotsPlugin as PreludeScreenshotsPlugin,
+        SteamworksScreenshotsResult as PreludeScreenshotsResult,
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
@@ -50,9 +55,10 @@ use bevy_steamworks::{
     SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
     SteamworksNetworkingResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
     SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
-    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
-    SteamworksUserResult,
+    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerListFilters,
+    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
 };
 
 #[test]
@@ -370,6 +376,59 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
 
     accepts_prelude_exports(
         PreludeRemoteStoragePlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+}
+
+#[test]
+fn screenshots_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksScreenshotsPlugin,
+        _command: SteamworksScreenshotsCommand,
+        _operation: SteamworksScreenshotsOperation,
+        _result: SteamworksScreenshotsResult,
+        _error: SteamworksScreenshotsError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeScreenshotsPlugin,
+        _command: PreludeScreenshotsCommand,
+        _operation: PreludeScreenshotsOperation,
+        _result: PreludeScreenshotsResult,
+        _error: PreludeScreenshotsError,
+    ) {
+    }
+
+    let command = SteamworksScreenshotsCommand::hook_screenshots(true);
+    let operation = SteamworksScreenshotsOperation::ScreenshotsHookSet { hook: true };
+    let error = SteamworksScreenshotsError::ClientUnavailable;
+    let result = SteamworksScreenshotsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksScreenshotsPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeScreenshotsCommand::hook_screenshots(true);
+    let operation = PreludeScreenshotsOperation::ScreenshotsHookSet { hook: true };
+    let error = PreludeScreenshotsError::ClientUnavailable;
+    let result = PreludeScreenshotsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(
+        PreludeScreenshotsPlugin::new(),
         command,
         operation,
         result,
