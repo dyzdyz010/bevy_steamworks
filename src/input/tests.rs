@@ -1,4 +1,4 @@
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
 use super::*;
@@ -16,6 +16,20 @@ fn input_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksInputResult>>());
+}
+
+#[test]
+fn plugin_name_matches_input_type_path_for_bevy_tracking() {
+    let plugin = SteamworksInputPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksInputPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::input::SteamworksInputPlugin"
+    );
 }
 
 #[test]

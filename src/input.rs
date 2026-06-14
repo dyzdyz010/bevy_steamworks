@@ -5,20 +5,15 @@
 //! workflows while keeping raw Steamworks SDK binding types out of this crate's
 //! public contract.
 
-use bevy_app::{App, First, Plugin};
-use bevy_ecs::schedule::IntoScheduleConfigs;
-
-use crate::SteamworksSystem;
-
 mod commands;
 mod messages;
+mod plugin;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
 mod validation;
 
-use commands::process_input_commands;
 pub use messages::*;
 pub use state::SteamworksInputState;
 pub use types::*;
@@ -30,28 +25,3 @@ pub use types::*;
 /// its command processor in [`bevy_app::First`] after Steam callbacks.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksInputPlugin;
-
-impl SteamworksInputPlugin {
-    /// Creates a Steam Input plugin with default behavior.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Plugin for SteamworksInputPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SteamworksInputState>()
-            .add_message::<SteamworksInputCommand>()
-            .add_message::<SteamworksInputResult>()
-            .configure_sets(
-                First,
-                SteamworksSystem::ProcessInputCommands
-                    .after(SteamworksSystem::RunCallbacks)
-                    .before(bevy_ecs::message::MessageUpdateSystems),
-            )
-            .add_systems(
-                First,
-                process_input_commands.in_set(SteamworksSystem::ProcessInputCommands),
-            );
-    }
-}

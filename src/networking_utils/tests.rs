@@ -1,5 +1,7 @@
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
+
+use crate::SteamworksEvent;
 
 use super::*;
 
@@ -22,12 +24,27 @@ fn networking_utils_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<SteamworksNetworkingUtilsState>());
+    assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksNetworkingUtilsCommand>>());
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksNetworkingUtilsResult>>());
+}
+
+#[test]
+fn plugin_name_matches_networking_utils_type_path_for_bevy_tracking() {
+    let plugin = SteamworksNetworkingUtilsPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksNetworkingUtilsPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::networking_utils::SteamworksNetworkingUtilsPlugin"
+    );
 }
 
 #[test]

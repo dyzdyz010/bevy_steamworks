@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
 use super::*;
@@ -18,6 +18,20 @@ fn timeline_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksTimelineResult>>());
+}
+
+#[test]
+fn plugin_name_matches_timeline_type_path_for_bevy_tracking() {
+    let plugin = SteamworksTimelinePlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksTimelinePlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::timeline::SteamworksTimelinePlugin"
+    );
 }
 
 #[test]
