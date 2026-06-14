@@ -1,9 +1,12 @@
 use std::{net::Ipv4Addr, time::Duration};
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
-use super::*;
+use super::{
+    requests::{SteamworksMatchmakingServerListRequests, SteamworksMatchmakingServersAsyncResults},
+    *,
+};
 
 #[test]
 fn matchmaking_servers_plugin_registers_resources_and_messages() {
@@ -25,6 +28,20 @@ fn matchmaking_servers_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksMatchmakingServersResult>>());
+}
+
+#[test]
+fn plugin_name_matches_matchmaking_servers_type_path_for_bevy_tracking() {
+    let plugin = SteamworksMatchmakingServersPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksMatchmakingServersPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::matchmaking_servers::SteamworksMatchmakingServersPlugin"
+    );
 }
 
 #[test]
