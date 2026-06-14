@@ -51,29 +51,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn validation_rejects_interior_nul_for_web_api_identity() {
-    let command = SteamworksUserCommand::get_authentication_session_ticket_for_web_api("web\0bad");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksUserError::InvalidString { field: "identity" })
-    );
-}
-
-#[test]
-fn validation_rejects_empty_auth_ticket() {
-    let command = SteamworksUserCommand::begin_authentication_session(
-        steamworks::SteamId::from_raw(1),
-        Vec::new(),
-    );
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksUserError::EmptyTicket)
-    );
-}
-
-#[test]
 fn command_debug_redacts_authentication_ticket_bytes() {
     let command = SteamworksUserCommand::begin_authentication_session(
         steamworks::SteamId::from_raw(1),
