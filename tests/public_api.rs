@@ -1,10 +1,11 @@
-use bevy_app::PluginGroup;
+use bevy_app::{Plugin, PluginGroup};
 use bevy_steamworks::{
     prelude::{
         SteamAPIInitError as PreludeInitError, SteamworksAppsCommand as PreludeAppsCommand,
         SteamworksAppsError as PreludeAppsError, SteamworksAppsOperation as PreludeAppsOperation,
         SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
-        SteamworksClientPlugins as PreludeClientPlugins,
+        SteamworksCallbackRegistry as PreludeCallbackRegistry, SteamworksClient as PreludeClient,
+        SteamworksClientPlugins as PreludeClientPlugins, SteamworksEvent as PreludeEvent,
         SteamworksFriendsCommand as PreludeFriendsCommand,
         SteamworksFriendsError as PreludeFriendsError,
         SteamworksFriendsOperation as PreludeFriendsOperation,
@@ -46,7 +47,7 @@ use bevy_steamworks::{
         SteamworksNetworkingUtilsPlugin as PreludeNetworkingUtilsPlugin,
         SteamworksNetworkingUtilsResult as PreludeNetworkingUtilsResult,
         SteamworksNotificationPosition as PreludeNotificationPosition,
-        SteamworksPlugins as PreludePlugins,
+        SteamworksPlugin as PreludePlugin, SteamworksPlugins as PreludePlugins,
         SteamworksRemotePlayCommand as PreludeRemotePlayCommand,
         SteamworksRemotePlayError as PreludeRemotePlayError,
         SteamworksRemotePlayOperation as PreludeRemotePlayOperation,
@@ -73,7 +74,7 @@ use bevy_steamworks::{
         SteamworksStatsCommand as PreludeStatsCommand, SteamworksStatsError as PreludeStatsError,
         SteamworksStatsOperation as PreludeStatsOperation,
         SteamworksStatsPlugin as PreludeStatsPlugin, SteamworksStatsResult as PreludeStatsResult,
-        SteamworksTimelineCommand as PreludeTimelineCommand,
+        SteamworksSystem as PreludeSystem, SteamworksTimelineCommand as PreludeTimelineCommand,
         SteamworksTimelineError as PreludeTimelineError,
         SteamworksTimelineGameMode as PreludeTimelineGameMode,
         SteamworksTimelineOperation as PreludeTimelineOperation,
@@ -90,41 +91,83 @@ use bevy_steamworks::{
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
-    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksClientPlugins, SteamworksFriendsCommand,
-    SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
-    SteamworksFriendsResult, SteamworksInitMode, SteamworksInputCommand, SteamworksInputError,
-    SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
-    SteamworksLobbyListFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
-    SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
-    SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
-    SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
-    SteamworksMatchmakingServersResult, SteamworksNetworkingCommand, SteamworksNetworkingError,
-    SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesError,
-    SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
-    SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
-    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsPollGroupId,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
-    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
-    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksPlugins, SteamworksRemotePlayCommand,
-    SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
-    SteamworksRemotePlayResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
-    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
-    SteamworksServerError, SteamworksServerListFilters, SteamworksServerListKind,
-    SteamworksServerListRequestId, SteamworksServerOperation, SteamworksServerPlugin,
-    SteamworksServerResult, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-    SteamworksStatsPlugin, SteamworksStatsResult, SteamworksTimelineCommand,
-    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
-    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError,
-    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable,
-    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
-    SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
-    SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksCallbackRegistry, SteamworksClient,
+    SteamworksClientPlugins, SteamworksEvent, SteamworksFriendsCommand, SteamworksFriendsError,
+    SteamworksFriendsOperation, SteamworksFriendsPlugin, SteamworksFriendsResult,
+    SteamworksInitMode, SteamworksInputCommand, SteamworksInputError, SteamworksInputOperation,
+    SteamworksInputPlugin, SteamworksInputResult, SteamworksLobbyListFilter,
+    SteamworksMatchmakingCommand, SteamworksMatchmakingError, SteamworksMatchmakingOperation,
+    SteamworksMatchmakingPlugin, SteamworksMatchmakingResult, SteamworksMatchmakingServersCommand,
+    SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
+    SteamworksMatchmakingServersPlugin, SteamworksMatchmakingServersResult,
+    SteamworksNetworkingCommand, SteamworksNetworkingError, SteamworksNetworkingMessagesCommand,
+    SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
+    SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesResult,
+    SteamworksNetworkingOperation, SteamworksNetworkingPlugin, SteamworksNetworkingResult,
+    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsPlugin,
+    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
+    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerError,
+    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
+    SteamworksServerOperation, SteamworksServerPlugin, SteamworksServerResult,
+    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+    SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
+    SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
+
+#[test]
+fn core_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksPlugin,
+        _registry: SteamworksCallbackRegistry,
+        _system: SteamworksSystem,
+        _client: Option<&SteamworksClient>,
+        _event: Option<SteamworksEvent>,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludePlugin,
+        _registry: PreludeCallbackRegistry,
+        _system: PreludeSystem,
+        _client: Option<&PreludeClient>,
+        _event: Option<PreludeEvent>,
+    ) {
+    }
+
+    let plugin = SteamworksPlugin::manual().run_callbacks(false);
+    assert_eq!(plugin.name(), "bevy_steamworks::SteamworksPlugin");
+    accepts_root_exports(
+        plugin,
+        SteamworksCallbackRegistry::default(),
+        SteamworksSystem::RunCallbacks,
+        None,
+        None,
+    );
+
+    let plugin = PreludePlugin::manual().run_callbacks(false);
+    assert_eq!(plugin.name(), "bevy_steamworks::SteamworksPlugin");
+    accepts_prelude_exports(
+        plugin,
+        PreludeCallbackRegistry::default(),
+        PreludeSystem::RunCallbacks,
+        None,
+        None,
+    );
+}
 
 #[test]
 fn availability_status_api_is_exported_from_root_and_prelude() {
