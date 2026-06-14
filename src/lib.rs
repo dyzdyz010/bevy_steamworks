@@ -6,7 +6,7 @@
 //! The plugin initializes a Steamworks client, stores it as a Bevy resource,
 //! and pumps Steam callbacks every frame.
 
-use std::{ops::Deref, sync::Mutex};
+use std::sync::Mutex;
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
@@ -30,6 +30,7 @@ pub use steamworks::{
 };
 
 pub mod apps;
+mod client;
 mod events;
 pub mod friends;
 pub mod game_server;
@@ -51,6 +52,7 @@ pub mod user;
 pub mod user_stats;
 pub mod utils;
 pub use apps::*;
+pub use client::SteamworksClient;
 pub use events::SteamworksEvent;
 pub use friends::*;
 pub use game_server::*;
@@ -180,41 +182,6 @@ impl SteamworksUnavailable {
             Self::ManualClientMissing => None,
             Self::InitFailed { source, .. } => Some(source),
         }
-    }
-}
-
-/// A Bevy resource wrapping [`steamworks::Client`].
-#[derive(Clone, Resource)]
-pub struct SteamworksClient(steamworks::Client);
-
-impl SteamworksClient {
-    /// Creates a Bevy resource from an initialized Steamworks client.
-    pub fn new(client: steamworks::Client) -> Self {
-        Self(client)
-    }
-
-    /// Returns the underlying Steamworks client.
-    pub fn inner(&self) -> &steamworks::Client {
-        &self.0
-    }
-
-    /// Clones the underlying Steamworks client handle.
-    pub fn clone_inner(&self) -> steamworks::Client {
-        self.0.clone()
-    }
-}
-
-impl From<steamworks::Client> for SteamworksClient {
-    fn from(client: steamworks::Client) -> Self {
-        Self::new(client)
-    }
-}
-
-impl Deref for SteamworksClient {
-    type Target = steamworks::Client;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner()
     }
 }
 
