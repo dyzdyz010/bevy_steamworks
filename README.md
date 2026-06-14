@@ -586,6 +586,8 @@ Accepted listen-socket connections are tracked against their parent listen socke
 
 Poll group messages are returned as `SteamworksNetworkingSocketsPollGroupMessage`. The upstream safe wrapper does not expose the raw connection handle carried by those messages, so the poll-group snapshot includes Steam's `connection_user_data` instead of a plugin connection ID. If you need to map poll-group messages back to game state, set unique connection user data through `SteamworksNetworkingSocketsCommand::set_connection_user_data`.
 
+`SteamworksNetworkingSocketsState` caches bounded snapshots for the latest created and closed handles, polled event batches, connection info, realtime status, sent message context, received message batches, flushes, poll-group assignments, lane configuration, and user-data updates. It keeps only the most recent received message batches; message and command `Debug` output reports payload lengths instead of raw bytes so tracing does not dump packet contents.
+
 ```rust,no_run
 # use std::net::{Ipv4Addr, SocketAddr};
 # use bevy::prelude::*;
