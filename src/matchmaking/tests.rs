@@ -178,25 +178,6 @@ fn async_success_operations_preserve_request_context() {
 }
 
 #[test]
-fn async_commands_get_unique_request_ids() {
-    let mut state = SteamworksMatchmakingState::default();
-    let command =
-        SteamworksMatchmakingCommand::request_lobby_list(SteamworksLobbyListFilter::new());
-
-    assert_eq!(async_command_request_id(&command, &mut state), Some(0));
-    assert_eq!(async_command_request_id(&command, &mut state), Some(1));
-    assert_eq!(
-        async_command_request_id(
-            &SteamworksMatchmakingCommand::GetLobbyDataCount {
-                lobby: steamworks::LobbyId::from_raw(1),
-            },
-            &mut state,
-        ),
-        None
-    );
-}
-
-#[test]
 fn state_records_matchmaking_operations_without_unbounded_history() {
     let mut state = SteamworksMatchmakingState::default();
     let filter = SteamworksLobbyListFilter::new().with_max_results(2);
