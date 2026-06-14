@@ -75,9 +75,9 @@ pub mod prelude {
         SteamworksAppsResult, SteamworksAppsState, SteamworksAuthSessionError,
         SteamworksAuthSessionTicketResponse, SteamworksAuthSessionValidateError,
         SteamworksAuthTicketValidation, SteamworksAvatar, SteamworksAvatarSize,
-        SteamworksCallbackRegistry, SteamworksClient, SteamworksConnectionRequestPolicy,
-        SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo, SteamworksEvent,
-        SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
+        SteamworksCallbackRegistry, SteamworksClient, SteamworksClientPlugins,
+        SteamworksConnectionRequestPolicy, SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo,
+        SteamworksEvent, SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
         SteamworksFriendAvatar, SteamworksFriendGameInfo, SteamworksFriendInfo,
         SteamworksFriendRichPresenceValue, SteamworksFriendsCommand, SteamworksFriendsError,
         SteamworksFriendsOperation, SteamworksFriendsPlugin, SteamworksFriendsResult,
@@ -550,6 +550,47 @@ impl SteamworksCallbackRegistry {
     }
 }
 
+/// Installs every default client-side high-level Steamworks feature plugin.
+///
+/// This is a convenience plugin for games that want the Bevy message/resource
+/// wrappers for apps, friends, input, lobbies, networking, screenshots, Steam
+/// Cloud, stats, timeline, UGC, user, and utility APIs.
+///
+/// It does not initialize Steamworks and it does not install the dedicated game
+/// server plugin. Add [`SteamworksPlugin`] separately for the client lifecycle,
+/// and add [`SteamworksServerPlugin`] separately for dedicated server builds.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SteamworksClientPlugins;
+
+impl SteamworksClientPlugins {
+    /// Creates the default client-side feature plugin collection.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Plugin for SteamworksClientPlugins {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(SteamworksAppsPlugin::new());
+        app.add_plugins(SteamworksFriendsPlugin::new());
+        app.add_plugins(SteamworksInputPlugin::new());
+        app.add_plugins(SteamworksMatchmakingPlugin::new());
+        app.add_plugins(SteamworksMatchmakingServersPlugin::new());
+        app.add_plugins(SteamworksNetworkingPlugin::new());
+        app.add_plugins(SteamworksNetworkingMessagesPlugin::new());
+        app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
+        app.add_plugins(SteamworksNetworkingUtilsPlugin::new());
+        app.add_plugins(SteamworksRemotePlayPlugin::new());
+        app.add_plugins(SteamworksRemoteStoragePlugin::new());
+        app.add_plugins(SteamworksScreenshotsPlugin::new());
+        app.add_plugins(SteamworksStatsPlugin::new());
+        app.add_plugins(SteamworksTimelinePlugin::new());
+        app.add_plugins(SteamworksUgcPlugin::new());
+        app.add_plugins(SteamworksUserPlugin::new());
+        app.add_plugins(SteamworksUtilsPlugin::new());
+    }
+}
+
 /// A Bevy plugin that integrates Steamworks into an app.
 pub struct SteamworksPlugin {
     mode: SteamworksInitMode,
@@ -781,6 +822,7 @@ fn run_steam_callbacks(
 #[cfg(test)]
 mod tests {
     use bevy_app::App;
+    use bevy_ecs::message::Messages;
 
     use super::*;
 
@@ -813,5 +855,158 @@ mod tests {
 
         assert!(registry.is_empty());
         assert_eq!(registry.len(), 0);
+    }
+
+    #[test]
+    fn client_plugins_register_default_feature_resources_and_messages() {
+        let mut app = App::new();
+
+        app.add_plugins(SteamworksClientPlugins::new());
+
+        assert!(app.world().contains_resource::<SteamworksAppsState>());
+        assert!(app.world().contains_resource::<SteamworksFriendsState>());
+        assert!(app.world().contains_resource::<SteamworksInputState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksMatchmakingState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksMatchmakingServersState>());
+        assert!(app.world().contains_resource::<SteamworksNetworkingState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksNetworkingMessagesState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksNetworkingSocketsState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksNetworkingUtilsState>());
+        assert!(app.world().contains_resource::<SteamworksRemotePlayState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksRemoteStorageState>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksScreenshotsState>());
+        assert!(app.world().contains_resource::<SteamworksStatsState>());
+        assert!(app.world().contains_resource::<SteamworksTimelineState>());
+        assert!(app.world().contains_resource::<SteamworksUgcState>());
+        assert!(app.world().contains_resource::<SteamworksUserState>());
+        assert!(app.world().contains_resource::<SteamworksUtilsState>());
+
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksAppsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksFriendsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksInputCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksMatchmakingCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksMatchmakingServersCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingMessagesCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingSocketsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingUtilsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksRemotePlayCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksRemoteStorageCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksScreenshotsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksStatsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksTimelineCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUgcCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUserCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUtilsCommand>>());
+
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksAppsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksFriendsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksInputResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksMatchmakingResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksMatchmakingServersResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingMessagesResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingSocketsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingUtilsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksRemotePlayResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksRemoteStorageResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksScreenshotsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksStatsResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksTimelineResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUgcResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUserResult>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksUtilsResult>>());
+
+        assert!(!app.world().contains_resource::<SteamworksClient>());
+        assert!(!app.world().contains_resource::<SteamworksUnavailable>());
+        assert!(!app.world().contains_resource::<SteamworksServer>());
+        assert!(!app
+            .world()
+            .contains_resource::<SteamworksServerUnavailable>());
+
+        app.update();
     }
 }
