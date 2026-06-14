@@ -5,7 +5,7 @@
 //! Server callbacks into the shared [`crate::SteamworksEvent`] stream, and
 //! mirrors relevant callback confirmations into [`SteamworksServerResult`].
 
-use std::{cell::RefCell, net::Ipv4Addr, ops::Deref, sync::Mutex};
+use std::{net::Ipv4Addr, ops::Deref, sync::Mutex};
 
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
@@ -15,20 +15,21 @@ use bevy_ecs::{
 };
 use thiserror::Error;
 
-use crate::{
-    user::{
-        SteamworksAuthSessionTicketResponse, SteamworksAuthTicketValidation,
-        SteamworksSteamServerConnectionEvent,
-    },
-    SteamworksEvent, SteamworksFailurePolicy, SteamworksSystem,
-};
+use crate::{SteamworksEvent, SteamworksFailurePolicy, SteamworksSystem};
 
+mod callbacks;
 mod messages;
+mod packets;
 mod registry;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
+mod validation;
+
+use callbacks::{process_server_steam_events, run_steam_server_callbacks};
+use packets::drain_outgoing_packets;
+use validation::{validate_server_command_for_state, validate_server_config};
 
 pub use messages::*;
 pub use registry::SteamworksServerCallbackRegistry;
@@ -389,92 +390,6 @@ fn process_server_commands(
     }
 }
 
-fn process_server_steam_events(
-    state: &mut SteamworksServerState,
-    steam_events: &mut MessageReader<SteamworksEvent>,
-    results: &mut MessageWriter<SteamworksServerResult>,
-) {
-    for event in steam_events.read() {
-        let operation = match event {
-            SteamworksEvent::AuthSessionTicketResponse(event) => {
-                SteamworksServerOperation::AuthenticationSessionTicketResponse {
-                    response: SteamworksAuthSessionTicketResponse {
-                        ticket: event.ticket,
-                        result: event.result,
-                    },
-                }
-            }
-            SteamworksEvent::ValidateAuthTicketResponse(event) => {
-                SteamworksServerOperation::AuthenticationTicketValidationReceived {
-                    validation: SteamworksAuthTicketValidation {
-                        steam_id: event.steam_id,
-                        owner_steam_id: event.owner_steam_id,
-                        response: event.response.clone().map_err(Into::into),
-                    },
-                }
-            }
-            SteamworksEvent::SteamServersConnected(_) => {
-                SteamworksServerOperation::SteamServerConnectionEventReceived {
-                    event: SteamworksSteamServerConnectionEvent::Connected,
-                }
-            }
-            SteamworksEvent::SteamServersDisconnected(event) => {
-                SteamworksServerOperation::SteamServerConnectionEventReceived {
-                    event: SteamworksSteamServerConnectionEvent::Disconnected {
-                        reason: event.reason,
-                    },
-                }
-            }
-            SteamworksEvent::SteamServerConnectFailure(event) => {
-                SteamworksServerOperation::SteamServerConnectionEventReceived {
-                    event: SteamworksSteamServerConnectionEvent::ConnectFailure {
-                        reason: event.reason,
-                        still_retrying: event.still_retrying,
-                    },
-                }
-            }
-            SteamworksEvent::GSClientApprove(event) => SteamworksServerOperation::ClientApproved {
-                approval: SteamworksServerClientApproval {
-                    user: event.user,
-                    owner: event.owner,
-                },
-            },
-            SteamworksEvent::GSClientDeny(event) => SteamworksServerOperation::ClientDenied {
-                denial: SteamworksServerClientDenial {
-                    user: event.user,
-                    deny_reason: event.deny_reason,
-                    optional_text: event.optional_text.clone(),
-                },
-            },
-            SteamworksEvent::GSClientKick(event) => SteamworksServerOperation::ClientKicked {
-                kick: SteamworksServerClientKick {
-                    user: event.user,
-                    deny_reason: event.deny_reason,
-                },
-            },
-            SteamworksEvent::GSClientGroupStatus(event) => {
-                SteamworksServerOperation::ClientGroupStatusReceived {
-                    status: SteamworksServerClientGroupStatus {
-                        user: event.user,
-                        group: event.group,
-                        member: event.member,
-                        officer: event.officer,
-                    },
-                }
-            }
-            _ => continue,
-        };
-
-        state.record_operation(&operation);
-        tracing::debug!(
-            target: "bevy_steamworks",
-            operation = ?operation,
-            "processed Steam Game Server callback"
-        );
-        results.write(SteamworksServerResult::Ok(operation));
-    }
-}
-
 fn handle_server_command(
     server: &SteamworksServer,
     state: &SteamworksServerState,
@@ -603,144 +518,4 @@ fn handle_server_command(
             }
         }
     })
-}
-
-fn drain_outgoing_packets(server: &SteamworksServer) -> Vec<SteamworksServerOutgoingPacket> {
-    let mut buffer = vec![0; STEAMWORKS_SERVER_QUERY_PACKET_BUFFER_BYTES];
-    let packets = RefCell::new(Vec::new());
-
-    server.get_next_outgoing_packet(&mut buffer, |addr, data| {
-        packets.borrow_mut().push(SteamworksServerOutgoingPacket {
-            addr,
-            data: data.to_vec(),
-        });
-    });
-
-    packets.into_inner()
-}
-
-fn run_steam_server_callbacks(
-    server: Option<Res<SteamworksServer>>,
-    mut output: MessageWriter<SteamworksEvent>,
-) {
-    let Some(server) = server else {
-        return;
-    };
-
-    server.process_callbacks(|callback| {
-        output.write(SteamworksEvent::from(callback));
-    });
-}
-
-fn validate_server_command(command: &SteamworksServerCommand) -> Result<(), SteamworksServerError> {
-    match command {
-        SteamworksServerCommand::BeginAuthenticationSession { ticket, .. } => {
-            if ticket.is_empty() {
-                Err(SteamworksServerError::EmptyTicket)
-            } else {
-                Ok(())
-            }
-        }
-        SteamworksServerCommand::SetProduct { product } => {
-            validate_steam_string("product", product)
-        }
-        SteamworksServerCommand::SetGameDescription { description } => {
-            validate_steam_string("description", description)
-        }
-        SteamworksServerCommand::SetGameData { data } => validate_steam_string("data", data),
-        SteamworksServerCommand::LogOn { token } => {
-            if token.as_str().is_empty() {
-                Err(SteamworksServerError::EmptyLogonToken)
-            } else {
-                validate_steam_string("token", token.as_str())
-            }
-        }
-        SteamworksServerCommand::SetModDir { mod_dir } => validate_steam_string("mod_dir", mod_dir),
-        SteamworksServerCommand::SetMapName { map_name } => {
-            validate_steam_string("map_name", map_name)
-        }
-        SteamworksServerCommand::SetServerName { server_name } => {
-            validate_steam_string("server_name", server_name)
-        }
-        SteamworksServerCommand::SetGameTags { tags } => {
-            validate_steam_string("tags", tags)?;
-            if tags.is_empty() || tags.len() >= 128 {
-                Err(SteamworksServerError::InvalidGameTags)
-            } else {
-                Ok(())
-            }
-        }
-        SteamworksServerCommand::SetKeyValue { key, value } => {
-            validate_steam_string("key", key)?;
-            validate_steam_string("value", value)
-        }
-        SteamworksServerCommand::SetMaxPlayers { count } => {
-            validate_non_negative_count("count", *count)
-        }
-        SteamworksServerCommand::SetBotPlayerCount { count } => {
-            validate_non_negative_count("count", *count)
-        }
-        _ => Ok(()),
-    }
-}
-
-fn validate_server_command_for_state(
-    command: &SteamworksServerCommand,
-    state: &SteamworksServerState,
-) -> Result<(), SteamworksServerError> {
-    validate_server_command(command)?;
-
-    if state.logon_submitted() {
-        if matches!(
-            command,
-            SteamworksServerCommand::LogOnAnonymous | SteamworksServerCommand::LogOn { .. }
-        ) {
-            return Err(SteamworksServerError::LogonAlreadySubmitted);
-        }
-
-        if let Some(command_name) = pre_logon_only_command_name(command) {
-            return Err(SteamworksServerError::command_requires_pre_logon(
-                command_name,
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn pre_logon_only_command_name(command: &SteamworksServerCommand) -> Option<&'static str> {
-    match command {
-        SteamworksServerCommand::SetProduct { .. } => Some("SetProduct"),
-        SteamworksServerCommand::SetGameDescription { .. } => Some("SetGameDescription"),
-        _ => None,
-    }
-}
-
-fn validate_server_config(
-    config: &SteamworksServerConfig,
-) -> Result<(), SteamworksServerUnavailable> {
-    if config.version.as_bytes().contains(&0) {
-        Err(SteamworksServerUnavailable::invalid_string("version"))
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_steam_string(field: &'static str, value: &str) -> Result<(), SteamworksServerError> {
-    if value.as_bytes().contains(&0) {
-        Err(SteamworksServerError::invalid_string(field))
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_non_negative_count(
-    field: &'static str,
-    value: i32,
-) -> Result<(), SteamworksServerError> {
-    if value < 0 {
-        Err(SteamworksServerError::invalid_count(field, value))
-    } else {
-        Ok(())
-    }
 }

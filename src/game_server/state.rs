@@ -1,5 +1,10 @@
 use bevy_ecs::prelude::Resource;
 
+use crate::user::{
+    SteamworksAuthSessionTicketResponse, SteamworksAuthTicketValidation,
+    SteamworksSteamServerConnectionEvent,
+};
+
 use super::*;
 
 /// Runtime state for [`crate::SteamworksServerPlugin`].
