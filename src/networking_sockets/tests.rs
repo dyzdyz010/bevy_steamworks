@@ -3,10 +3,25 @@ use std::{
     str::FromStr,
 };
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
+use super::handles::SteamworksNetworkingSocketsHandles;
 use super::*;
+
+#[test]
+fn plugin_name_matches_networking_sockets_type_path_for_bevy_tracking() {
+    let plugin = SteamworksNetworkingSocketsPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksNetworkingSocketsPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::networking_sockets::SteamworksNetworkingSocketsPlugin"
+    );
+}
 
 fn connection_id() -> SteamworksNetworkingSocketsConnectionId {
     SteamworksNetworkingSocketsConnectionId::from_raw(42)

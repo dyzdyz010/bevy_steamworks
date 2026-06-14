@@ -6,11 +6,6 @@
 //! stable integer IDs, owned snapshots, and command/result messages to game
 //! systems.
 
-use bevy_app::{App, First, Plugin};
-use bevy_ecs::schedule::IntoScheduleConfigs;
-
-use crate::SteamworksSystem;
-
 /// Maximum number of socket/listen events processed by one poll command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND: usize = 256;
 
@@ -43,44 +38,16 @@ pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES: usize = 1_048_576;
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksNetworkingSocketsPlugin;
 
-impl SteamworksNetworkingSocketsPlugin {
-    /// Creates a Networking Sockets plugin with default behavior.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Plugin for SteamworksNetworkingSocketsPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SteamworksNetworkingSocketsState>()
-            .init_resource::<SteamworksNetworkingSocketsHandles>()
-            .add_message::<SteamworksNetworkingSocketsCommand>()
-            .add_message::<SteamworksNetworkingSocketsResult>()
-            .configure_sets(
-                First,
-                SteamworksSystem::ProcessNetworkingSocketsCommands
-                    .after(SteamworksSystem::RunCallbacks)
-                    .before(bevy_ecs::message::MessageUpdateSystems),
-            )
-            .add_systems(
-                First,
-                process_networking_sockets_commands
-                    .in_set(SteamworksSystem::ProcessNetworkingSocketsCommands),
-            );
-    }
-}
-
 mod commands;
 mod handles;
 mod messages;
+mod plugin;
 mod polling;
 mod snapshots;
 mod state;
 mod types;
 mod validation;
 
-use commands::process_networking_sockets_commands;
-use handles::SteamworksNetworkingSocketsHandles;
 #[cfg(test)]
 use handles::{
     SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleStorage,
