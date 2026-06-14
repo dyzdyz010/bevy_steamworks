@@ -28,7 +28,9 @@ pub const STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND: usize = 256;
 
 mod achievements;
 mod async_results;
+mod callbacks;
 mod leaderboards;
+mod lifecycle;
 mod messages;
 mod snapshots;
 mod state;
@@ -40,11 +42,13 @@ mod validation;
 #[cfg(test)]
 use achievements::achievement_icon_from_rgba;
 use achievements::{
-    achievement_icon_fetched_operation, list_achievement_global_percentages,
-    list_achievement_infos, list_achievement_names, read_achievement_icon,
+    list_achievement_global_percentages, list_achievement_infos, list_achievement_names,
+    read_achievement_icon,
 };
 use async_results::SteamworksStatsAsyncResults;
+use callbacks::process_stats_steam_events;
 use leaderboards::SteamworksStatsLeaderboardHandles;
+use lifecycle::{request_current_user_stats, should_submit_store};
 use snapshots::{
     snapshot_leaderboard_entry, snapshot_leaderboard_info, snapshot_leaderboard_score_uploaded,
 };
@@ -196,82 +200,6 @@ fn process_stats_commands(
                 });
             }
         }
-    }
-}
-
-fn should_submit_store(settings: &SteamworksStatsSettings, state: &SteamworksStatsState) -> bool {
-    state.pending_store && (settings.auto_store || state.force_store)
-}
-
-fn request_current_user_stats(
-    client: &SteamworksClient,
-    state: &mut SteamworksStatsState,
-    results: &mut MessageWriter<SteamworksStatsResult>,
-) {
-    let steam_id = client.user().steam_id();
-    client.user_stats().request_user_stats(steam_id.raw());
-    state.current_user_stats_requested = true;
-    results.write(SteamworksStatsResult::Ok(
-        SteamworksStatsOperation::CurrentUserStatsRequested { steam_id },
-    ));
-    tracing::debug!(
-        target: "bevy_steamworks",
-        steam_id = steam_id.raw(),
-        "requested Steamworks stats for current user"
-    );
-}
-
-fn process_stats_steam_events(
-    client: Option<&SteamworksClient>,
-    state: &mut SteamworksStatsState,
-    steam_events: &mut MessageReader<SteamworksEvent>,
-    results: &mut MessageWriter<SteamworksStatsResult>,
-) {
-    for event in steam_events.read() {
-        let operation = match event {
-            SteamworksEvent::UserStatsReceived(event) => {
-                SteamworksStatsOperation::UserStatsReceived {
-                    callback: SteamworksUserStatsReceived {
-                        steam_id: event.steam_id,
-                        game_id: event.game_id,
-                        result: event.result,
-                    },
-                }
-            }
-            SteamworksEvent::UserStatsStored(event) => SteamworksStatsOperation::UserStatsStored {
-                callback: SteamworksUserStatsStored {
-                    game_id: event.game_id,
-                    result: event.result,
-                },
-            },
-            SteamworksEvent::UserAchievementStored(event) => {
-                SteamworksStatsOperation::UserAchievementStored {
-                    callback: SteamworksUserAchievementStored {
-                        game_id: event.game_id,
-                        achievement_name: event.achievement_name.clone(),
-                        current_progress: event.current_progress,
-                        max_progress: event.max_progress,
-                    },
-                }
-            }
-            SteamworksEvent::UserAchievementIconFetched(event) => {
-                let icon = client
-                    .map(|client| {
-                        read_achievement_icon(&client.user_stats(), &event.achievement_name)
-                    })
-                    .unwrap_or(SteamworksAchievementIconStatus::PendingOrUnavailable);
-                achievement_icon_fetched_operation(event, icon)
-            }
-            _ => continue,
-        };
-
-        state.record_operation(&operation);
-        tracing::debug!(
-            target: "bevy_steamworks",
-            operation = ?operation,
-            "processed Steamworks stats callback"
-        );
-        results.write(SteamworksStatsResult::Ok(operation));
     }
 }
 

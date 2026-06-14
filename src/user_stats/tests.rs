@@ -1,6 +1,8 @@
 use bevy_app::App;
 use bevy_ecs::message::Messages;
 
+use super::achievements::achievement_icon_fetched_operation;
+use super::lifecycle::should_submit_store;
 use super::*;
 
 #[test]
