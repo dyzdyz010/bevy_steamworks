@@ -13,12 +13,17 @@ use bevy_steamworks::{
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
+        SteamworksUserCommand as PreludeUserCommand, SteamworksUserError as PreludeUserError,
+        SteamworksUserOperation as PreludeUserOperation, SteamworksUserPlugin as PreludeUserPlugin,
+        SteamworksUserResult as PreludeUserResult,
     },
     SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
     SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksMatchmakingServersCommand,
     SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
     SteamworksMatchmakingServersPlugin, SteamworksMatchmakingServersResult,
     SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
+    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
+    SteamworksUserResult,
 };
 
 #[test]
@@ -76,6 +81,53 @@ fn friends_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+}
+
+#[test]
+fn user_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksUserPlugin,
+        _command: SteamworksUserCommand,
+        _operation: SteamworksUserOperation,
+        _result: SteamworksUserResult,
+        _error: SteamworksUserError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeUserPlugin,
+        _command: PreludeUserCommand,
+        _operation: PreludeUserOperation,
+        _result: PreludeUserResult,
+        _error: PreludeUserError,
+    ) {
+    }
+
+    let command = SteamworksUserCommand::GetLevel;
+    let operation = SteamworksUserOperation::LevelRead { level: 1 };
+    let error = SteamworksUserError::ClientUnavailable;
+    let result = SteamworksUserResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksUserPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeUserCommand::GetLevel;
+    let operation = PreludeUserOperation::LevelRead { level: 1 };
+    let error = PreludeUserError::ClientUnavailable;
+    let result = PreludeUserResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(PreludeUserPlugin::new(), command, operation, result, error);
 }
 
 #[test]
