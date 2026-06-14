@@ -1009,6 +1009,78 @@ fn stats_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    let _root_settings: bevy_steamworks::SteamworksStatsSettings =
+        bevy_steamworks::SteamworksStatsSettings::default();
+    let _root_state: bevy_steamworks::SteamworksStatsState =
+        bevy_steamworks::SteamworksStatsState::default();
+    let _root_leaderboard: bevy_steamworks::SteamworksLeaderboardId =
+        bevy_steamworks::SteamworksLeaderboardId::from_raw(1);
+    let _root_achievement: Option<bevy_steamworks::SteamworksAchievementInfo> = None;
+    let _root_achievement_icon: Option<bevy_steamworks::SteamworksAchievementIcon> = None;
+    let _root_achievement_icon_status: bevy_steamworks::SteamworksAchievementIconStatus =
+        bevy_steamworks::SteamworksAchievementIconStatus::PendingOrUnavailable;
+    let _root_achievement_percentage: Option<
+        bevy_steamworks::SteamworksAchievementGlobalPercentage,
+    > = None;
+    let _root_achievement_attribute: Option<
+        bevy_steamworks::SteamworksAchievementDisplayAttribute,
+    > = None;
+    let _root_global_stat: Option<bevy_steamworks::SteamworksGlobalStatValue<i64>> = None;
+    let _root_global_stat_history: Option<bevy_steamworks::SteamworksGlobalStatHistory<i64>> = None;
+    let _root_leaderboard_info: Option<bevy_steamworks::SteamworksLeaderboardInfo> = None;
+    let _root_leaderboard_entry: Option<bevy_steamworks::SteamworksLeaderboardEntry> = None;
+    let _root_leaderboard_score_upload: Option<
+        bevy_steamworks::SteamworksLeaderboardScoreUploaded,
+    > = None;
+
+    let _prelude_settings: bevy_steamworks::prelude::SteamworksStatsSettings =
+        bevy_steamworks::prelude::SteamworksStatsSettings::default();
+    let _prelude_state: bevy_steamworks::prelude::SteamworksStatsState =
+        bevy_steamworks::prelude::SteamworksStatsState::default();
+    let _prelude_leaderboard: bevy_steamworks::prelude::SteamworksLeaderboardId =
+        bevy_steamworks::prelude::SteamworksLeaderboardId::from_raw(1);
+    let _prelude_achievement: Option<bevy_steamworks::prelude::SteamworksAchievementInfo> = None;
+    let _prelude_achievement_icon: Option<bevy_steamworks::prelude::SteamworksAchievementIcon> =
+        None;
+    let _prelude_achievement_icon_status:
+        bevy_steamworks::prelude::SteamworksAchievementIconStatus =
+        bevy_steamworks::prelude::SteamworksAchievementIconStatus::PendingOrUnavailable;
+    let _prelude_achievement_percentage: Option<
+        bevy_steamworks::prelude::SteamworksAchievementGlobalPercentage,
+    > = None;
+    let _prelude_achievement_attribute: Option<
+        bevy_steamworks::prelude::SteamworksAchievementDisplayAttribute,
+    > = None;
+    let _prelude_global_stat: Option<bevy_steamworks::prelude::SteamworksGlobalStatValue<i64>> =
+        None;
+    let _prelude_global_stat_history: Option<
+        bevy_steamworks::prelude::SteamworksGlobalStatHistory<i64>,
+    > = None;
+    let _prelude_leaderboard_info: Option<bevy_steamworks::prelude::SteamworksLeaderboardInfo> =
+        None;
+    let _prelude_leaderboard_entry: Option<bevy_steamworks::prelude::SteamworksLeaderboardEntry> =
+        None;
+    let _prelude_leaderboard_score_upload: Option<
+        bevy_steamworks::prelude::SteamworksLeaderboardScoreUploaded,
+    > = None;
+
+    assert_eq!(
+        bevy_steamworks::STEAMWORKS_LEADERBOARD_MAX_DETAILS,
+        bevy_steamworks::prelude::STEAMWORKS_LEADERBOARD_MAX_DETAILS,
+    );
+    assert_eq!(
+        bevy_steamworks::STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
+        bevy_steamworks::prelude::STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
+    );
+    assert_eq!(
+        bevy_steamworks::STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+        bevy_steamworks::prelude::STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
+    );
+    assert_eq!(
+        bevy_steamworks::STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
+        bevy_steamworks::prelude::STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
+    );
+
     let command = SteamworksStatsCommand::RequestCurrentUserStats;
     let operation = SteamworksStatsOperation::GlobalAchievementPercentagesRequested;
     let error = SteamworksStatsError::ClientUnavailable;
