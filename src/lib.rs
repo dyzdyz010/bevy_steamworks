@@ -41,6 +41,7 @@ pub mod networking_messages;
 pub mod networking_sockets;
 pub mod networking_utils;
 mod plugin_groups;
+mod registry;
 pub mod remote_play;
 pub mod remote_storage;
 pub mod screenshots;
@@ -61,6 +62,7 @@ pub use networking_messages::*;
 pub use networking_sockets::*;
 pub use networking_utils::*;
 pub use plugin_groups::{SteamworksClientPlugins, SteamworksPlugins};
+pub use registry::SteamworksCallbackRegistry;
 pub use remote_play::*;
 pub use remote_storage::*;
 pub use screenshots::*;
@@ -213,38 +215,6 @@ impl Deref for SteamworksClient {
 
     fn deref(&self) -> &Self::Target {
         self.inner()
-    }
-}
-
-/// Stores Steamworks callback handles so callbacks stay registered.
-#[derive(Default, Resource)]
-pub struct SteamworksCallbackRegistry {
-    handles: Vec<CallbackHandle>,
-}
-
-impl SteamworksCallbackRegistry {
-    /// Registers a typed Steamworks callback and stores its handle.
-    pub fn register<C, F>(&mut self, client: &SteamworksClient, callback: F)
-    where
-        C: Callback,
-        F: FnMut(C) + Send + 'static,
-    {
-        self.handles.push(client.register_callback(callback));
-    }
-
-    /// Drops every registered callback handle.
-    pub fn clear(&mut self) {
-        self.handles.clear();
-    }
-
-    /// Number of callback handles currently held.
-    pub fn len(&self) -> usize {
-        self.handles.len()
-    }
-
-    /// Returns true when no callback handles are held.
-    pub fn is_empty(&self) -> bool {
-        self.handles.is_empty()
     }
 }
 
@@ -510,14 +480,6 @@ mod tests {
         let mut app = App::new();
 
         app.add_plugins(SteamworksPlugin::manual());
-    }
-
-    #[test]
-    fn callback_registry_tracks_handles() {
-        let registry = SteamworksCallbackRegistry::default();
-
-        assert!(registry.is_empty());
-        assert_eq!(registry.len(), 0);
     }
 
     #[test]
