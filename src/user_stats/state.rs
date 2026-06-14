@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::Resource;
 
+use super::leaderboards::SteamworksStatsLeaderboardHandles;
 use super::{
     SteamworksAchievementDisplayAttribute, SteamworksAchievementGlobalPercentage,
     SteamworksAchievementIcon, SteamworksAchievementInfo, SteamworksGlobalStatHistory,
@@ -8,9 +9,8 @@ use super::{
     SteamworksLeaderboardFindOrCreateRequest, SteamworksLeaderboardFindOrCreateResult,
     SteamworksLeaderboardFindRequest, SteamworksLeaderboardFindResult, SteamworksLeaderboardId,
     SteamworksLeaderboardInfo, SteamworksLeaderboardScoreUploadRequest,
-    SteamworksLeaderboardScoreUploadResult, SteamworksStatsError,
-    SteamworksStatsLeaderboardHandles, SteamworksStatsOperation, SteamworksUserAchievementStored,
-    SteamworksUserStatsReceived, SteamworksUserStatsStored,
+    SteamworksLeaderboardScoreUploadResult, SteamworksStatsError, SteamworksStatsOperation,
+    SteamworksUserAchievementStored, SteamworksUserStatsReceived, SteamworksUserStatsStored,
 };
 
 /// Settings used by [`crate::SteamworksStatsPlugin`].

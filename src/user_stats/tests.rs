@@ -1,9 +1,26 @@
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
+use crate::SteamworksEvent;
+
 use super::achievements::achievement_icon_fetched_operation;
+use super::leaderboards::SteamworksStatsLeaderboardHandles;
 use super::lifecycle::should_submit_store;
 use super::*;
+
+#[test]
+fn plugin_name_matches_stats_type_path_for_bevy_tracking() {
+    let plugin = SteamworksStatsPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksStatsPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::user_stats::SteamworksStatsPlugin"
+    );
+}
 
 #[test]
 fn stats_plugin_registers_resources_and_messages() {
