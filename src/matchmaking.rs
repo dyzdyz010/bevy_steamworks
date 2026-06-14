@@ -4,22 +4,29 @@
 //! It keeps async Steam call results and lobby callbacks flowing through Bevy
 //! messages, while avoiding blocking work in the frame loop.
 
-use std::sync::{Arc, Mutex};
-
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     message::{MessageReader, MessageWriter, Messages},
-    prelude::{Res, ResMut, Resource},
+    prelude::{Res, ResMut},
     schedule::IntoScheduleConfigs,
 };
 
 use crate::{SteamworksClient, SteamworksEvent, SteamworksSystem};
 
+mod async_results;
+mod callbacks;
+mod filters;
 mod messages;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
+mod validation;
+
+use async_results::SteamworksMatchmakingAsyncResults;
+use callbacks::process_matchmaking_steam_events;
+use filters::apply_lobby_list_filter;
+use validation::validate_command;
 
 pub use messages::*;
 pub use state::SteamworksMatchmakingState;
@@ -62,28 +69,6 @@ impl Plugin for SteamworksMatchmakingPlugin {
                 First,
                 process_matchmaking_commands.in_set(SteamworksSystem::ProcessMatchmakingCommands),
             );
-    }
-}
-
-#[derive(Clone, Debug, Default, Resource)]
-struct SteamworksMatchmakingAsyncResults {
-    queue: Arc<Mutex<Vec<SteamworksMatchmakingResult>>>,
-}
-
-impl SteamworksMatchmakingAsyncResults {
-    fn push(&self, result: SteamworksMatchmakingResult) {
-        self.queue
-            .lock()
-            .expect("Steamworks matchmaking async result mutex was poisoned")
-            .push(result);
-    }
-
-    fn drain(&self) -> Vec<SteamworksMatchmakingResult> {
-        self.queue
-            .lock()
-            .expect("Steamworks matchmaking async result mutex was poisoned")
-            .drain(..)
-            .collect()
     }
 }
 
@@ -137,77 +122,6 @@ fn process_matchmaking_commands(
                 results.write(SteamworksMatchmakingResult::Err { command, error });
             }
         }
-    }
-}
-
-fn process_matchmaking_steam_events(
-    state: &mut SteamworksMatchmakingState,
-    steam_events: &mut MessageReader<SteamworksEvent>,
-    results: &mut MessageWriter<SteamworksMatchmakingResult>,
-) {
-    for event in steam_events.read() {
-        let operation = match event {
-            SteamworksEvent::LobbyCreated(event) => {
-                SteamworksMatchmakingOperation::LobbyCreateCallbackReceived {
-                    callback: SteamworksLobbyCreatedCallback {
-                        result: event.result,
-                        lobby: event.lobby,
-                    },
-                }
-            }
-            SteamworksEvent::LobbyEnter(event) => {
-                SteamworksMatchmakingOperation::LobbyEnterCallbackReceived {
-                    callback: SteamworksLobbyEnterCallback {
-                        lobby: event.lobby,
-                        chat_permissions: event.chat_permissions,
-                        blocked: event.blocked,
-                        chat_room_enter_response: event.chat_room_enter_response,
-                    },
-                }
-            }
-            SteamworksEvent::LobbyChatMsg(event) => {
-                SteamworksMatchmakingOperation::LobbyChatMessageReceived {
-                    message: snapshot_lobby_chat_message(event),
-                }
-            }
-            SteamworksEvent::LobbyChatUpdate(event) => {
-                SteamworksMatchmakingOperation::LobbyChatUpdateReceived {
-                    update: SteamworksLobbyChatUpdate {
-                        lobby: event.lobby,
-                        user_changed: event.user_changed,
-                        making_change: event.making_change,
-                        member_state_change: event.member_state_change.clone(),
-                    },
-                }
-            }
-            SteamworksEvent::LobbyDataUpdate(event) => {
-                SteamworksMatchmakingOperation::LobbyDataUpdateReceived {
-                    update: SteamworksLobbyDataUpdate {
-                        lobby: event.lobby,
-                        member: event.member,
-                        success: event.success,
-                    },
-                }
-            }
-            _ => continue,
-        };
-
-        state.record_operation(&operation);
-        tracing::debug!(
-            target: "bevy_steamworks",
-            operation = ?operation,
-            "processed Steamworks matchmaking callback"
-        );
-        results.write(SteamworksMatchmakingResult::Ok(operation));
-    }
-}
-
-fn snapshot_lobby_chat_message(event: &steamworks::LobbyChatMsg) -> SteamworksLobbyChatMessage {
-    SteamworksLobbyChatMessage {
-        lobby: event.lobby,
-        user: event.user,
-        chat_entry_type: event.chat_entry_type,
-        chat_id: event.chat_id,
     }
 }
 
@@ -468,139 +382,5 @@ fn handle_matchmaking_command(
                 .map(|(address, steam_id)| SteamworksLobbyGameServer { address, steam_id });
             Ok(SteamworksMatchmakingOperation::LobbyGameServerRead { lobby, server })
         }
-    }
-}
-
-fn apply_lobby_list_filter(
-    matchmaking: &steamworks::Matchmaking,
-    filter: &SteamworksLobbyListFilter,
-) -> Result<(), SteamworksMatchmakingError> {
-    for item in &filter.string {
-        let key = lobby_key(&item.key)?;
-        matchmaking.add_request_lobby_list_string_filter(steamworks::StringFilter(
-            key,
-            &item.value,
-            item.comparison,
-        ));
-    }
-
-    for item in &filter.number {
-        let key = lobby_key(&item.key)?;
-        matchmaking.add_request_lobby_list_numerical_filter(steamworks::NumberFilter(
-            key,
-            item.value,
-            item.comparison,
-        ));
-    }
-
-    for item in &filter.near_value {
-        let key = lobby_key(&item.key)?;
-        matchmaking
-            .add_request_lobby_list_near_value_filter(steamworks::NearFilter(key, item.value));
-    }
-
-    if let Some(open_slots) = filter.open_slots {
-        matchmaking.set_request_lobby_list_slots_available_filter(open_slots);
-    }
-    if let Some(distance) = filter.distance {
-        matchmaking.set_request_lobby_list_distance_filter(distance);
-    }
-    if let Some(max_results) = filter.max_results {
-        matchmaking.set_request_lobby_list_result_count_filter(max_results);
-    }
-
-    Ok(())
-}
-
-fn lobby_key(key: &str) -> Result<steamworks::LobbyKey<'_>, SteamworksMatchmakingError> {
-    steamworks::LobbyKey::try_new(key)
-        .map_err(|_| SteamworksMatchmakingError::lobby_key_too_long(key))
-}
-
-fn validate_command(
-    command: &SteamworksMatchmakingCommand,
-) -> Result<(), SteamworksMatchmakingError> {
-    match command {
-        SteamworksMatchmakingCommand::RequestLobbyList { filter } => validate_filter(filter),
-        SteamworksMatchmakingCommand::CreateLobby { max_members, .. } => {
-            if *max_members > MAX_LOBBY_MEMBERS {
-                Err(SteamworksMatchmakingError::MaxLobbyMembersExceeded {
-                    requested: *max_members,
-                    max_supported: MAX_LOBBY_MEMBERS,
-                })
-            } else {
-                Ok(())
-            }
-        }
-        SteamworksMatchmakingCommand::GetLobbyData { key, .. }
-        | SteamworksMatchmakingCommand::DeleteLobbyData { key, .. } => validate_lobby_key(key),
-        SteamworksMatchmakingCommand::SetLobbyData { key, value, .. }
-        | SteamworksMatchmakingCommand::SetLobbyMemberData { key, value, .. } => {
-            validate_lobby_key(key)?;
-            validate_steam_string("value", value)
-        }
-        SteamworksMatchmakingCommand::GetLobbyMemberData { key, .. } => validate_lobby_key(key),
-        SteamworksMatchmakingCommand::SendLobbyChatMessage { data, .. } => {
-            validate_lobby_chat_message(data.len())
-        }
-        SteamworksMatchmakingCommand::GetLobbyChatEntry { max_bytes, .. } => {
-            validate_lobby_chat_message(*max_bytes)
-        }
-        _ => Ok(()),
-    }
-}
-
-fn validate_filter(filter: &SteamworksLobbyListFilter) -> Result<(), SteamworksMatchmakingError> {
-    for item in &filter.string {
-        validate_lobby_key(&item.key)?;
-        validate_steam_string("value", &item.value)?;
-    }
-    for item in &filter.number {
-        validate_lobby_key(&item.key)?;
-    }
-    for item in &filter.near_value {
-        validate_lobby_key(&item.key)?;
-    }
-    if let Some(max_results) = filter.max_results {
-        validate_lobby_list_result_count(max_results)?;
-    }
-    Ok(())
-}
-
-fn validate_lobby_key(key: &str) -> Result<(), SteamworksMatchmakingError> {
-    validate_steam_string("key", key)?;
-    lobby_key(key).map(|_| ())
-}
-
-fn validate_steam_string(
-    field: &'static str,
-    value: &str,
-) -> Result<(), SteamworksMatchmakingError> {
-    if value.as_bytes().contains(&0) {
-        Err(SteamworksMatchmakingError::invalid_string(field))
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_lobby_chat_message(len: usize) -> Result<(), SteamworksMatchmakingError> {
-    if len == 0 || len > MAX_LOBBY_CHAT_MESSAGE_BYTES {
-        Err(SteamworksMatchmakingError::InvalidChatMessageLength {
-            requested: len,
-            max_supported: MAX_LOBBY_CHAT_MESSAGE_BYTES,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_lobby_list_result_count(count: u64) -> Result<(), SteamworksMatchmakingError> {
-    if count > MAX_LOBBY_LIST_RESULTS {
-        Err(SteamworksMatchmakingError::MaxLobbyListResultsExceeded {
-            requested: count,
-            max_supported: MAX_LOBBY_LIST_RESULTS,
-        })
-    } else {
-        Ok(())
     }
 }

@@ -1,6 +1,7 @@
 use bevy_app::App;
 use bevy_ecs::message::Messages;
 
+use super::validation::{validate_command, validate_filter};
 use super::*;
 
 #[test]
