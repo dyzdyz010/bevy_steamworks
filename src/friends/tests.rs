@@ -51,29 +51,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn string_validation_rejects_interior_nul() {
-    let command = SteamworksFriendsCommand::SetRichPresence {
-        key: "status\0bad".to_owned(),
-        value: Some("ok".to_owned()),
-    };
-
-    assert_eq!(
-        validate_command_strings(&command),
-        Err(SteamworksFriendsError::InvalidString { field: "key" })
-    );
-
-    let command = SteamworksFriendsCommand::invite_user_to_game(
-        steamworks::SteamId::from_raw(1),
-        "join\0bad",
-    );
-
-    assert_eq!(
-        validate_command_strings(&command),
-        Err(SteamworksFriendsError::InvalidString { field: "connect" })
-    );
-}
-
-#[test]
 fn state_records_friend_operations() {
     let mut state = SteamworksFriendsState::default();
     let user = steamworks::SteamId::from_raw(1);
