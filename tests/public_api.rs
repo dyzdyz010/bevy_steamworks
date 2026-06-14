@@ -485,6 +485,24 @@ fn networking_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    fn accepts_usize(_value: usize) {}
+
+    accepts_usize(bevy_steamworks::STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES);
+    accepts_usize(bevy_steamworks::STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES);
+    accepts_usize(bevy_steamworks::STEAMWORKS_P2P_MAX_READ_PACKET_BYTES);
+    accepts_usize(bevy_steamworks::prelude::STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES);
+    accepts_usize(bevy_steamworks::prelude::STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES);
+    accepts_usize(bevy_steamworks::prelude::STEAMWORKS_P2P_MAX_READ_PACKET_BYTES);
+
+    assert_eq!(
+        bevy_steamworks::STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
+        bevy_steamworks::STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES
+    );
+    assert_eq!(
+        bevy_steamworks::prelude::STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
+        bevy_steamworks::prelude::STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES
+    );
+
     let command = SteamworksNetworkingCommand::get_available_packet_size(0);
     let operation = SteamworksNetworkingOperation::PacketRead {
         channel: 0,

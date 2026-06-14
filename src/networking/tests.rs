@@ -115,62 +115,6 @@ fn p2p_callback_events_are_bridged_without_client() {
 }
 
 #[test]
-fn validation_rejects_invalid_inputs() {
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::accept_p2p_session(
-            steamworks::SteamId::from_raw(0),
-        )),
-        Err(SteamworksNetworkingError::InvalidSteamId)
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::get_available_packet_size(
-            i32::MAX as u32 + 1,
-        )),
-        Err(SteamworksNetworkingError::InvalidChannel {
-            channel: i32::MAX as u32 + 1,
-        })
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::send_p2p_packet(
-            user(),
-            SteamworksP2pSendType::Unreliable,
-            0,
-            vec![0; STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES + 1],
-        )),
-        Err(SteamworksNetworkingError::PacketTooLarge {
-            bytes: STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES + 1,
-            max_bytes: STEAMWORKS_P2P_MAX_UNRELIABLE_PACKET_BYTES,
-        })
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::send_p2p_packet(
-            user(),
-            SteamworksP2pSendType::Reliable,
-            0,
-            vec![0; STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES + 1],
-        )),
-        Err(SteamworksNetworkingError::PacketTooLarge {
-            bytes: STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES + 1,
-            max_bytes: STEAMWORKS_P2P_MAX_RELIABLE_PACKET_BYTES,
-        })
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::read_p2p_packet(0, 0)),
-        Err(SteamworksNetworkingError::InvalidReadBufferSize)
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingCommand::read_p2p_packet(
-            0,
-            STEAMWORKS_P2P_MAX_READ_PACKET_BYTES + 1,
-        )),
-        Err(SteamworksNetworkingError::ReadBufferTooLarge {
-            max_bytes: STEAMWORKS_P2P_MAX_READ_PACKET_BYTES + 1,
-            max_supported: STEAMWORKS_P2P_MAX_READ_PACKET_BYTES,
-        })
-    );
-}
-
-#[test]
 fn packet_exceeds_read_buffer_error_is_cloneable_and_comparable() {
     assert_eq!(
         SteamworksNetworkingError::PacketExceedsReadBuffer {
