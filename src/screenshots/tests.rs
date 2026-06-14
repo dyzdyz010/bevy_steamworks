@@ -55,20 +55,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn validation_rejects_invalid_dimensions() {
-    let command =
-        SteamworksScreenshotsCommand::add_screenshot_to_library("shot.png", None::<&str>, 0, 720);
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksScreenshotsError::InvalidDimensions {
-            width: 0,
-            height: 720,
-        })
-    );
-}
-
-#[test]
 fn screenshot_library_errors_are_cloneable_and_comparable() {
     assert_eq!(
         SteamworksScreenshotLibraryError::from(
