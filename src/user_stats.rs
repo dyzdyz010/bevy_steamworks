@@ -4,15 +4,10 @@
 //! Games can keep using the raw Steamworks API through [`SteamworksClient`],
 //! while this plugin provides a message-driven layer for common Bevy workflows.
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     message::{MessageReader, MessageWriter, Messages},
-    prelude::{Res, ResMut, Resource},
+    prelude::{Res, ResMut},
     schedule::IntoScheduleConfigs,
     system::SystemParam,
 };
@@ -31,114 +26,33 @@ pub const STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND: usize = 64;
 /// Maximum achievement catalog items accepted by one command.
 pub const STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND: usize = 256;
 
+mod achievements;
+mod async_results;
+mod leaderboards;
 mod messages;
+mod snapshots;
 mod state;
+#[cfg(test)]
+mod tests;
 mod types;
+mod validation;
+
+#[cfg(test)]
+use achievements::achievement_icon_from_rgba;
+use achievements::{
+    achievement_icon_fetched_operation, list_achievement_global_percentages,
+    list_achievement_infos, list_achievement_names, read_achievement_icon,
+};
+use async_results::SteamworksStatsAsyncResults;
+use leaderboards::SteamworksStatsLeaderboardHandles;
+use snapshots::{
+    snapshot_leaderboard_entry, snapshot_leaderboard_info, snapshot_leaderboard_score_uploaded,
+};
+use validation::{operation_requires_store, validate_stats_command};
 
 pub use messages::*;
 pub use state::{SteamworksStatsSettings, SteamworksStatsState};
 pub use types::*;
-
-#[derive(Clone, Debug, Default, Resource)]
-struct SteamworksStatsAsyncResults {
-    queue: Arc<Mutex<Vec<SteamworksStatsResult>>>,
-}
-
-impl SteamworksStatsAsyncResults {
-    fn push(&self, result: SteamworksStatsResult) {
-        self.queue
-            .lock()
-            .expect("Steamworks stats async result mutex was poisoned")
-            .push(result);
-    }
-
-    fn drain(&self) -> Vec<SteamworksStatsResult> {
-        self.queue
-            .lock()
-            .expect("Steamworks stats async result mutex was poisoned")
-            .drain(..)
-            .collect()
-    }
-}
-
-#[derive(Clone, Debug, Default, Resource)]
-struct SteamworksStatsLeaderboardHandles {
-    storage: Arc<Mutex<SteamworksStatsLeaderboardHandleStorage>>,
-}
-
-impl SteamworksStatsLeaderboardHandles {
-    fn insert(&self, leaderboard: steamworks::Leaderboard) -> SteamworksLeaderboardId {
-        self.storage
-            .lock()
-            .expect("Steamworks leaderboard handle storage mutex was poisoned")
-            .insert(leaderboard)
-    }
-
-    fn get(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
-        self.storage
-            .lock()
-            .expect("Steamworks leaderboard handle storage mutex was poisoned")
-            .get(id)
-    }
-
-    fn remove(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
-        self.storage
-            .lock()
-            .expect("Steamworks leaderboard handle storage mutex was poisoned")
-            .remove(id)
-    }
-
-    fn len(&self) -> usize {
-        self.storage
-            .lock()
-            .expect("Steamworks leaderboard handle storage mutex was poisoned")
-            .len()
-    }
-}
-
-#[derive(Debug)]
-struct SteamworksStatsLeaderboardHandleStorage {
-    next_id: u64,
-    handles: HashMap<SteamworksLeaderboardId, steamworks::Leaderboard>,
-}
-
-impl Default for SteamworksStatsLeaderboardHandleStorage {
-    fn default() -> Self {
-        Self {
-            next_id: 1,
-            handles: HashMap::default(),
-        }
-    }
-}
-
-impl SteamworksStatsLeaderboardHandleStorage {
-    fn insert(&mut self, leaderboard: steamworks::Leaderboard) -> SteamworksLeaderboardId {
-        if let Some((id, _)) = self
-            .handles
-            .iter()
-            .find(|(_, known)| known.raw() == leaderboard.raw())
-        {
-            return *id;
-        }
-
-        let id = SteamworksLeaderboardId::from_raw(self.next_id);
-        self.next_id = self.next_id.saturating_add(1).max(1);
-        self.handles.insert(id, leaderboard);
-        id
-    }
-
-    fn get(&self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
-        self.handles.get(&id).cloned()
-    }
-
-    fn remove(&mut self, id: SteamworksLeaderboardId) -> Option<steamworks::Leaderboard> {
-        self.handles.remove(&id)
-    }
-
-    fn len(&self) -> usize {
-        self.handles.len()
-    }
-}
 
 /// Bevy plugin for high-level Steam user stats and achievements commands.
 ///
@@ -809,309 +723,3 @@ fn handle_stats_command(
         }
     }
 }
-
-fn operation_requires_store(operation: &SteamworksStatsOperation) -> bool {
-    matches!(
-        operation,
-        SteamworksStatsOperation::StatI32Set { .. }
-            | SteamworksStatsOperation::StatF32Set { .. }
-            | SteamworksStatsOperation::AchievementUnlocked { .. }
-            | SteamworksStatsOperation::AchievementCleared { .. }
-    )
-}
-
-fn list_achievement_names(
-    stats: &steamworks::UserStats,
-    offset: usize,
-    limit: usize,
-) -> Result<(usize, Vec<String>), SteamworksStatsError> {
-    let names = read_all_achievement_names(stats)?;
-    let total = names.len();
-    let page = names.into_iter().skip(offset).take(limit).collect();
-
-    Ok((total, page))
-}
-
-fn read_all_achievement_names(
-    stats: &steamworks::UserStats,
-) -> Result<Vec<String>, SteamworksStatsError> {
-    stats
-        .get_num_achievements()
-        .map_err(|()| SteamworksStatsError::operation_failed("user_stats.get_num_achievements"))?;
-
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        stats.get_achievement_names()
-    }))
-    .map_err(|_| SteamworksStatsError::operation_failed("user_stats.get_achievement_names"))?
-    .ok_or_else(|| SteamworksStatsError::operation_failed("user_stats.get_achievement_names"))
-}
-
-fn list_achievement_infos(
-    stats: &steamworks::UserStats,
-    include_display_attributes: bool,
-    include_unlock_state: bool,
-    offset: usize,
-    limit: usize,
-) -> Result<(usize, Vec<SteamworksAchievementInfo>), SteamworksStatsError> {
-    let (total, names) = list_achievement_names(stats, offset, limit)?;
-    let achievements = names
-        .into_iter()
-        .map(|api_name| {
-            let mut info = SteamworksAchievementInfo {
-                api_name,
-                ..Default::default()
-            };
-
-            if include_display_attributes {
-                info.display_name = achievement_display_attribute(stats, &info.api_name, "name")?;
-                info.description = achievement_display_attribute(stats, &info.api_name, "desc")?;
-                info.hidden = achievement_display_attribute(stats, &info.api_name, "hidden")?
-                    .map(|value| value != "0");
-            }
-            if include_unlock_state {
-                let (achieved, unlock_time) = stats
-                    .achievement(&info.api_name)
-                    .get_achievement_and_unlock_time()
-                    .map_err(|()| {
-                        SteamworksStatsError::operation_failed(
-                            "achievement.get_achievement_and_unlock_time",
-                        )
-                    })?;
-                info.achieved = Some(achieved);
-                info.unlock_time = Some(unlock_time);
-            }
-
-            Ok(info)
-        })
-        .collect::<Result<Vec<_>, SteamworksStatsError>>()?;
-
-    Ok((total, achievements))
-}
-
-fn list_achievement_global_percentages(
-    stats: &steamworks::UserStats,
-    offset: usize,
-    limit: usize,
-) -> Result<(usize, Vec<SteamworksAchievementGlobalPercentage>), SteamworksStatsError> {
-    let (total, names) = list_achievement_names(stats, offset, limit)?;
-    let percentages = names
-        .into_iter()
-        .map(|api_name| {
-            let percent = stats
-                .achievement(&api_name)
-                .get_achievement_achieved_percent()
-                .map_err(|()| {
-                    SteamworksStatsError::operation_failed(
-                        "achievement.get_achievement_achieved_percent",
-                    )
-                })?;
-
-            Ok(SteamworksAchievementGlobalPercentage { api_name, percent })
-        })
-        .collect::<Result<Vec<_>, SteamworksStatsError>>()?;
-
-    Ok((total, percentages))
-}
-
-fn achievement_display_attribute(
-    stats: &steamworks::UserStats,
-    achievement: &str,
-    key: &str,
-) -> Result<Option<String>, SteamworksStatsError> {
-    stats
-        .achievement(achievement)
-        .get_achievement_display_attribute(key)
-        .map(|value| (!value.is_empty()).then(|| value.to_owned()))
-        .map_err(|()| {
-            SteamworksStatsError::operation_failed("achievement.get_achievement_display_attribute")
-        })
-}
-
-fn read_achievement_icon(
-    stats: &steamworks::UserStats,
-    achievement: &str,
-) -> SteamworksAchievementIconStatus {
-    stats
-        .achievement(achievement)
-        .get_achievement_icon()
-        .map(|rgba| {
-            SteamworksAchievementIconStatus::Available(achievement_icon_from_rgba(
-                achievement,
-                rgba,
-            ))
-        })
-        .unwrap_or(SteamworksAchievementIconStatus::PendingOrUnavailable)
-}
-
-fn achievement_icon_from_rgba(achievement: &str, rgba: Vec<u8>) -> SteamworksAchievementIcon {
-    SteamworksAchievementIcon {
-        api_name: achievement.to_owned(),
-        width: 64,
-        height: 64,
-        rgba,
-    }
-}
-
-fn achievement_icon_fetched_operation(
-    event: &steamworks::UserAchievementIconFetched,
-    icon: SteamworksAchievementIconStatus,
-) -> SteamworksStatsOperation {
-    SteamworksStatsOperation::AchievementIconFetched {
-        name: event.achievement_name.clone(),
-        achieved: event.achieved,
-        icon_handle: event.icon_handle,
-        icon,
-    }
-}
-
-fn snapshot_leaderboard_info(
-    stats: &steamworks::UserStats,
-    leaderboard: SteamworksLeaderboardId,
-    leaderboard_handle: &steamworks::Leaderboard,
-) -> SteamworksLeaderboardInfo {
-    SteamworksLeaderboardInfo {
-        leaderboard,
-        name: stats.get_leaderboard_name(leaderboard_handle),
-        display_type: stats
-            .get_leaderboard_display_type(leaderboard_handle)
-            .map(Into::into),
-        sort_method: stats
-            .get_leaderboard_sort_method(leaderboard_handle)
-            .map(Into::into),
-        entry_count: stats.get_leaderboard_entry_count(leaderboard_handle),
-    }
-}
-
-fn snapshot_leaderboard_entry(entry: steamworks::LeaderboardEntry) -> SteamworksLeaderboardEntry {
-    SteamworksLeaderboardEntry {
-        user: entry.user,
-        global_rank: entry.global_rank,
-        score: entry.score,
-        details: entry.details,
-    }
-}
-
-fn snapshot_leaderboard_score_uploaded(
-    upload: steamworks::LeaderboardScoreUploaded,
-) -> SteamworksLeaderboardScoreUploaded {
-    SteamworksLeaderboardScoreUploaded {
-        score: upload.score,
-        was_changed: upload.was_changed,
-        global_rank_new: upload.global_rank_new,
-        global_rank_previous: upload.global_rank_previous,
-    }
-}
-
-fn validate_stats_command(command: &SteamworksStatsCommand) -> Result<(), SteamworksStatsError> {
-    match command {
-        SteamworksStatsCommand::GetStatI32 { name }
-        | SteamworksStatsCommand::SetStatI32 { name, .. }
-        | SteamworksStatsCommand::GetStatF32 { name }
-        | SteamworksStatsCommand::SetStatF32 { name, .. }
-        | SteamworksStatsCommand::GetAchievement { name }
-        | SteamworksStatsCommand::GetAchievementIcon { name }
-        | SteamworksStatsCommand::UnlockAchievement { name }
-        | SteamworksStatsCommand::ClearAchievement { name }
-        | SteamworksStatsCommand::GetAchievementAndUnlockTime { name }
-        | SteamworksStatsCommand::GetAchievementAchievedPercent { name }
-        | SteamworksStatsCommand::GetGlobalStatI64 { name }
-        | SteamworksStatsCommand::GetGlobalStatF64 { name }
-        | SteamworksStatsCommand::GetGlobalStatHistoryI64 { name, .. }
-        | SteamworksStatsCommand::GetGlobalStatHistoryF64 { name, .. }
-        | SteamworksStatsCommand::FindLeaderboard { name }
-        | SteamworksStatsCommand::FindOrCreateLeaderboard { name, .. } => {
-            validate_no_nul("name", name)
-        }
-        SteamworksStatsCommand::GetAchievementDisplayAttribute { name, key } => {
-            validate_no_nul("name", name)?;
-            validate_no_nul("key", key)
-        }
-        SteamworksStatsCommand::ListAchievementNames { limit, .. }
-        | SteamworksStatsCommand::ListAchievements { limit, .. }
-        | SteamworksStatsCommand::ListAchievementGlobalPercentages { limit, .. } => {
-            validate_achievement_page_limit(*limit)
-        }
-        SteamworksStatsCommand::UploadLeaderboardScore { details, .. } => {
-            validate_leaderboard_details_len(details.len())
-        }
-        SteamworksStatsCommand::DownloadLeaderboardEntries {
-            request,
-            max_details,
-            ..
-        } => {
-            validate_leaderboard_details_len(*max_details)?;
-            validate_leaderboard_data_request(*request)
-        }
-        _ => Ok(()),
-    }
-}
-
-fn validate_no_nul(field: &'static str, value: &str) -> Result<(), SteamworksStatsError> {
-    if value.as_bytes().contains(&0) {
-        Err(SteamworksStatsError::invalid_string(field))
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_achievement_page_limit(limit: usize) -> Result<(), SteamworksStatsError> {
-    if limit > STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND {
-        Err(SteamworksStatsError::TooManyAchievementEntries {
-            requested: limit,
-            max_supported: STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_leaderboard_details_len(len: usize) -> Result<(), SteamworksStatsError> {
-    if len > STEAMWORKS_LEADERBOARD_MAX_DETAILS {
-        Err(SteamworksStatsError::TooManyLeaderboardDetails {
-            requested: len,
-            max_supported: STEAMWORKS_LEADERBOARD_MAX_DETAILS,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_leaderboard_data_request(
-    request: SteamworksLeaderboardDataRequest,
-) -> Result<(), SteamworksStatsError> {
-    match request {
-        SteamworksLeaderboardDataRequest::Global { start, end } => {
-            if start < 1 || start > end {
-                return Err(SteamworksStatsError::InvalidLeaderboardRange { start, end });
-            }
-            validate_leaderboard_requested_entries(start, end)
-        }
-        SteamworksLeaderboardDataRequest::GlobalAroundUser { start, end } => {
-            if start > end {
-                return Err(SteamworksStatsError::InvalidLeaderboardRange { start, end });
-            }
-            validate_leaderboard_requested_entries(start, end)
-        }
-        SteamworksLeaderboardDataRequest::Friends => Ok(()),
-    }
-}
-
-fn validate_leaderboard_requested_entries(
-    start: i32,
-    end: i32,
-) -> Result<(), SteamworksStatsError> {
-    let requested = i64::from(end) - i64::from(start) + 1;
-    let requested = usize::try_from(requested)
-        .map_err(|_| SteamworksStatsError::InvalidLeaderboardRange { start, end })?;
-    if requested > STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND {
-        return Err(SteamworksStatsError::TooManyLeaderboardEntries {
-            requested,
-            max_supported: STEAMWORKS_LEADERBOARD_MAX_ENTRIES_PER_COMMAND,
-        });
-    }
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests;
