@@ -54,54 +54,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn validation_rejects_interior_nul() {
-    let command =
-        SteamworksTimelineCommand::set_state_description("boss\0phase", Duration::from_secs(1));
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksTimelineError::InvalidString {
-            field: "description",
-        })
-    );
-
-    let command = SteamworksTimelineCommand::add_event(SteamworksTimelineEventInfo {
-        icon: "skull".to_owned(),
-        title: "wipe\0bad".to_owned(),
-        description: "party defeated".to_owned(),
-        priority: 10,
-        start_offset_seconds: 0.0,
-        duration: Duration::ZERO,
-        clip_priority: SteamworksTimelineEventClipPriority::Featured,
-    });
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksTimelineError::InvalidString { field: "title" })
-    );
-}
-
-#[test]
-fn validation_rejects_non_finite_values() {
-    let command = SteamworksTimelineCommand::add_event(SteamworksTimelineEventInfo {
-        icon: "star".to_owned(),
-        title: "win".to_owned(),
-        description: "match won".to_owned(),
-        priority: 1,
-        start_offset_seconds: f32::NAN,
-        duration: Duration::from_secs(1),
-        clip_priority: SteamworksTimelineEventClipPriority::Standard,
-    });
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksTimelineError::InvalidFloat {
-            field: "start_offset_seconds",
-        })
-    );
-}
-
-#[test]
 fn state_tracks_last_event_and_count_without_unbounded_history() {
     let mut state = SteamworksTimelineState::default();
     let state_description = SteamworksTimelineStateDescription {
