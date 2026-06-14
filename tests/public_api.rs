@@ -65,7 +65,8 @@ use bevy_steamworks::{
         SteamworksScreenshotsPlugin as PreludeScreenshotsPlugin,
         SteamworksScreenshotsResult as PreludeScreenshotsResult,
         SteamworksServerCommand as PreludeServerCommand,
-        SteamworksServerError as PreludeServerError,
+        SteamworksServerConfig as PreludeServerConfig, SteamworksServerError as PreludeServerError,
+        SteamworksServerInitMode as PreludeServerInitMode,
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
@@ -117,16 +118,17 @@ use bevy_steamworks::{
     SteamworksRemoteStorageError, SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
     SteamworksRemoteStorageResult, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
     SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
-    SteamworksServerCommand, SteamworksServerError, SteamworksServerListFilters,
-    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
-    SteamworksServerPlugin, SteamworksServerResult, SteamworksStatsCommand, SteamworksStatsError,
-    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem,
-    SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineGameMode,
-    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
-    SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation, SteamworksUgcPlugin,
-    SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError,
-    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
-    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksServerCommand, SteamworksServerConfig, SteamworksServerError,
+    SteamworksServerInitMode, SteamworksServerListFilters, SteamworksServerListKind,
+    SteamworksServerListRequestId, SteamworksServerOperation, SteamworksServerPlugin,
+    SteamworksServerResult, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+    SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand,
+    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
+    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable,
+    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
+    SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
+    SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 
 #[test]
@@ -408,14 +410,27 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
-
-    accepts_root_exports(
-        SteamworksServerPlugin::manual(),
-        command,
-        operation,
-        result,
-        error,
+    let config = SteamworksServerConfig::new(
+        std::net::Ipv4Addr::LOCALHOST,
+        27015,
+        27016,
+        steamworks::ServerMode::Authentication,
+        "1.0.0",
     );
+    let plugin = SteamworksServerPlugin::new(config.clone())
+        .failure_policy(SteamworksFailurePolicy::LogAndContinue)
+        .run_callbacks(false);
+    assert_eq!(
+        plugin.init_mode(),
+        &SteamworksServerInitMode::Config(config)
+    );
+    assert_eq!(
+        plugin.failure_policy_setting(),
+        SteamworksFailurePolicy::LogAndContinue
+    );
+    assert!(!plugin.runs_callbacks());
+
+    accepts_root_exports(plugin, command, operation, result, error);
 
     let command = PreludeServerCommand::GetSteamId;
     let operation = PreludeServerOperation::AnonymousLogonSubmitted;
@@ -424,14 +439,24 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
-
-    accepts_prelude_exports(
-        PreludeServerPlugin::manual(),
-        command,
-        operation,
-        result,
-        error,
+    let config = PreludeServerConfig::new(
+        std::net::Ipv4Addr::LOCALHOST,
+        27015,
+        27016,
+        steamworks::ServerMode::Authentication,
+        "1.0.0",
     );
+    let plugin = PreludeServerPlugin::new(config.clone())
+        .failure_policy(PreludeFailurePolicy::LogAndContinue)
+        .run_callbacks(false);
+    assert_eq!(plugin.init_mode(), &PreludeServerInitMode::Config(config));
+    assert_eq!(
+        plugin.failure_policy_setting(),
+        PreludeFailurePolicy::LogAndContinue
+    );
+    assert!(!plugin.runs_callbacks());
+
+    accepts_prelude_exports(plugin, command, operation, result, error);
 }
 
 #[test]

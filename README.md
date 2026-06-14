@@ -114,6 +114,8 @@ You can also register typed callbacks through the underlying `steamworks::Client
 
 `SteamworksServerPlugin` initializes the upstream `steamworks::Server`, inserts `SteamworksServer` as a Bevy resource, registers `SteamworksServerCommand` / `SteamworksServerResult`, and pumps Steam Game Server callbacks into the shared `SteamworksEvent` message stream. Dedicated server initialization is separate from `SteamworksPlugin`; use one lifecycle for the process unless you have a specific reason to initialize both.
 
+Server wrappers and diagnostics can inspect dedicated server lifecycle settings without initializing Steam by reading `init_mode()`, `failure_policy_setting()`, and `runs_callbacks()` from `SteamworksServerPlugin`.
+
 ```rust,no_run
 # use std::net::Ipv4Addr;
 # use bevy::prelude::*;

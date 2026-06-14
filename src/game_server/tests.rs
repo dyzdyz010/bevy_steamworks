@@ -9,6 +9,38 @@ use super::validation::{validate_server_command, validate_server_command_for_sta
 use super::*;
 
 #[test]
+fn configuration_accessors_expose_builder_settings() {
+    let config = SteamworksServerConfig::new(
+        Ipv4Addr::LOCALHOST,
+        27015,
+        27016,
+        steamworks::ServerMode::Authentication,
+        "1.0.0",
+    );
+    let plugin = SteamworksServerPlugin::new(config.clone())
+        .failure_policy(SteamworksFailurePolicy::LogAndContinue)
+        .run_callbacks(false);
+
+    assert_eq!(
+        plugin.init_mode(),
+        &SteamworksServerInitMode::Config(config)
+    );
+    assert_eq!(
+        plugin.failure_policy_setting(),
+        SteamworksFailurePolicy::LogAndContinue
+    );
+    assert!(!plugin.runs_callbacks());
+
+    let plugin = SteamworksServerPlugin::manual();
+    assert_eq!(plugin.init_mode(), &SteamworksServerInitMode::Manual);
+    assert_eq!(
+        plugin.failure_policy_setting(),
+        SteamworksFailurePolicy::Panic
+    );
+    assert!(plugin.runs_callbacks());
+}
+
+#[test]
 fn manual_mode_can_continue_without_server() {
     let mut app = App::new();
 

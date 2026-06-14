@@ -220,6 +220,21 @@ impl SteamworksServerPlugin {
         self
     }
 
+    /// Returns how this plugin will create or locate the Steam Game Server.
+    pub fn init_mode(&self) -> &SteamworksServerInitMode {
+        &self.mode
+    }
+
+    /// Returns how this plugin reacts when Steam Game Server cannot be initialized.
+    pub fn failure_policy_setting(&self) -> SteamworksFailurePolicy {
+        self.failure_policy
+    }
+
+    /// Returns true when this plugin will automatically run Steam Game Server callbacks.
+    pub fn runs_callbacks(&self) -> bool {
+        self.run_callbacks
+    }
+
     fn with_mode(mode: SteamworksServerInitMode) -> Self {
         Self {
             mode,
