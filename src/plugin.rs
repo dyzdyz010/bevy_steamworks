@@ -78,6 +78,21 @@ impl SteamworksPlugin {
         self
     }
 
+    /// Returns how this plugin will create or locate the Steamworks client.
+    pub fn init_mode(&self) -> SteamworksInitMode {
+        self.mode
+    }
+
+    /// Returns how this plugin reacts when Steamworks cannot be initialized.
+    pub fn failure_policy_setting(&self) -> SteamworksFailurePolicy {
+        self.failure_policy
+    }
+
+    /// Returns true when this plugin will automatically run Steam callbacks.
+    pub fn runs_callbacks(&self) -> bool {
+        self.run_callbacks
+    }
+
     fn with_mode(mode: SteamworksInitMode) -> Self {
         Self {
             mode,
@@ -225,6 +240,20 @@ mod tests {
         app.add_plugins(plugin);
 
         assert!(app.is_plugin_added::<SteamworksPlugin>());
+    }
+
+    #[test]
+    fn configuration_accessors_expose_builder_settings() {
+        let plugin = SteamworksPlugin::app_id(AppId(480))
+            .failure_policy(SteamworksFailurePolicy::LogAndContinue)
+            .run_callbacks(false);
+
+        assert_eq!(plugin.init_mode(), SteamworksInitMode::AppId(AppId(480)));
+        assert_eq!(
+            plugin.failure_policy_setting(),
+            SteamworksFailurePolicy::LogAndContinue
+        );
+        assert!(!plugin.runs_callbacks());
     }
 
     #[test]

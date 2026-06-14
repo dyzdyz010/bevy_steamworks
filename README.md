@@ -49,6 +49,8 @@ App::new()
 
 For lower-level control, use `SteamworksPlugin` for the client lifecycle and add selected feature plugins yourself. `SteamworksClientPlugins` installs the default client-side feature plugin group without initializing Steamworks; use it with `SteamworksPlugin` when you want the full feature set but need to configure the core plugin separately. Dedicated server builds should use `SteamworksServerPlugin` explicitly.
 
+Engine layers and diagnostics can inspect lifecycle configuration without initializing Steam by reading `init_mode()`, `failure_policy_setting()`, and `runs_callbacks()` from either `SteamworksPlugin` or the full `SteamworksPlugins` group. `SteamworksPlugins::core_plugin()` returns the configured core plugin when a wrapper needs to pass through or audit lifecycle settings.
+
 Most upstream `steamworks` types are re-exported at the crate root, so app code can use common items directly:
 
 ```rust,no_run

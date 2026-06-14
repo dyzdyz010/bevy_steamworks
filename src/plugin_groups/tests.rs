@@ -4,20 +4,20 @@ use bevy_ecs::message::Messages;
 use super::*;
 use crate::{
     SteamworksAppsCommand, SteamworksAppsResult, SteamworksAppsState, SteamworksCallbackRegistry,
-    SteamworksEvent, SteamworksFriendsCommand, SteamworksFriendsResult, SteamworksFriendsState,
-    SteamworksInputCommand, SteamworksInputResult, SteamworksInputState,
-    SteamworksMatchmakingCommand, SteamworksMatchmakingResult, SteamworksMatchmakingServersCommand,
-    SteamworksMatchmakingServersResult, SteamworksMatchmakingServersState,
-    SteamworksMatchmakingState, SteamworksNetworkingCommand, SteamworksNetworkingMessagesCommand,
-    SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesState,
-    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingSocketsState, SteamworksNetworkingState,
-    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsResult,
-    SteamworksNetworkingUtilsState, SteamworksPlugin, SteamworksRemotePlayCommand,
-    SteamworksRemotePlayResult, SteamworksRemotePlayState, SteamworksRemoteStorageCommand,
-    SteamworksRemoteStorageResult, SteamworksRemoteStorageState, SteamworksScreenshotsCommand,
-    SteamworksScreenshotsResult, SteamworksScreenshotsState, SteamworksServer,
-    SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsPlugin,
+    SteamworksEvent, SteamworksFailurePolicy, SteamworksFriendsCommand, SteamworksFriendsResult,
+    SteamworksFriendsState, SteamworksInitMode, SteamworksInputCommand, SteamworksInputResult,
+    SteamworksInputState, SteamworksMatchmakingCommand, SteamworksMatchmakingResult,
+    SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersResult,
+    SteamworksMatchmakingServersState, SteamworksMatchmakingState, SteamworksNetworkingCommand,
+    SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesResult,
+    SteamworksNetworkingMessagesState, SteamworksNetworkingResult,
+    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingSocketsState, SteamworksNetworkingState, SteamworksNetworkingUtilsCommand,
+    SteamworksNetworkingUtilsResult, SteamworksNetworkingUtilsState, SteamworksPlugin,
+    SteamworksRemotePlayCommand, SteamworksRemotePlayResult, SteamworksRemotePlayState,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageResult, SteamworksRemoteStorageState,
+    SteamworksScreenshotsCommand, SteamworksScreenshotsResult, SteamworksScreenshotsState,
+    SteamworksServer, SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsPlugin,
     SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState,
     SteamworksTimelineCommand, SteamworksTimelineResult, SteamworksTimelineState,
     SteamworksUgcCommand, SteamworksUgcResult, SteamworksUgcState, SteamworksUnavailable,
@@ -244,6 +244,29 @@ fn plugins_group_can_replace_individual_feature_plugins() {
     assert!(!app.world().resource::<SteamworksStatsSettings>().auto_store);
 
     app.update();
+}
+
+#[test]
+fn plugins_group_exposes_core_lifecycle_configuration() {
+    let plugins = SteamworksPlugins::app_id(480)
+        .log_and_continue()
+        .run_callbacks(false);
+
+    assert_eq!(plugins.init_mode(), SteamworksInitMode::AppId(AppId(480)));
+    assert_eq!(plugins.core_plugin().init_mode(), plugins.init_mode());
+    assert_eq!(
+        plugins.failure_policy_setting(),
+        SteamworksFailurePolicy::LogAndContinue
+    );
+    assert_eq!(
+        plugins.core_plugin().failure_policy_setting(),
+        plugins.failure_policy_setting()
+    );
+    assert!(!plugins.runs_callbacks());
+    assert_eq!(
+        plugins.core_plugin().runs_callbacks(),
+        plugins.runs_callbacks()
+    );
 }
 
 #[test]

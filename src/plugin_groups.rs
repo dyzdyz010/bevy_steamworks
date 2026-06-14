@@ -159,6 +159,26 @@ impl SteamworksPlugins {
         self.core = self.core.run_callbacks(run_callbacks);
         self
     }
+
+    /// Returns the configured core Steamworks lifecycle plugin.
+    pub fn core_plugin(&self) -> &SteamworksPlugin {
+        &self.core
+    }
+
+    /// Returns how the core plugin will create or locate the Steamworks client.
+    pub fn init_mode(&self) -> crate::SteamworksInitMode {
+        self.core.init_mode()
+    }
+
+    /// Returns how the core plugin reacts when Steamworks cannot be initialized.
+    pub fn failure_policy_setting(&self) -> SteamworksFailurePolicy {
+        self.core.failure_policy_setting()
+    }
+
+    /// Returns true when the core plugin will automatically run Steam callbacks.
+    pub fn runs_callbacks(&self) -> bool {
+        self.core.runs_callbacks()
+    }
 }
 
 impl From<SteamworksPlugin> for SteamworksPlugins {
