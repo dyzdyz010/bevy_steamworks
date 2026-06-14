@@ -4,20 +4,15 @@
 //! common utility calls in Bevy messages while mirroring text-input dismissal
 //! callbacks from [`crate::SteamworksEvent`] into [`SteamworksUtilsResult`].
 
-use bevy_app::{App, First, Plugin};
-use bevy_ecs::schedule::IntoScheduleConfigs;
-
-use crate::{SteamworksEvent, SteamworksSystem};
-
 mod callbacks;
 mod commands;
 mod messages;
+mod plugin;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
 
-use commands::process_utils_commands;
 pub use messages::*;
 pub use state::SteamworksUtilsState;
 pub use types::*;
@@ -30,29 +25,3 @@ pub use types::*;
 /// mirrors gamepad text input dismissal callbacks into utils results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksUtilsPlugin;
-
-impl SteamworksUtilsPlugin {
-    /// Creates a utils plugin with default behavior.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Plugin for SteamworksUtilsPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SteamworksUtilsState>()
-            .add_message::<SteamworksEvent>()
-            .add_message::<SteamworksUtilsCommand>()
-            .add_message::<SteamworksUtilsResult>()
-            .configure_sets(
-                First,
-                SteamworksSystem::ProcessUtilsCommands
-                    .after(SteamworksSystem::RunCallbacks)
-                    .before(bevy_ecs::message::MessageUpdateSystems),
-            )
-            .add_systems(
-                First,
-                process_utils_commands.in_set(SteamworksSystem::ProcessUtilsCommands),
-            );
-    }
-}

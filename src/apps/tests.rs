@@ -1,5 +1,7 @@
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
+
+use crate::SteamworksEvent;
 
 use super::*;
 
@@ -17,6 +19,14 @@ fn apps_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksAppsResult>>());
+}
+
+#[test]
+fn plugin_name_matches_apps_type_path_for_bevy_tracking() {
+    let plugin = SteamworksAppsPlugin::new();
+
+    assert_eq!(plugin.name(), std::any::type_name::<SteamworksAppsPlugin>());
+    assert_eq!(plugin.name(), "bevy_steamworks::apps::SteamworksAppsPlugin");
 }
 
 #[test]
