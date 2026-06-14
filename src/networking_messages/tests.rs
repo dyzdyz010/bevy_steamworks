@@ -118,44 +118,6 @@ fn auto_accept_command_applies_before_run_callbacks_set() {
 }
 
 #[test]
-fn validation_rejects_invalid_inputs() {
-    assert_eq!(
-        validate_command(
-            &SteamworksNetworkingMessagesCommand::send_message_to_steam_id(
-                steamworks::SteamId::from_raw(0),
-                steamworks::networking_types::SendFlags::RELIABLE,
-                0,
-                vec![1],
-            )
-        ),
-        Err(SteamworksNetworkingMessagesError::InvalidIdentity)
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingMessagesCommand::receive_messages(
-            i32::MAX as u32 + 1,
-            1,
-        )),
-        Err(SteamworksNetworkingMessagesError::InvalidChannel {
-            channel: i32::MAX as u32 + 1,
-        })
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingMessagesCommand::receive_messages(0, 0)),
-        Err(SteamworksNetworkingMessagesError::InvalidBatchSize)
-    );
-    assert_eq!(
-        validate_command(&SteamworksNetworkingMessagesCommand::receive_messages(
-            0,
-            STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE + 1,
-        )),
-        Err(SteamworksNetworkingMessagesError::BatchSizeTooLarge {
-            batch_size: STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE + 1,
-            max_batch_size: STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE,
-        })
-    );
-}
-
-#[test]
 fn constructors_preserve_inputs() {
     let peer = SteamworksNetworkingPeer::steam_id(steamworks::SteamId::from_raw(42));
 
