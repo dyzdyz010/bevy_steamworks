@@ -18,6 +18,11 @@ use bevy_steamworks::{
         SteamworksMatchmakingServersResult as PreludeMatchmakingServersResult,
         SteamworksNetworkingCommand as PreludeNetworkingCommand,
         SteamworksNetworkingError as PreludeNetworkingError,
+        SteamworksNetworkingMessagesCommand as PreludeNetworkingMessagesCommand,
+        SteamworksNetworkingMessagesError as PreludeNetworkingMessagesError,
+        SteamworksNetworkingMessagesOperation as PreludeNetworkingMessagesOperation,
+        SteamworksNetworkingMessagesPlugin as PreludeNetworkingMessagesPlugin,
+        SteamworksNetworkingMessagesResult as PreludeNetworkingMessagesResult,
         SteamworksNetworkingOperation as PreludeNetworkingOperation,
         SteamworksNetworkingPlugin as PreludeNetworkingPlugin,
         SteamworksNetworkingResult as PreludeNetworkingResult,
@@ -40,11 +45,14 @@ use bevy_steamworks::{
     SteamworksInputResult, SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
     SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
     SteamworksMatchmakingServersResult, SteamworksNetworkingCommand, SteamworksNetworkingError,
-    SteamworksNetworkingOperation, SteamworksNetworkingPlugin, SteamworksNetworkingResult,
-    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError, SteamworksRemoteStorageOperation,
-    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksServerListFilters,
-    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesError,
+    SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
+    SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
+    SteamworksNetworkingResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
+    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
+    SteamworksUserResult,
 };
 
 #[test]
@@ -254,6 +262,61 @@ fn networking_api_is_exported_from_root_and_prelude() {
 
     accepts_prelude_exports(
         PreludeNetworkingPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+}
+
+#[test]
+fn networking_messages_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksNetworkingMessagesPlugin,
+        _command: SteamworksNetworkingMessagesCommand,
+        _operation: SteamworksNetworkingMessagesOperation,
+        _result: SteamworksNetworkingMessagesResult,
+        _error: SteamworksNetworkingMessagesError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeNetworkingMessagesPlugin,
+        _command: PreludeNetworkingMessagesCommand,
+        _operation: PreludeNetworkingMessagesOperation,
+        _result: PreludeNetworkingMessagesResult,
+        _error: PreludeNetworkingMessagesError,
+    ) {
+    }
+
+    let command = SteamworksNetworkingMessagesCommand::receive_messages(0, 1);
+    let operation =
+        SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
+    let error = SteamworksNetworkingMessagesError::ClientUnavailable;
+    let result = SteamworksNetworkingMessagesResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksNetworkingMessagesPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeNetworkingMessagesCommand::receive_messages(0, 1);
+    let operation =
+        PreludeNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
+    let error = PreludeNetworkingMessagesError::ClientUnavailable;
+    let result = PreludeNetworkingMessagesResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(
+        PreludeNetworkingMessagesPlugin::new(),
         command,
         operation,
         result,
