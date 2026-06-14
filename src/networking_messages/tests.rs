@@ -1,10 +1,27 @@
-use bevy_app::{App, First};
+use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     message::Messages,
     prelude::{Res, ResMut, Resource},
+    schedule::IntoScheduleConfigs,
 };
 
+use crate::SteamworksSystem;
+
 use super::*;
+
+#[test]
+fn plugin_name_matches_networking_messages_type_path_for_bevy_tracking() {
+    let plugin = SteamworksNetworkingMessagesPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksNetworkingMessagesPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::networking_messages::SteamworksNetworkingMessagesPlugin"
+    );
+}
 
 #[test]
 fn configuration_accessors_expose_builder_settings() {
