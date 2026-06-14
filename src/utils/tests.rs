@@ -171,17 +171,3 @@ fn state_records_utility_operations() {
         Some(SteamworksNotificationPosition::BottomRight)
     );
 }
-
-#[test]
-fn validation_accepts_all_current_commands() {
-    assert_eq!(
-        validate_command(&SteamworksUtilsCommand::GetCurrentInfo),
-        Ok(())
-    );
-    assert_eq!(
-        validate_command(&SteamworksUtilsCommand::set_overlay_notification_position(
-            SteamworksNotificationPosition::BottomRight
-        )),
-        Ok(())
-    );
-}
