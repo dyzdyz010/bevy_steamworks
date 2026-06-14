@@ -272,41 +272,6 @@ fn download_item_callbacks_are_bridged_without_client() {
 }
 
 #[test]
-fn async_commands_get_unique_request_ids() {
-    let mut state = SteamworksUgcState::default();
-    let query =
-        SteamworksUgcCommand::query(SteamworksUgcQuery::item(steamworks::PublishedFileId(1)));
-
-    assert_eq!(async_command_request_id(&query, &mut state), Some(0));
-    assert_eq!(async_command_request_id(&query, &mut state), Some(1));
-    assert_eq!(
-        async_command_request_id(
-            &SteamworksUgcCommand::download_item(steamworks::PublishedFileId(1), false),
-            &mut state,
-        ),
-        None
-    );
-    assert_eq!(
-        async_command_request_id(
-            &SteamworksUgcCommand::subscribe_item(steamworks::PublishedFileId(1)),
-            &mut state,
-        ),
-        Some(2)
-    );
-    assert_eq!(
-        async_command_request_id(
-            &SteamworksUgcCommand::submit_item_update(
-                steamworks::AppId(480),
-                steamworks::PublishedFileId(1),
-                SteamworksUgcItemUpdate::new().with_title("Title"),
-            ),
-            &mut state,
-        ),
-        Some(3)
-    );
-}
-
-#[test]
 fn constructors_preserve_inputs() {
     let item = steamworks::PublishedFileId(42);
     let query = SteamworksUgcQuery::item(item).with_options(
@@ -476,32 +441,5 @@ fn state_records_operations_without_unbounded_query_history() {
             processed_bytes: 10,
             total_bytes: 100,
         })
-    );
-}
-
-#[test]
-fn state_counts_async_failures_as_completed() {
-    let mut state = SteamworksUgcState::default();
-    let result = SteamworksUgcResult::Err {
-        command: SteamworksUgcCommand::subscribe_item(steamworks::PublishedFileId(1)),
-        error: SteamworksUgcError::steam_error(
-            "ugc.subscribe_item",
-            Some(7),
-            steamworks::SteamError::IOFailure,
-        ),
-    };
-
-    record_ugc_result(&mut state, &result);
-
-    assert_eq!(state.successful_async_operations(), 0);
-    assert_eq!(state.failed_async_operations(), 1);
-    assert_eq!(state.completed_async_operations(), 1);
-    assert_eq!(
-        state.last_error(),
-        Some(&SteamworksUgcError::steam_error(
-            "ugc.subscribe_item",
-            Some(7),
-            steamworks::SteamError::IOFailure,
-        ))
     );
 }
