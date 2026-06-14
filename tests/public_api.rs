@@ -672,6 +672,27 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    fn accepts_root_state_status(
+        _state: bevy_steamworks::SteamworksNetworkingUtilsState,
+        _status: Option<bevy_steamworks::SteamworksRelayNetworkStatus>,
+    ) {
+    }
+
+    fn accepts_prelude_state_status(
+        _state: bevy_steamworks::prelude::SteamworksNetworkingUtilsState,
+        _status: Option<bevy_steamworks::prelude::SteamworksRelayNetworkStatus>,
+    ) {
+    }
+
+    accepts_root_state_status(
+        bevy_steamworks::SteamworksNetworkingUtilsState::default(),
+        None,
+    );
+    accepts_prelude_state_status(
+        bevy_steamworks::prelude::SteamworksNetworkingUtilsState::default(),
+        None,
+    );
+
     let command = SteamworksNetworkingUtilsCommand::init_relay_network_access();
     let operation = SteamworksNetworkingUtilsOperation::RelayNetworkAccessInitialized;
     let error = SteamworksNetworkingUtilsError::ClientUnavailable;
