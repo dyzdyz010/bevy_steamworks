@@ -3,6 +3,9 @@ use std::path::PathBuf;
 use bevy_app::App;
 use bevy_ecs::message::Messages;
 
+use super::validation::{
+    validate_command, validate_item_update, validate_query, validate_query_options,
+};
 use super::*;
 
 #[test]
