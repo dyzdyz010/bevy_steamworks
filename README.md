@@ -24,10 +24,7 @@ use bevy_steamworks::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((
-            SteamworksPlugin::app_id(480),
-            SteamworksClientPlugins::new(),
-        ))
+        .add_plugins(SteamworksPlugins::app_id(480))
         .add_plugins(DefaultPlugins)
         .run();
 }
@@ -35,11 +32,22 @@ fn main() {
 
 `480` is Valve's Spacewar sample app id. Real games should use the app id assigned by Valve.
 
-The plugin inserts `SteamworksClient` as a Bevy resource and automatically runs Steam callbacks in `SteamworksSystem::RunCallbacks` during Bevy's `First` schedule.
+`SteamworksPlugins` inserts `SteamworksClient` as a Bevy resource, automatically runs Steam callbacks in `SteamworksSystem::RunCallbacks` during Bevy's `First` schedule, and installs every default client-side high-level feature plugin: apps, friends, input, matchmaking, server browser queries, legacy P2P networking, networking messages, networking sockets, networking utils, Remote Play, Remote Storage, screenshots, stats, timeline, UGC, user, and utils.
 
-`SteamworksClientPlugins` installs every default client-side high-level feature plugin: apps, friends, input, matchmaking, server browser queries, legacy P2P networking, networking messages, networking sockets, networking utils, Remote Play, Remote Storage, screenshots, stats, timeline, UGC, user, and utils. It does not initialize Steamworks and does not install `SteamworksServerPlugin`; keep using `SteamworksPlugin` for the client lifecycle and `SteamworksServerPlugin` for dedicated server builds.
+For module settings, use Bevy's plugin group customization APIs:
 
-When a feature needs custom settings, add that specific plugin manually instead of `SteamworksClientPlugins`; for example, use `SteamworksStatsPlugin::new().auto_store(false)` or `SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false)`.
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+App::new()
+    .add_plugins(
+        SteamworksPlugins::app_id(480)
+            .set(SteamworksStatsPlugin::new().auto_store(false))
+            .disable::<SteamworksNetworkingPlugin>(),
+    );
+```
+
+For lower-level control, use `SteamworksPlugin` for the client lifecycle and add selected feature plugins yourself. `SteamworksClientPlugins` installs the default client-side feature plugin group without initializing Steamworks; use it with `SteamworksPlugin` when you want the full feature set but need to configure the core plugin separately. Dedicated server builds should use `SteamworksServerPlugin` explicitly.
 
 Most upstream `steamworks` types are re-exported at the crate root, so app code can use common items directly:
 
@@ -61,7 +69,7 @@ By default, initialization failures panic so games do not silently run without S
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 App::new()
-    .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+    .add_plugins(SteamworksPlugins::app_id(480).log_and_continue())
     .add_systems(Startup, |error: Option<Res<SteamworksUnavailable>>| {
         if let Some(error) = error {
             warn!("Steamworks unavailable: {}", &*error);

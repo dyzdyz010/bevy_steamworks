@@ -1,3 +1,4 @@
+use bevy_app::PluginGroup;
 use bevy_steamworks::{
     prelude::{
         SteamworksAppsCommand as PreludeAppsCommand, SteamworksAppsError as PreludeAppsError,
@@ -44,6 +45,7 @@ use bevy_steamworks::{
         SteamworksNetworkingUtilsPlugin as PreludeNetworkingUtilsPlugin,
         SteamworksNetworkingUtilsResult as PreludeNetworkingUtilsResult,
         SteamworksNotificationPosition as PreludeNotificationPosition,
+        SteamworksPlugins as PreludePlugins,
         SteamworksRemotePlayCommand as PreludeRemotePlayCommand,
         SteamworksRemotePlayError as PreludeRemotePlayError,
         SteamworksRemotePlayOperation as PreludeRemotePlayOperation,
@@ -104,21 +106,22 @@ use bevy_steamworks::{
     SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
     SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
     SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
-    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
-    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError, SteamworksRemoteStorageOperation,
-    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
-    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerError,
-    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
-    SteamworksServerOperation, SteamworksServerPlugin, SteamworksServerResult,
-    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
-    SteamworksStatsResult, SteamworksTimelineCommand, SteamworksTimelineError,
-    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
-    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUserCommand, SteamworksUserError,
-    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
-    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksNotificationPosition, SteamworksPlugins, SteamworksRemotePlayCommand,
+    SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
+    SteamworksRemotePlayResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
+    SteamworksServerError, SteamworksServerListFilters, SteamworksServerListKind,
+    SteamworksServerListRequestId, SteamworksServerOperation, SteamworksServerPlugin,
+    SteamworksServerResult, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+    SteamworksStatsPlugin, SteamworksStatsResult, SteamworksTimelineCommand,
+    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
+    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
 
 #[test]
@@ -128,6 +131,29 @@ fn client_plugin_bundle_api_is_exported_from_root_and_prelude() {
 
     accepts_root_exports(SteamworksClientPlugins::new());
     accepts_prelude_exports(PreludeClientPlugins::new());
+
+    let _ = SteamworksClientPlugins::new()
+        .build()
+        .disable::<SteamworksStatsPlugin>();
+    let _ = PreludeClientPlugins::new()
+        .build()
+        .disable::<PreludeStatsPlugin>();
+}
+
+#[test]
+fn full_plugin_group_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(_plugins: SteamworksPlugins) {}
+    fn accepts_prelude_exports(_plugins: PreludePlugins) {}
+
+    accepts_root_exports(SteamworksPlugins::manual().log_and_continue());
+    accepts_prelude_exports(PreludePlugins::manual().log_and_continue());
+
+    let _ = SteamworksPlugins::manual()
+        .log_and_continue()
+        .set(SteamworksStatsPlugin::new().auto_store(false));
+    let _ = PreludePlugins::manual()
+        .log_and_continue()
+        .set(PreludeStatsPlugin::new().auto_store(false));
 }
 
 #[test]

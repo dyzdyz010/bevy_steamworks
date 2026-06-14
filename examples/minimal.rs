@@ -21,7 +21,7 @@ fn log_steam_callbacks(mut callbacks: MessageReader<SteamworksEvent>) {
 
 fn main() {
     App::new()
-        .add_plugins(SteamworksPlugin::app_id(480).log_and_continue())
+        .add_plugins(SteamworksPlugins::app_id(480).log_and_continue())
         .add_plugins(ScheduleRunnerPlugin::run_once())
         .add_systems(Startup, report_steam_status)
         .add_systems(Update, log_steam_callbacks)

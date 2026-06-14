@@ -8,7 +8,7 @@
 
 use std::{ops::Deref, sync::Mutex};
 
-use bevy_app::{App, First, Plugin};
+use bevy_app::{App, First, Plugin, PluginGroup, PluginGroupBuilder};
 use bevy_ecs::{
     message::{Message, MessageWriter},
     prelude::Resource,
@@ -149,51 +149,51 @@ pub mod prelude {
         SteamworksOverlayUserActivation, SteamworksP2pPacket, SteamworksP2pPacketAvailability,
         SteamworksP2pPacketSent, SteamworksP2pSendType, SteamworksP2pSessionConnectFailure,
         SteamworksP2pSessionState, SteamworksP2pSessionStateResult, SteamworksPersonaStateChange,
-        SteamworksPlugin, SteamworksRelayNetworkStatus, SteamworksRemotePlayCommand,
-        SteamworksRemotePlayError, SteamworksRemotePlayInvite, SteamworksRemotePlayOperation,
-        SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
-        SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState,
-        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageCommand,
-        SteamworksRemoteStorageError, SteamworksRemoteStorageFileInfo,
-        SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageFileSummary,
-        SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
-        SteamworksRemoteStorageResult, SteamworksRemoteStorageSharedFile,
-        SteamworksRemoteStorageState, SteamworksRichPresenceChange,
-        SteamworksRichPresenceJoinRequest, SteamworksScreenshotLibraryError,
-        SteamworksScreenshotReady, SteamworksScreenshotReadyError, SteamworksScreenshotsCommand,
-        SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-        SteamworksScreenshotsResult, SteamworksScreenshotsState, SteamworksServer,
-        SteamworksServerCallbackRegistry, SteamworksServerClientApproval,
-        SteamworksServerClientDenial, SteamworksServerClientGroupStatus,
-        SteamworksServerClientKick, SteamworksServerCommand, SteamworksServerConfig,
-        SteamworksServerError, SteamworksServerIncomingPacket, SteamworksServerInitMode,
-        SteamworksServerIssuedAuthSessionTicket, SteamworksServerListCount,
-        SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRefreshing,
-        SteamworksServerListReleaseError, SteamworksServerListRequestId,
-        SteamworksServerListRequestInfo, SteamworksServerListResponse,
-        SteamworksServerListServerIndex, SteamworksServerLoginToken, SteamworksServerOperation,
-        SteamworksServerOutgoingPacket, SteamworksServerPlugin, SteamworksServerResult,
-        SteamworksServerState, SteamworksServerUnavailable, SteamworksStatsCommand,
-        SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
-        SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState,
-        SteamworksSteamServerConnectionEvent, SteamworksSubmittedScreenshot, SteamworksSystem,
-        SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineEventClipPriority,
-        SteamworksTimelineEventInfo, SteamworksTimelineGameMode, SteamworksTimelineOperation,
-        SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksTimelineState,
-        SteamworksTimelineStateDescription, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
-        SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcItemDetails,
-        SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
-        SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult,
-        SteamworksUgcItemStateInfo, SteamworksUgcItemUpdate, SteamworksUgcItemUpdateProgress,
-        SteamworksUgcItemUpdateTags, SteamworksUgcOperation, SteamworksUgcPlugin,
-        SteamworksUgcQuery, SteamworksUgcQueryOptions, SteamworksUgcQueryResults,
-        SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic, SteamworksUnavailable,
-        SteamworksUserAchievementStored, SteamworksUserCommand, SteamworksUserError,
-        SteamworksUserGameInvite, SteamworksUserInfo, SteamworksUserInformationRequest,
-        SteamworksUserLicenseForApp, SteamworksUserOperation, SteamworksUserPlugin,
-        SteamworksUserResult, SteamworksUserState, SteamworksUserStatsReceived,
-        SteamworksUserStatsStored, SteamworksUtilsCommand, SteamworksUtilsError,
-        SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+        SteamworksPlugin, SteamworksPlugins, SteamworksRelayNetworkStatus,
+        SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayInvite,
+        SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+        SteamworksRemotePlaySessionInfo, SteamworksRemotePlaySessionSnapshot,
+        SteamworksRemotePlayState, SteamworksRemoteStorageCloudInfo,
+        SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+        SteamworksRemoteStorageFileInfo, SteamworksRemoteStorageFileShareHandle,
+        SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageOperation,
+        SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+        SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState,
+        SteamworksRichPresenceChange, SteamworksRichPresenceJoinRequest,
+        SteamworksScreenshotLibraryError, SteamworksScreenshotReady,
+        SteamworksScreenshotReadyError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
+        SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
+        SteamworksScreenshotsState, SteamworksServer, SteamworksServerCallbackRegistry,
+        SteamworksServerClientApproval, SteamworksServerClientDenial,
+        SteamworksServerClientGroupStatus, SteamworksServerClientKick, SteamworksServerCommand,
+        SteamworksServerConfig, SteamworksServerError, SteamworksServerIncomingPacket,
+        SteamworksServerInitMode, SteamworksServerIssuedAuthSessionTicket,
+        SteamworksServerListCount, SteamworksServerListFilters, SteamworksServerListKind,
+        SteamworksServerListRefreshing, SteamworksServerListReleaseError,
+        SteamworksServerListRequestId, SteamworksServerListRequestInfo,
+        SteamworksServerListResponse, SteamworksServerListServerIndex, SteamworksServerLoginToken,
+        SteamworksServerOperation, SteamworksServerOutgoingPacket, SteamworksServerPlugin,
+        SteamworksServerResult, SteamworksServerState, SteamworksServerUnavailable,
+        SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
+        SteamworksStatsPlugin, SteamworksStatsResult, SteamworksStatsSettings,
+        SteamworksStatsState, SteamworksSteamServerConnectionEvent, SteamworksSubmittedScreenshot,
+        SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+        SteamworksTimelineEventClipPriority, SteamworksTimelineEventInfo,
+        SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+        SteamworksTimelineResult, SteamworksTimelineState, SteamworksTimelineStateDescription,
+        SteamworksUgcCommand, SteamworksUgcContentDescriptor, SteamworksUgcDownloadItemResult,
+        SteamworksUgcError, SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo,
+        SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfo,
+        SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcItemUpdate,
+        SteamworksUgcItemUpdateProgress, SteamworksUgcItemUpdateTags, SteamworksUgcOperation,
+        SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryOptions,
+        SteamworksUgcQueryResults, SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic,
+        SteamworksUnavailable, SteamworksUserAchievementStored, SteamworksUserCommand,
+        SteamworksUserError, SteamworksUserGameInvite, SteamworksUserInfo,
+        SteamworksUserInformationRequest, SteamworksUserLicenseForApp, SteamworksUserOperation,
+        SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState,
+        SteamworksUserStatsReceived, SteamworksUserStatsStored, SteamworksUtilsCommand,
+        SteamworksUtilsError, SteamworksUtilsInfo, SteamworksUtilsOperation, SteamworksUtilsPlugin,
         SteamworksUtilsResult, SteamworksUtilsState, SteamworksWebApiAuthenticationTicketRequest,
         SteamworksWebApiTicketResponse, STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
         STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND, STEAMWORKS_LEADERBOARD_MAX_DETAILS,
@@ -552,9 +552,9 @@ impl SteamworksCallbackRegistry {
 
 /// Installs every default client-side high-level Steamworks feature plugin.
 ///
-/// This is a convenience plugin for games that want the Bevy message/resource
-/// wrappers for apps, friends, input, lobbies, networking, screenshots, Steam
-/// Cloud, stats, timeline, UGC, user, and utility APIs.
+/// This is a convenience plugin group for games that want the Bevy
+/// message/resource wrappers for apps, friends, input, lobbies, networking,
+/// screenshots, Steam Cloud, stats, timeline, UGC, user, and utility APIs.
 ///
 /// It does not initialize Steamworks and it does not install the dedicated game
 /// server plugin. Add [`SteamworksPlugin`] separately for the client lifecycle,
@@ -569,25 +569,149 @@ impl SteamworksClientPlugins {
     }
 }
 
-impl Plugin for SteamworksClientPlugins {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(SteamworksAppsPlugin::new());
-        app.add_plugins(SteamworksFriendsPlugin::new());
-        app.add_plugins(SteamworksInputPlugin::new());
-        app.add_plugins(SteamworksMatchmakingPlugin::new());
-        app.add_plugins(SteamworksMatchmakingServersPlugin::new());
-        app.add_plugins(SteamworksNetworkingPlugin::new());
-        app.add_plugins(SteamworksNetworkingMessagesPlugin::new());
-        app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
-        app.add_plugins(SteamworksNetworkingUtilsPlugin::new());
-        app.add_plugins(SteamworksRemotePlayPlugin::new());
-        app.add_plugins(SteamworksRemoteStoragePlugin::new());
-        app.add_plugins(SteamworksScreenshotsPlugin::new());
-        app.add_plugins(SteamworksStatsPlugin::new());
-        app.add_plugins(SteamworksTimelinePlugin::new());
-        app.add_plugins(SteamworksUgcPlugin::new());
-        app.add_plugins(SteamworksUserPlugin::new());
-        app.add_plugins(SteamworksUtilsPlugin::new());
+impl PluginGroup for SteamworksClientPlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(SteamworksAppsPlugin::new())
+            .add(SteamworksFriendsPlugin::new())
+            .add(SteamworksInputPlugin::new())
+            .add(SteamworksMatchmakingPlugin::new())
+            .add(SteamworksMatchmakingServersPlugin::new())
+            .add(SteamworksNetworkingPlugin::new())
+            .add(SteamworksNetworkingMessagesPlugin::new())
+            .add(SteamworksNetworkingSocketsPlugin::new())
+            .add(SteamworksNetworkingUtilsPlugin::new())
+            .add(SteamworksRemotePlayPlugin::new())
+            .add(SteamworksRemoteStoragePlugin::new())
+            .add(SteamworksScreenshotsPlugin::new())
+            .add(SteamworksStatsPlugin::new())
+            .add(SteamworksTimelinePlugin::new())
+            .add(SteamworksUgcPlugin::new())
+            .add(SteamworksUserPlugin::new())
+            .add(SteamworksUtilsPlugin::new())
+    }
+}
+
+/// A Bevy plugin group that installs Steamworks client initialization and every
+/// default client-side high-level feature plugin.
+///
+/// This is the shortest path for games that want a full Bevy-native Steamworks
+/// client integration:
+///
+/// ```rust,no_run
+/// # use bevy_app::prelude::*;
+/// # use bevy_steamworks::prelude::*;
+/// App::new().add_plugins(SteamworksPlugins::app_id(480));
+/// ```
+///
+/// Use Bevy's [`PluginGroup`] customization methods such as
+/// [`set`](PluginGroup::set) and [`PluginGroupBuilder::disable`] to replace or
+/// disable individual feature plugins. Use [`SteamworksPlugin`] plus selected
+/// feature plugins directly when you only want the raw [`SteamworksClient`]
+/// resource.
+pub struct SteamworksPlugins {
+    core: SteamworksPlugin,
+    client_plugins: SteamworksClientPlugins,
+}
+
+impl Default for SteamworksPlugins {
+    fn default() -> Self {
+        Self::automatic()
+    }
+}
+
+impl SteamworksPlugins {
+    /// Creates a plugin group that initializes Steamworks from the environment.
+    ///
+    /// This uses [`steamworks::Client::init`] through [`SteamworksPlugin`].
+    pub fn automatic() -> Self {
+        Self::from_plugin(SteamworksPlugin::automatic())
+    }
+
+    /// Creates a plugin group that initializes Steamworks with a specific app id.
+    ///
+    /// This uses [`steamworks::Client::init_app`] through [`SteamworksPlugin`].
+    pub fn app_id(app_id: impl Into<AppId>) -> Self {
+        Self::from_plugin(SteamworksPlugin::app_id(app_id))
+    }
+
+    /// Creates a plugin group that does not initialize Steamworks.
+    ///
+    /// Use this when another layer inserts [`SteamworksClient`] before the app
+    /// runs, or for tests that only need message/resource setup.
+    pub fn manual() -> Self {
+        Self::from_plugin(SteamworksPlugin::manual())
+    }
+
+    /// Initializes Steamworks immediately from the environment and wraps it in
+    /// the full default client feature plugin group.
+    pub fn init() -> Result<Self, SteamAPIInitError> {
+        SteamworksPlugin::init().map(Self::from_plugin)
+    }
+
+    /// Initializes Steamworks immediately with a specific app id and wraps it in
+    /// the full default client feature plugin group.
+    pub fn init_app(app_id: impl Into<AppId>) -> Result<Self, SteamAPIInitError> {
+        SteamworksPlugin::init_app(app_id).map(Self::from_plugin)
+    }
+
+    /// Creates a plugin group from an already initialized Steamworks client.
+    pub fn from_client(client: steamworks::Client) -> Self {
+        Self::from_plugin(SteamworksPlugin::from_client(client))
+    }
+
+    /// Creates a plugin group from an already configured [`SteamworksPlugin`].
+    pub fn from_plugin(plugin: SteamworksPlugin) -> Self {
+        Self {
+            core: plugin,
+            client_plugins: SteamworksClientPlugins::new(),
+        }
+    }
+
+    /// Replaces the client-side feature plugin collection.
+    pub fn client_plugins(mut self, client_plugins: SteamworksClientPlugins) -> Self {
+        self.client_plugins = client_plugins;
+        self
+    }
+
+    /// Sets the initialization failure policy.
+    pub fn failure_policy(mut self, policy: SteamworksFailurePolicy) -> Self {
+        self.core = self.core.failure_policy(policy);
+        self
+    }
+
+    /// Keeps the Bevy app running when Steamworks cannot be initialized.
+    ///
+    /// The underlying [`SteamworksPlugin`] will insert [`SteamworksUnavailable`]
+    /// and emit a structured `tracing` error.
+    pub fn log_and_continue(self) -> Self {
+        self.failure_policy(SteamworksFailurePolicy::LogAndContinue)
+    }
+
+    /// Sets whether the plugin group should automatically run Steam callbacks.
+    pub fn run_callbacks(mut self, run_callbacks: bool) -> Self {
+        self.core = self.core.run_callbacks(run_callbacks);
+        self
+    }
+}
+
+impl From<SteamworksPlugin> for SteamworksPlugins {
+    fn from(plugin: SteamworksPlugin) -> Self {
+        Self::from_plugin(plugin)
+    }
+}
+
+impl From<steamworks::Client> for SteamworksPlugins {
+    fn from(client: steamworks::Client) -> Self {
+        Self::from_client(client)
+    }
+}
+
+impl PluginGroup for SteamworksPlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(self.core)
+            .add_group(self.client_plugins)
     }
 }
 
@@ -821,7 +945,7 @@ fn run_steam_callbacks(
 
 #[cfg(test)]
 mod tests {
-    use bevy_app::App;
+    use bevy_app::{App, PluginGroup};
     use bevy_ecs::message::Messages;
 
     use super::*;
@@ -1008,5 +1132,102 @@ mod tests {
             .contains_resource::<SteamworksServerUnavailable>());
 
         app.update();
+    }
+
+    #[test]
+    fn client_plugins_group_can_disable_individual_feature_plugins() {
+        let mut app = App::new();
+
+        app.add_plugins(
+            SteamworksClientPlugins::new()
+                .build()
+                .disable::<SteamworksStatsPlugin>(),
+        );
+
+        assert!(app.world().contains_resource::<SteamworksAppsState>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksAppsCommand>>());
+        assert!(!app.world().contains_resource::<SteamworksStatsState>());
+        assert!(!app.world().contains_resource::<SteamworksStatsSettings>());
+        assert!(!app
+            .world()
+            .contains_resource::<Messages<SteamworksStatsCommand>>());
+
+        app.update();
+    }
+
+    #[test]
+    fn plugins_group_can_continue_without_client_and_register_default_features() {
+        let mut app = App::new();
+
+        app.add_plugins(SteamworksPlugins::manual().log_and_continue());
+
+        assert!(app.world().contains_resource::<SteamworksUnavailable>());
+        assert!(app
+            .world()
+            .contains_resource::<SteamworksCallbackRegistry>());
+        assert!(app.world().contains_resource::<SteamworksAppsState>());
+        assert!(app.world().contains_resource::<SteamworksStatsState>());
+        assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksAppsCommand>>());
+        assert!(app
+            .world()
+            .contains_resource::<Messages<SteamworksAppsResult>>());
+        assert!(!app.world().contains_resource::<SteamworksClient>());
+        assert!(!app.world().contains_resource::<SteamworksServer>());
+        assert!(!app
+            .world()
+            .contains_resource::<SteamworksServerUnavailable>());
+
+        app.update();
+    }
+
+    #[test]
+    fn plugins_group_can_replace_individual_feature_plugins() {
+        let mut app = App::new();
+
+        app.add_plugins(
+            SteamworksPlugins::manual()
+                .log_and_continue()
+                .set(SteamworksStatsPlugin::new().auto_store(false)),
+        );
+
+        assert!(app.world().contains_resource::<SteamworksUnavailable>());
+        assert!(app.world().contains_resource::<SteamworksStatsState>());
+        assert!(!app.world().resource::<SteamworksStatsSettings>().auto_store);
+
+        app.update();
+    }
+
+    #[test]
+    fn plugins_group_can_disable_individual_feature_plugins() {
+        let mut app = App::new();
+
+        app.add_plugins(
+            SteamworksPlugins::manual()
+                .log_and_continue()
+                .build()
+                .disable::<SteamworksNetworkingPlugin>(),
+        );
+
+        assert!(app.world().contains_resource::<SteamworksUnavailable>());
+        assert!(app.world().contains_resource::<SteamworksAppsState>());
+        assert!(!app.world().contains_resource::<SteamworksNetworkingState>());
+        assert!(!app
+            .world()
+            .contains_resource::<Messages<SteamworksNetworkingCommand>>());
+
+        app.update();
+    }
+
+    #[test]
+    #[should_panic(expected = "manual Steamworks initialization was selected")]
+    fn plugins_group_panics_by_default_in_manual_mode() {
+        let mut app = App::new();
+
+        app.add_plugins(SteamworksPlugins::manual());
     }
 }
