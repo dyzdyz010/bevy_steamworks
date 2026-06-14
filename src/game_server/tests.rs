@@ -1,12 +1,29 @@
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
-use crate::user::{SteamworksAuthTicketValidation, SteamworksSteamServerConnectionEvent};
+use crate::{
+    user::{SteamworksAuthTicketValidation, SteamworksSteamServerConnectionEvent},
+    SteamworksEvent,
+};
 
 use super::validation::{validate_server_command, validate_server_command_for_state};
 use super::*;
+
+#[test]
+fn plugin_name_matches_game_server_type_path_for_bevy_tracking() {
+    let plugin = SteamworksServerPlugin::manual();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksServerPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::game_server::SteamworksServerPlugin"
+    );
+}
 
 #[test]
 fn configuration_accessors_expose_builder_settings() {
