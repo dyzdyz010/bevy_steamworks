@@ -1,5 +1,8 @@
 use bevy_steamworks::{
     prelude::{
+        SteamworksAppsCommand as PreludeAppsCommand, SteamworksAppsError as PreludeAppsError,
+        SteamworksAppsOperation as PreludeAppsOperation, SteamworksAppsPlugin as PreludeAppsPlugin,
+        SteamworksAppsResult as PreludeAppsResult,
         SteamworksFriendsCommand as PreludeFriendsCommand,
         SteamworksFriendsError as PreludeFriendsError,
         SteamworksFriendsOperation as PreludeFriendsOperation,
@@ -25,10 +28,11 @@ use bevy_steamworks::{
         SteamworksUserOperation as PreludeUserOperation, SteamworksUserPlugin as PreludeUserPlugin,
         SteamworksUserResult as PreludeUserResult,
     },
-    SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
-    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksInputCommand, SteamworksInputError,
-    SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
-    SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
+    SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin,
+    SteamworksAppsResult, SteamworksFriendsCommand, SteamworksFriendsError,
+    SteamworksFriendsOperation, SteamworksFriendsPlugin, SteamworksFriendsResult,
+    SteamworksInputCommand, SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin,
+    SteamworksInputResult, SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
     SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
     SteamworksMatchmakingServersResult, SteamworksRemoteStorageCommand,
     SteamworksRemoteStorageError, SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
@@ -36,6 +40,53 @@ use bevy_steamworks::{
     SteamworksServerListRequestId, SteamworksUserCommand, SteamworksUserError,
     SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
 };
+
+#[test]
+fn apps_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksAppsPlugin,
+        _command: SteamworksAppsCommand,
+        _operation: SteamworksAppsOperation,
+        _result: SteamworksAppsResult,
+        _error: SteamworksAppsError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeAppsPlugin,
+        _command: PreludeAppsCommand,
+        _operation: PreludeAppsOperation,
+        _result: PreludeAppsResult,
+        _error: PreludeAppsError,
+    ) {
+    }
+
+    let command = SteamworksAppsCommand::IsSubscribed;
+    let operation = SteamworksAppsOperation::SubscriptionRead { subscribed: true };
+    let error = SteamworksAppsError::ClientUnavailable;
+    let result = SteamworksAppsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksAppsPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeAppsCommand::IsSubscribed;
+    let operation = PreludeAppsOperation::SubscriptionRead { subscribed: true };
+    let error = PreludeAppsError::ClientUnavailable;
+    let result = PreludeAppsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(PreludeAppsPlugin::new(), command, operation, result, error);
+}
 
 #[test]
 fn friends_api_is_exported_from_root_and_prelude() {
