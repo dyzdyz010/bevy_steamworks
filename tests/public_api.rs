@@ -13,6 +13,11 @@ use bevy_steamworks::{
         SteamworksMatchmakingServersOperation as PreludeMatchmakingServersOperation,
         SteamworksMatchmakingServersPlugin as PreludeMatchmakingServersPlugin,
         SteamworksMatchmakingServersResult as PreludeMatchmakingServersResult,
+        SteamworksRemoteStorageCommand as PreludeRemoteStorageCommand,
+        SteamworksRemoteStorageError as PreludeRemoteStorageError,
+        SteamworksRemoteStorageOperation as PreludeRemoteStorageOperation,
+        SteamworksRemoteStoragePlugin as PreludeRemoteStoragePlugin,
+        SteamworksRemoteStorageResult as PreludeRemoteStorageResult,
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
@@ -25,7 +30,9 @@ use bevy_steamworks::{
     SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
     SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
     SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
-    SteamworksMatchmakingServersResult, SteamworksServerListFilters, SteamworksServerListKind,
+    SteamworksMatchmakingServersResult, SteamworksRemoteStorageCommand,
+    SteamworksRemoteStorageError, SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
+    SteamworksRemoteStorageResult, SteamworksServerListFilters, SteamworksServerListKind,
     SteamworksServerListRequestId, SteamworksUserCommand, SteamworksUserError,
     SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
 };
@@ -136,6 +143,59 @@ fn input_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeInputPlugin::new(), command, operation, result, error);
+}
+
+#[test]
+fn remote_storage_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksRemoteStoragePlugin,
+        _command: SteamworksRemoteStorageCommand,
+        _operation: SteamworksRemoteStorageOperation,
+        _result: SteamworksRemoteStorageResult,
+        _error: SteamworksRemoteStorageError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeRemoteStoragePlugin,
+        _command: PreludeRemoteStorageCommand,
+        _operation: PreludeRemoteStorageOperation,
+        _result: PreludeRemoteStorageResult,
+        _error: PreludeRemoteStorageError,
+    ) {
+    }
+
+    let command = SteamworksRemoteStorageCommand::GetCloudInfo;
+    let operation = SteamworksRemoteStorageOperation::CloudEnabledForAppRead { enabled: true };
+    let error = SteamworksRemoteStorageError::ClientUnavailable;
+    let result = SteamworksRemoteStorageResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksRemoteStoragePlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeRemoteStorageCommand::GetCloudInfo;
+    let operation = PreludeRemoteStorageOperation::CloudEnabledForAppRead { enabled: true };
+    let error = PreludeRemoteStorageError::ClientUnavailable;
+    let result = PreludeRemoteStorageResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(
+        PreludeRemoteStoragePlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
 }
 
 #[test]
