@@ -26,6 +26,12 @@ use bevy_steamworks::{
         SteamworksNetworkingOperation as PreludeNetworkingOperation,
         SteamworksNetworkingPlugin as PreludeNetworkingPlugin,
         SteamworksNetworkingResult as PreludeNetworkingResult,
+        SteamworksNotificationPosition as PreludeNotificationPosition,
+        SteamworksRemotePlayCommand as PreludeRemotePlayCommand,
+        SteamworksRemotePlayError as PreludeRemotePlayError,
+        SteamworksRemotePlayOperation as PreludeRemotePlayOperation,
+        SteamworksRemotePlayPlugin as PreludeRemotePlayPlugin,
+        SteamworksRemotePlayResult as PreludeRemotePlayResult,
         SteamworksRemoteStorageCommand as PreludeRemoteStorageCommand,
         SteamworksRemoteStorageError as PreludeRemoteStorageError,
         SteamworksRemoteStorageOperation as PreludeRemoteStorageOperation,
@@ -39,9 +45,18 @@ use bevy_steamworks::{
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
+        SteamworksTimelineCommand as PreludeTimelineCommand,
+        SteamworksTimelineError as PreludeTimelineError,
+        SteamworksTimelineGameMode as PreludeTimelineGameMode,
+        SteamworksTimelineOperation as PreludeTimelineOperation,
+        SteamworksTimelinePlugin as PreludeTimelinePlugin,
+        SteamworksTimelineResult as PreludeTimelineResult,
         SteamworksUserCommand as PreludeUserCommand, SteamworksUserError as PreludeUserError,
         SteamworksUserOperation as PreludeUserOperation, SteamworksUserPlugin as PreludeUserPlugin,
-        SteamworksUserResult as PreludeUserResult,
+        SteamworksUserResult as PreludeUserResult, SteamworksUtilsCommand as PreludeUtilsCommand,
+        SteamworksUtilsError as PreludeUtilsError,
+        SteamworksUtilsOperation as PreludeUtilsOperation,
+        SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
     SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsPlugin,
     SteamworksAppsResult, SteamworksFriendsCommand, SteamworksFriendsError,
@@ -53,12 +68,17 @@ use bevy_steamworks::{
     SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesError,
     SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
     SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
-    SteamworksNetworkingResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksNetworkingResult, SteamworksNotificationPosition, SteamworksRemotePlayCommand,
+    SteamworksRemotePlayError, SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin,
+    SteamworksRemotePlayResult, SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
     SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
     SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
     SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerListFilters,
-    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksTimelineCommand,
+    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
+    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUserCommand, SteamworksUserError,
+    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
+    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 
 #[test]
@@ -384,6 +404,59 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
 }
 
 #[test]
+fn remote_play_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksRemotePlayPlugin,
+        _command: SteamworksRemotePlayCommand,
+        _operation: SteamworksRemotePlayOperation,
+        _result: SteamworksRemotePlayResult,
+        _error: SteamworksRemotePlayError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeRemotePlayPlugin,
+        _command: PreludeRemotePlayCommand,
+        _operation: PreludeRemotePlayOperation,
+        _result: PreludeRemotePlayResult,
+        _error: PreludeRemotePlayError,
+    ) {
+    }
+
+    let command = SteamworksRemotePlayCommand::ListSessions;
+    let operation = SteamworksRemotePlayOperation::SessionsListed { sessions: vec![] };
+    let error = SteamworksRemotePlayError::ClientUnavailable;
+    let result = SteamworksRemotePlayResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksRemotePlayPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeRemotePlayCommand::ListSessions;
+    let operation = PreludeRemotePlayOperation::SessionsListed { sessions: vec![] };
+    let error = PreludeRemotePlayError::ClientUnavailable;
+    let result = PreludeRemotePlayResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(
+        PreludeRemotePlayPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+}
+
+#[test]
 fn screenshots_api_is_exported_from_root_and_prelude() {
     fn accepts_root_exports(
         _plugin: SteamworksScreenshotsPlugin,
@@ -437,6 +510,63 @@ fn screenshots_api_is_exported_from_root_and_prelude() {
 }
 
 #[test]
+fn timeline_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksTimelinePlugin,
+        _command: SteamworksTimelineCommand,
+        _operation: SteamworksTimelineOperation,
+        _result: SteamworksTimelineResult,
+        _error: SteamworksTimelineError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeTimelinePlugin,
+        _command: PreludeTimelineCommand,
+        _operation: PreludeTimelineOperation,
+        _result: PreludeTimelineResult,
+        _error: PreludeTimelineError,
+    ) {
+    }
+
+    let command = SteamworksTimelineCommand::set_game_mode(SteamworksTimelineGameMode::Playing);
+    let operation = SteamworksTimelineOperation::GameModeSet {
+        mode: SteamworksTimelineGameMode::Playing,
+    };
+    let error = SteamworksTimelineError::ClientUnavailable;
+    let result = SteamworksTimelineResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksTimelinePlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeTimelineCommand::set_game_mode(PreludeTimelineGameMode::Playing);
+    let operation = PreludeTimelineOperation::GameModeSet {
+        mode: PreludeTimelineGameMode::Playing,
+    };
+    let error = PreludeTimelineError::ClientUnavailable;
+    let result = PreludeTimelineResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(
+        PreludeTimelinePlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+}
+
+#[test]
 fn user_api_is_exported_from_root_and_prelude() {
     fn accepts_root_exports(
         _plugin: SteamworksUserPlugin,
@@ -481,6 +611,61 @@ fn user_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeUserPlugin::new(), command, operation, result, error);
+}
+
+#[test]
+fn utils_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksUtilsPlugin,
+        _command: SteamworksUtilsCommand,
+        _operation: SteamworksUtilsOperation,
+        _result: SteamworksUtilsResult,
+        _error: SteamworksUtilsError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeUtilsPlugin,
+        _command: PreludeUtilsCommand,
+        _operation: PreludeUtilsOperation,
+        _result: PreludeUtilsResult,
+        _error: PreludeUtilsError,
+    ) {
+    }
+
+    let command = SteamworksUtilsCommand::set_overlay_notification_position(
+        SteamworksNotificationPosition::TopLeft,
+    );
+    let operation = SteamworksUtilsOperation::OverlayNotificationPositionSet {
+        position: SteamworksNotificationPosition::TopLeft,
+    };
+    let error = SteamworksUtilsError::ClientUnavailable;
+    let result = SteamworksUtilsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksUtilsPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeUtilsCommand::set_overlay_notification_position(
+        PreludeNotificationPosition::TopLeft,
+    );
+    let operation = PreludeUtilsOperation::OverlayNotificationPositionSet {
+        position: PreludeNotificationPosition::TopLeft,
+    };
+    let error = PreludeUtilsError::ClientUnavailable;
+    let result = PreludeUtilsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(PreludeUtilsPlugin::new(), command, operation, result, error);
 }
 
 #[test]
