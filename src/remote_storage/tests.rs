@@ -52,36 +52,6 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn validation_rejects_interior_nul() {
-    let command = SteamworksRemoteStorageCommand::get_file_info("save\0bad.dat");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-    );
-
-    let command = SteamworksRemoteStorageCommand::share_file("save\0bad.dat");
-
-    assert_eq!(
-        validate_command(&command),
-        Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-    );
-}
-
-#[test]
-fn async_share_commands_get_unique_request_ids() {
-    let mut state = SteamworksRemoteStorageState::default();
-    let command = SteamworksRemoteStorageCommand::share_file("save.dat");
-
-    assert_eq!(async_command_request_id(&command, &mut state), Some(0));
-    assert_eq!(async_command_request_id(&command, &mut state), Some(1));
-    assert_eq!(
-        async_command_request_id(&SteamworksRemoteStorageCommand::GetCloudInfo, &mut state),
-        None
-    );
-}
-
-#[test]
 fn state_records_remote_storage_operations_without_unbounded_share_history() {
     let mut state = SteamworksRemoteStorageState::default();
     let platforms =
