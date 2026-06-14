@@ -5,6 +5,9 @@ use bevy_steamworks::{
         SteamworksFriendsOperation as PreludeFriendsOperation,
         SteamworksFriendsPlugin as PreludeFriendsPlugin,
         SteamworksFriendsResult as PreludeFriendsResult,
+        SteamworksInputCommand as PreludeInputCommand, SteamworksInputError as PreludeInputError,
+        SteamworksInputOperation as PreludeInputOperation,
+        SteamworksInputPlugin as PreludeInputPlugin, SteamworksInputResult as PreludeInputResult,
         SteamworksMatchmakingServersCommand as PreludeMatchmakingServersCommand,
         SteamworksMatchmakingServersError as PreludeMatchmakingServersError,
         SteamworksMatchmakingServersOperation as PreludeMatchmakingServersOperation,
@@ -18,12 +21,13 @@ use bevy_steamworks::{
         SteamworksUserResult as PreludeUserResult,
     },
     SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
-    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksMatchmakingServersCommand,
-    SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
-    SteamworksMatchmakingServersPlugin, SteamworksMatchmakingServersResult,
-    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
-    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
-    SteamworksUserResult,
+    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksInputCommand, SteamworksInputError,
+    SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
+    SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
+    SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
+    SteamworksMatchmakingServersResult, SteamworksServerListFilters, SteamworksServerListKind,
+    SteamworksServerListRequestId, SteamworksUserCommand, SteamworksUserError,
+    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
 };
 
 #[test]
@@ -81,6 +85,57 @@ fn friends_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+}
+
+#[test]
+fn input_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_exports(
+        _plugin: SteamworksInputPlugin,
+        _command: SteamworksInputCommand,
+        _operation: SteamworksInputOperation,
+        _result: SteamworksInputResult,
+        _error: SteamworksInputError,
+    ) {
+    }
+
+    fn accepts_prelude_exports(
+        _plugin: PreludeInputPlugin,
+        _command: PreludeInputCommand,
+        _operation: PreludeInputOperation,
+        _result: PreludeInputResult,
+        _error: PreludeInputError,
+    ) {
+    }
+
+    let command = SteamworksInputCommand::init(false);
+    let operation = SteamworksInputOperation::Initialized {
+        explicitly_call_run_frame: false,
+    };
+    let error = SteamworksInputError::ClientUnavailable;
+    let result = SteamworksInputResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_root_exports(
+        SteamworksInputPlugin::new(),
+        command,
+        operation,
+        result,
+        error,
+    );
+
+    let command = PreludeInputCommand::init(false);
+    let operation = PreludeInputOperation::Initialized {
+        explicitly_call_run_frame: false,
+    };
+    let error = PreludeInputError::ClientUnavailable;
+    let result = PreludeInputResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    accepts_prelude_exports(PreludeInputPlugin::new(), command, operation, result, error);
 }
 
 #[test]
