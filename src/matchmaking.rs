@@ -4,24 +4,17 @@
 //! It keeps async Steam call results and lobby callbacks flowing through Bevy
 //! messages, while avoiding blocking work in the frame loop.
 
-use bevy_app::{App, First, Plugin};
-use bevy_ecs::schedule::IntoScheduleConfigs;
-
-use crate::{SteamworksEvent, SteamworksSystem};
-
 mod async_results;
 mod callbacks;
 mod commands;
 mod filters;
 mod messages;
+mod plugin;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
 mod validation;
-
-use async_results::SteamworksMatchmakingAsyncResults;
-use commands::process_matchmaking_commands;
 
 pub use messages::*;
 pub use state::SteamworksMatchmakingState;
@@ -39,30 +32,3 @@ const MAX_LOBBY_LIST_RESULTS: u64 = i32::MAX as u64;
 /// callbacks. It also mirrors lobby callbacks into matchmaking results.
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksMatchmakingPlugin;
-
-impl SteamworksMatchmakingPlugin {
-    /// Creates a matchmaking plugin with default behavior.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Plugin for SteamworksMatchmakingPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SteamworksMatchmakingState>()
-            .init_resource::<SteamworksMatchmakingAsyncResults>()
-            .add_message::<SteamworksEvent>()
-            .add_message::<SteamworksMatchmakingCommand>()
-            .add_message::<SteamworksMatchmakingResult>()
-            .configure_sets(
-                First,
-                SteamworksSystem::ProcessMatchmakingCommands
-                    .after(SteamworksSystem::RunCallbacks)
-                    .before(bevy_ecs::message::MessageUpdateSystems),
-            )
-            .add_systems(
-                First,
-                process_matchmaking_commands.in_set(SteamworksSystem::ProcessMatchmakingCommands),
-            );
-    }
-}

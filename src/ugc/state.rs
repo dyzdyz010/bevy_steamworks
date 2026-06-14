@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::Resource;
 
+use super::update_watches::SteamworksUgcUpdateWatches;
 use super::*;
 
 /// Runtime state for [`crate::SteamworksUgcPlugin`].

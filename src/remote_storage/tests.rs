@@ -1,6 +1,7 @@
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
+use super::async_results::SteamworksRemoteStorageAsyncResults;
 use super::*;
 
 #[test]
@@ -14,10 +15,27 @@ fn remote_storage_plugin_registers_resources_and_messages() {
         .contains_resource::<SteamworksRemoteStorageState>());
     assert!(app
         .world()
+        .contains_resource::<SteamworksRemoteStorageAsyncResults>());
+    assert!(app
+        .world()
         .contains_resource::<Messages<SteamworksRemoteStorageCommand>>());
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksRemoteStorageResult>>());
+}
+
+#[test]
+fn plugin_name_matches_remote_storage_type_path_for_bevy_tracking() {
+    let plugin = SteamworksRemoteStoragePlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksRemoteStoragePlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::remote_storage::SteamworksRemoteStoragePlugin"
+    );
 }
 
 #[test]

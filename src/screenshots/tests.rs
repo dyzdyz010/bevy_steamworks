@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
+
+use crate::SteamworksEvent;
 
 use super::*;
 
@@ -21,6 +23,20 @@ fn screenshots_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksScreenshotsResult>>());
+}
+
+#[test]
+fn plugin_name_matches_screenshots_type_path_for_bevy_tracking() {
+    let plugin = SteamworksScreenshotsPlugin::new();
+
+    assert_eq!(
+        plugin.name(),
+        std::any::type_name::<SteamworksScreenshotsPlugin>()
+    );
+    assert_eq!(
+        plugin.name(),
+        "bevy_steamworks::screenshots::SteamworksScreenshotsPlugin"
+    );
 }
 
 #[test]

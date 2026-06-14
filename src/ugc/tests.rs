@@ -1,8 +1,12 @@
 use std::path::PathBuf;
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
+use crate::SteamworksEvent;
+
+use super::async_results::SteamworksUgcAsyncResults;
+use super::update_watches::SteamworksUgcUpdateWatches;
 use super::validation::{
     validate_command, validate_item_update, validate_query, validate_query_options,
 };
@@ -15,6 +19,7 @@ fn ugc_plugin_registers_resources_and_messages() {
     app.add_plugins(SteamworksUgcPlugin::new());
 
     assert!(app.world().contains_resource::<SteamworksUgcState>());
+    assert!(app.world().contains_resource::<SteamworksUgcAsyncResults>());
     assert!(app
         .world()
         .contains_resource::<SteamworksUgcUpdateWatches>());
@@ -25,6 +30,14 @@ fn ugc_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksUgcResult>>());
+}
+
+#[test]
+fn plugin_name_matches_ugc_type_path_for_bevy_tracking() {
+    let plugin = SteamworksUgcPlugin::new();
+
+    assert_eq!(plugin.name(), std::any::type_name::<SteamworksUgcPlugin>());
+    assert_eq!(plugin.name(), "bevy_steamworks::ugc::SteamworksUgcPlugin");
 }
 
 #[test]

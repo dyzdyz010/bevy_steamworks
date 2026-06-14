@@ -5,11 +5,6 @@
 //! Bevy messages, while converting asynchronous Steam call results and download
 //! callbacks into owned ECS-safe result messages.
 
-use bevy_app::{App, First, Plugin};
-use bevy_ecs::schedule::IntoScheduleConfigs;
-
-use crate::{SteamworksEvent, SteamworksSystem};
-
 /// Maximum number of item IDs accepted by one UGC details or playtime command.
 ///
 /// The raw Steam call takes a `u32` count and is not intended for unbounded
@@ -43,49 +38,18 @@ pub const STEAMWORKS_UGC_MAX_UPDATE_KEY_VALUE_TAGS: usize = 100;
 #[derive(Clone, Debug, Default)]
 pub struct SteamworksUgcPlugin;
 
-impl SteamworksUgcPlugin {
-    /// Creates a UGC plugin with default behavior.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Plugin for SteamworksUgcPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SteamworksUgcState>()
-            .init_resource::<SteamworksUgcAsyncResults>()
-            .init_resource::<SteamworksUgcUpdateWatches>()
-            .add_message::<SteamworksEvent>()
-            .add_message::<SteamworksUgcCommand>()
-            .add_message::<SteamworksUgcResult>()
-            .configure_sets(
-                First,
-                SteamworksSystem::ProcessUgcCommands
-                    .after(SteamworksSystem::RunCallbacks)
-                    .before(bevy_ecs::message::MessageUpdateSystems),
-            )
-            .add_systems(
-                First,
-                process_ugc_commands.in_set(SteamworksSystem::ProcessUgcCommands),
-            );
-    }
-}
-
 mod async_results;
 mod callbacks;
 mod commands;
 mod item_updates;
 mod messages;
+mod plugin;
 mod queries;
 mod snapshots;
 mod state;
 mod types;
 mod update_watches;
 mod validation;
-
-use async_results::SteamworksUgcAsyncResults;
-use commands::process_ugc_commands;
-use update_watches::SteamworksUgcUpdateWatches;
 
 pub use messages::*;
 pub use state::SteamworksUgcState;
