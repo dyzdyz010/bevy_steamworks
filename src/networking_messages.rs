@@ -72,6 +72,11 @@ impl SteamworksNetworkingMessagesPlugin {
         self.auto_accept_session_requests = enabled;
         self
     }
+
+    /// Returns true when incoming session requests are accepted in the Steam callback.
+    pub fn auto_accepts_session_requests(&self) -> bool {
+        self.auto_accept_session_requests
+    }
 }
 
 impl Plugin for SteamworksNetworkingMessagesPlugin {

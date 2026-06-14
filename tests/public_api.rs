@@ -704,14 +704,10 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
+    assert!(!plugin.auto_accepts_session_requests());
 
-    accepts_root_exports(
-        SteamworksNetworkingMessagesPlugin::new(),
-        command,
-        operation,
-        result,
-        error,
-    );
+    accepts_root_exports(plugin, command, operation, result, error);
 
     let command = PreludeNetworkingMessagesCommand::receive_messages(0, 1);
     let operation =
@@ -721,14 +717,10 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let plugin = PreludeNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
+    assert!(!plugin.auto_accepts_session_requests());
 
-    accepts_prelude_exports(
-        PreludeNetworkingMessagesPlugin::new(),
-        command,
-        operation,
-        result,
-        error,
-    );
+    accepts_prelude_exports(plugin, command, operation, result, error);
 }
 
 #[test]

@@ -7,6 +7,15 @@ use bevy_ecs::{
 use super::*;
 
 #[test]
+fn configuration_accessors_expose_builder_settings() {
+    let plugin = SteamworksNetworkingMessagesPlugin::new();
+    assert!(plugin.auto_accepts_session_requests());
+
+    let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
+    assert!(!plugin.auto_accepts_session_requests());
+}
+
+#[test]
 fn networking_messages_plugin_registers_resources_and_messages() {
     let mut app = App::new();
 
