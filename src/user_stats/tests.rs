@@ -23,6 +23,30 @@ fn plugin_name_matches_stats_type_path_for_bevy_tracking() {
 }
 
 #[test]
+fn configuration_accessors_expose_builder_settings() {
+    let plugin = SteamworksStatsPlugin::new();
+    assert_eq!(plugin.settings(), &SteamworksStatsSettings::default());
+    assert!(plugin.requests_current_user_stats_on_startup());
+    assert!(plugin.auto_store_enabled());
+
+    let settings = SteamworksStatsSettings {
+        request_current_user_stats_on_startup: false,
+        auto_store: false,
+    };
+    let plugin = SteamworksStatsPlugin::with_settings(settings.clone());
+    assert_eq!(plugin.settings(), &settings);
+    assert!(!plugin.requests_current_user_stats_on_startup());
+    assert!(!plugin.auto_store_enabled());
+
+    let plugin = SteamworksStatsPlugin::new()
+        .request_current_user_stats_on_startup(false)
+        .auto_store(false);
+    assert_eq!(plugin.settings(), &settings);
+    assert!(!plugin.requests_current_user_stats_on_startup());
+    assert!(!plugin.auto_store_enabled());
+}
+
+#[test]
 fn stats_plugin_registers_resources_and_messages() {
     let mut app = App::new();
 

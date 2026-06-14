@@ -14,7 +14,7 @@ use super::{
 };
 
 /// Settings used by [`crate::SteamworksStatsPlugin`].
-#[derive(Clone, Debug, Resource)]
+#[derive(Clone, Debug, PartialEq, Eq, Resource)]
 pub struct SteamworksStatsSettings {
     /// Request stats for the current Steam user when the plugin starts.
     ///

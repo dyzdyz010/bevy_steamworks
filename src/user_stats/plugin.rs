@@ -31,6 +31,21 @@ impl SteamworksStatsPlugin {
         self.settings.auto_store = enabled;
         self
     }
+
+    /// Returns the settings this plugin will insert when built.
+    pub fn settings(&self) -> &SteamworksStatsSettings {
+        &self.settings
+    }
+
+    /// Returns true when this plugin requests current-user stats on startup.
+    pub fn requests_current_user_stats_on_startup(&self) -> bool {
+        self.settings.request_current_user_stats_on_startup
+    }
+
+    /// Returns true when successful writes are automatically followed by `store_stats()`.
+    pub fn auto_store_enabled(&self) -> bool {
+        self.settings.auto_store
+    }
 }
 
 impl Plugin for SteamworksStatsPlugin {

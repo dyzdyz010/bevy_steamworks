@@ -1125,6 +1125,8 @@ fn user_api_is_exported_from_root_and_prelude() {
 
 #[test]
 fn stats_api_is_exported_from_root_and_prelude() {
+    fn assert_eq_type<T: Eq>() {}
+
     fn accepts_root_exports(
         _plugin: SteamworksStatsPlugin,
         _command: SteamworksStatsCommand,
@@ -1143,8 +1145,15 @@ fn stats_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let _root_settings: bevy_steamworks::SteamworksStatsSettings =
-        bevy_steamworks::SteamworksStatsSettings::default();
+    let root_settings = bevy_steamworks::SteamworksStatsSettings {
+        request_current_user_stats_on_startup: false,
+        auto_store: false,
+    };
+    assert_eq_type::<bevy_steamworks::SteamworksStatsSettings>();
+    let root_plugin = SteamworksStatsPlugin::with_settings(root_settings.clone());
+    assert_eq!(root_plugin.settings(), &root_settings);
+    assert!(!root_plugin.requests_current_user_stats_on_startup());
+    assert!(!root_plugin.auto_store_enabled());
     let _root_state: bevy_steamworks::SteamworksStatsState =
         bevy_steamworks::SteamworksStatsState::default();
     let _root_leaderboard: bevy_steamworks::SteamworksLeaderboardId =
@@ -1167,8 +1176,15 @@ fn stats_api_is_exported_from_root_and_prelude() {
         bevy_steamworks::SteamworksLeaderboardScoreUploaded,
     > = None;
 
-    let _prelude_settings: bevy_steamworks::prelude::SteamworksStatsSettings =
-        bevy_steamworks::prelude::SteamworksStatsSettings::default();
+    let prelude_settings = bevy_steamworks::prelude::SteamworksStatsSettings {
+        request_current_user_stats_on_startup: false,
+        auto_store: false,
+    };
+    assert_eq_type::<bevy_steamworks::prelude::SteamworksStatsSettings>();
+    let prelude_plugin = PreludeStatsPlugin::with_settings(prelude_settings.clone());
+    assert_eq!(prelude_plugin.settings(), &prelude_settings);
+    assert!(!prelude_plugin.requests_current_user_stats_on_startup());
+    assert!(!prelude_plugin.auto_store_enabled());
     let _prelude_state: bevy_steamworks::prelude::SteamworksStatsState =
         bevy_steamworks::prelude::SteamworksStatsState::default();
     let _prelude_leaderboard: bevy_steamworks::prelude::SteamworksLeaderboardId =
@@ -1223,13 +1239,7 @@ fn stats_api_is_exported_from_root_and_prelude() {
         error: error.clone(),
     };
 
-    accepts_root_exports(
-        SteamworksStatsPlugin::new(),
-        command,
-        operation,
-        result,
-        error,
-    );
+    accepts_root_exports(root_plugin, command, operation, result, error);
 
     let command = PreludeStatsCommand::RequestCurrentUserStats;
     let operation = PreludeStatsOperation::GlobalAchievementPercentagesRequested;
@@ -1239,7 +1249,7 @@ fn stats_api_is_exported_from_root_and_prelude() {
         error: error.clone(),
     };
 
-    accepts_prelude_exports(PreludeStatsPlugin::new(), command, operation, result, error);
+    accepts_prelude_exports(prelude_plugin, command, operation, result, error);
 }
 
 #[test]
