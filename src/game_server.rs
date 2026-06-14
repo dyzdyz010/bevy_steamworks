@@ -117,6 +117,45 @@ impl SteamworksServerUnavailable {
     fn init_failed(config: SteamworksServerConfig, source: steamworks::SteamAPIInitError) -> Self {
         Self::InitFailed { config, source }
     }
+
+    /// Returns true when manual initialization was selected without inserting a server resource.
+    pub fn is_manual_server_missing(&self) -> bool {
+        matches!(self, Self::ManualServerMissing)
+    }
+
+    /// Returns true when Steam Game Server initialization failed before calling upstream Steam.
+    pub fn is_invalid_string(&self) -> bool {
+        matches!(self, Self::InvalidString { .. })
+    }
+
+    /// Returns true when an upstream Steam Game Server initialization call failed.
+    pub fn is_init_failed(&self) -> bool {
+        matches!(self, Self::InitFailed { .. })
+    }
+
+    /// Returns the invalid config field, when initialization failed during validation.
+    pub fn invalid_string_field(&self) -> Option<&'static str> {
+        match self {
+            Self::InvalidString { field } => Some(*field),
+            Self::ManualServerMissing | Self::InitFailed { .. } => None,
+        }
+    }
+
+    /// Returns the config used for a failed upstream Steam Game Server initialization call.
+    pub fn init_config(&self) -> Option<&SteamworksServerConfig> {
+        match self {
+            Self::InitFailed { config, .. } => Some(config),
+            Self::ManualServerMissing | Self::InvalidString { .. } => None,
+        }
+    }
+
+    /// Returns the upstream Steamworks initialization error, when initialization failed.
+    pub fn init_error(&self) -> Option<&steamworks::SteamAPIInitError> {
+        match self {
+            Self::InitFailed { source, .. } => Some(source),
+            Self::ManualServerMissing | Self::InvalidString { .. } => None,
+        }
+    }
 }
 
 /// A Bevy resource wrapping [`steamworks::Server`].

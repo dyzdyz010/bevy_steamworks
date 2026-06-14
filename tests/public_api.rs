@@ -73,6 +73,7 @@ use bevy_steamworks::{
         SteamworksServerOperation as PreludeServerOperation,
         SteamworksServerPlugin as PreludeServerPlugin,
         SteamworksServerResult as PreludeServerResult,
+        SteamworksServerUnavailable as PreludeServerUnavailable,
         SteamworksStatsCommand as PreludeStatsCommand, SteamworksStatsError as PreludeStatsError,
         SteamworksStatsOperation as PreludeStatsOperation,
         SteamworksStatsPlugin as PreludeStatsPlugin, SteamworksStatsResult as PreludeStatsResult,
@@ -121,14 +122,15 @@ use bevy_steamworks::{
     SteamworksServerCommand, SteamworksServerConfig, SteamworksServerError,
     SteamworksServerInitMode, SteamworksServerListFilters, SteamworksServerListKind,
     SteamworksServerListRequestId, SteamworksServerOperation, SteamworksServerPlugin,
-    SteamworksServerResult, SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation,
-    SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand,
-    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
-    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError,
-    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable,
-    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
-    SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
-    SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksServerResult, SteamworksServerUnavailable, SteamworksStatsCommand,
+    SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
+    SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
+    SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
 
 #[test]
@@ -391,6 +393,7 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         _operation: SteamworksServerOperation,
         _result: SteamworksServerResult,
         _error: SteamworksServerError,
+        _unavailable: SteamworksServerUnavailable,
     ) {
     }
 
@@ -400,6 +403,7 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         _operation: PreludeServerOperation,
         _result: PreludeServerResult,
         _error: PreludeServerError,
+        _unavailable: PreludeServerUnavailable,
     ) {
     }
 
@@ -429,8 +433,25 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         SteamworksFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let source = SteamAPIInitError::NoSteamClient("offline".into());
+    let unavailable = SteamworksServerUnavailable::InitFailed {
+        config: SteamworksServerConfig::new(
+            std::net::Ipv4Addr::LOCALHOST,
+            27015,
+            27016,
+            steamworks::ServerMode::Authentication,
+            "1.0.0",
+        ),
+        source: source.clone(),
+    };
+    assert!(unavailable.is_init_failed());
+    assert!(!unavailable.is_manual_server_missing());
+    assert!(!unavailable.is_invalid_string());
+    assert_eq!(unavailable.init_error(), Some(&source));
+    assert!(unavailable.init_config().is_some());
+    assert_eq!(unavailable.invalid_string_field(), None);
 
-    accepts_root_exports(plugin, command, operation, result, error);
+    accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
     let command = PreludeServerCommand::GetSteamId;
     let operation = PreludeServerOperation::AnonymousLogonSubmitted;
@@ -455,8 +476,15 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         PreludeFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let unavailable = PreludeServerUnavailable::InvalidString { field: "version" };
+    assert!(!unavailable.is_init_failed());
+    assert!(!unavailable.is_manual_server_missing());
+    assert!(unavailable.is_invalid_string());
+    assert_eq!(unavailable.init_error(), None);
+    assert_eq!(unavailable.init_config(), None);
+    assert_eq!(unavailable.invalid_string_field(), Some("version"));
 
-    accepts_prelude_exports(plugin, command, operation, result, error);
+    accepts_prelude_exports(plugin, command, operation, result, error, unavailable);
 }
 
 #[test]

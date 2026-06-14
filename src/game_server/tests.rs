@@ -41,6 +41,45 @@ fn configuration_accessors_expose_builder_settings() {
 }
 
 #[test]
+fn unavailable_accessors_expose_structured_status() {
+    let config = SteamworksServerConfig::new(
+        Ipv4Addr::LOCALHOST,
+        27015,
+        27016,
+        steamworks::ServerMode::Authentication,
+        "1.0.0",
+    );
+    let source = steamworks::SteamAPIInitError::NoSteamClient("Steam is not running".to_string());
+    let unavailable = SteamworksServerUnavailable::InitFailed {
+        config: config.clone(),
+        source: source.clone(),
+    };
+
+    assert!(!unavailable.is_manual_server_missing());
+    assert!(!unavailable.is_invalid_string());
+    assert!(unavailable.is_init_failed());
+    assert_eq!(unavailable.invalid_string_field(), None);
+    assert_eq!(unavailable.init_config(), Some(&config));
+    assert_eq!(unavailable.init_error(), Some(&source));
+
+    let unavailable = SteamworksServerUnavailable::InvalidString { field: "version" };
+    assert!(!unavailable.is_manual_server_missing());
+    assert!(unavailable.is_invalid_string());
+    assert!(!unavailable.is_init_failed());
+    assert_eq!(unavailable.invalid_string_field(), Some("version"));
+    assert_eq!(unavailable.init_config(), None);
+    assert_eq!(unavailable.init_error(), None);
+
+    let unavailable = SteamworksServerUnavailable::ManualServerMissing;
+    assert!(unavailable.is_manual_server_missing());
+    assert!(!unavailable.is_invalid_string());
+    assert!(!unavailable.is_init_failed());
+    assert_eq!(unavailable.invalid_string_field(), None);
+    assert_eq!(unavailable.init_config(), None);
+    assert_eq!(unavailable.init_error(), None);
+}
+
+#[test]
 fn manual_mode_can_continue_without_server() {
     let mut app = App::new();
 
