@@ -158,6 +158,14 @@ pub struct SteamworksServerState {
     steam_server_connected: Option<bool>,
     active_auth_tickets: Vec<steamworks::AuthTicket>,
     authenticated_users: Vec<steamworks::SteamId>,
+    last_auth_session_ticket: Option<SteamworksServerIssuedAuthSessionTicket>,
+    last_cancelled_auth_ticket: Option<steamworks::AuthTicket>,
+    last_started_authentication_session: Option<steamworks::SteamId>,
+    last_ended_authentication_session: Option<steamworks::SteamId>,
+    auth_session_ticket_issue_count: u64,
+    auth_ticket_cancel_count: u64,
+    authentication_session_start_count: u64,
+    authentication_session_end_count: u64,
     last_steam_server_connection_event: Option<SteamworksSteamServerConnectionEvent>,
     last_auth_ticket_response: Option<SteamworksAuthSessionTicketResponse>,
     last_auth_ticket_validation: Option<SteamworksAuthTicketValidation>,
@@ -180,7 +188,10 @@ pub struct SteamworksServerState {
     key_values: Vec<(String, String)>,
     password_protected: Option<bool>,
     bot_player_count: Option<i32>,
+    last_incoming_packet: Option<SteamworksServerIncomingPacket>,
+    incoming_packet_count: u64,
     last_outgoing_packets: Vec<SteamworksServerOutgoingPacket>,
+    outgoing_packet_drain_count: u64,
 }
 
 impl SteamworksServerState {
@@ -217,6 +228,46 @@ impl SteamworksServerState {
     /// denial, or kick for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns the most recent auth session ticket issued through this command layer.
+    pub fn last_auth_session_ticket(&self) -> Option<&SteamworksServerIssuedAuthSessionTicket> {
+        self.last_auth_session_ticket.as_ref()
+    }
+
+    /// Returns the most recent auth ticket cancelled through this command layer.
+    pub fn last_cancelled_auth_ticket(&self) -> Option<steamworks::AuthTicket> {
+        self.last_cancelled_auth_ticket
+    }
+
+    /// Returns the most recent remote authentication session started through this command layer.
+    pub fn last_started_authentication_session(&self) -> Option<steamworks::SteamId> {
+        self.last_started_authentication_session
+    }
+
+    /// Returns the most recent remote authentication session ended through this command layer.
+    pub fn last_ended_authentication_session(&self) -> Option<steamworks::SteamId> {
+        self.last_ended_authentication_session
+    }
+
+    /// Returns how many auth session tickets this plugin issued.
+    pub fn auth_session_ticket_issue_count(&self) -> u64 {
+        self.auth_session_ticket_issue_count
+    }
+
+    /// Returns how many auth tickets this plugin cancelled.
+    pub fn auth_ticket_cancel_count(&self) -> u64 {
+        self.auth_ticket_cancel_count
+    }
+
+    /// Returns how many remote authentication sessions this plugin started.
+    pub fn authentication_session_start_count(&self) -> u64 {
+        self.authentication_session_start_count
+    }
+
+    /// Returns how many remote authentication sessions this plugin ended.
+    pub fn authentication_session_end_count(&self) -> u64 {
+        self.authentication_session_end_count
     }
 
     /// Returns the most recent Steam server connection callback snapshot.
@@ -336,9 +387,24 @@ impl SteamworksServerState {
         self.bot_player_count
     }
 
+    /// Returns the most recent shared-query incoming packet forwarded to Steam.
+    pub fn last_incoming_packet(&self) -> Option<&SteamworksServerIncomingPacket> {
+        self.last_incoming_packet.as_ref()
+    }
+
+    /// Returns how many shared-query incoming packets this command layer forwarded.
+    pub fn incoming_packet_count(&self) -> u64 {
+        self.incoming_packet_count
+    }
+
     /// Returns packets returned by the most recent outgoing packet drain command.
     pub fn last_outgoing_packets(&self) -> &[SteamworksServerOutgoingPacket] {
         &self.last_outgoing_packets
+    }
+
+    /// Returns how many shared-query outgoing packet drain commands this layer processed.
+    pub fn outgoing_packet_drain_count(&self) -> u64 {
+        self.outgoing_packet_drain_count
     }
 
     fn record_error(&mut self, error: SteamworksServerError) {
@@ -350,21 +416,40 @@ impl SteamworksServerState {
             SteamworksServerOperation::SteamIdRead { steam_id } => {
                 self.steam_id = Some(*steam_id);
             }
-            SteamworksServerOperation::AuthenticationSessionTicketIssued { ticket, .. }
-                if !self.active_auth_tickets.contains(ticket) =>
-            {
-                self.active_auth_tickets.push(*ticket);
+            SteamworksServerOperation::AuthenticationSessionTicketIssued {
+                ticket,
+                ticket_bytes,
+                steam_id,
+            } => {
+                if !self.active_auth_tickets.contains(ticket) {
+                    self.active_auth_tickets.push(*ticket);
+                }
+                self.last_auth_session_ticket = Some(SteamworksServerIssuedAuthSessionTicket {
+                    ticket: *ticket,
+                    ticket_bytes: ticket_bytes.clone(),
+                    steam_id: *steam_id,
+                });
+                self.auth_session_ticket_issue_count =
+                    self.auth_session_ticket_issue_count.saturating_add(1);
             }
             SteamworksServerOperation::AuthenticationTicketCancelled { ticket } => {
                 self.active_auth_tickets.retain(|known| known != ticket);
+                self.last_cancelled_auth_ticket = Some(*ticket);
+                self.auth_ticket_cancel_count = self.auth_ticket_cancel_count.saturating_add(1);
             }
-            SteamworksServerOperation::AuthenticationSessionStarted { user }
-                if !self.authenticated_users.contains(user) =>
-            {
-                self.authenticated_users.push(*user);
+            SteamworksServerOperation::AuthenticationSessionStarted { user } => {
+                if !self.authenticated_users.contains(user) {
+                    self.authenticated_users.push(*user);
+                }
+                self.last_started_authentication_session = Some(*user);
+                self.authentication_session_start_count =
+                    self.authentication_session_start_count.saturating_add(1);
             }
             SteamworksServerOperation::AuthenticationSessionEnded { user } => {
                 self.authenticated_users.retain(|known| known != user);
+                self.last_ended_authentication_session = Some(*user);
+                self.authentication_session_end_count =
+                    self.authentication_session_end_count.saturating_add(1);
             }
             SteamworksServerOperation::AuthenticationSessionTicketResponse { response } => {
                 if response.result.is_err() {
@@ -461,11 +546,23 @@ impl SteamworksServerState {
             SteamworksServerOperation::BotPlayerCountSet { count } => {
                 self.bot_player_count = Some(*count);
             }
-            SteamworksServerOperation::IncomingPacketHandled { .. } => {}
+            SteamworksServerOperation::IncomingPacketHandled {
+                addr,
+                bytes,
+                accepted,
+            } => {
+                self.last_incoming_packet = Some(SteamworksServerIncomingPacket {
+                    addr: *addr,
+                    bytes: *bytes,
+                    accepted: *accepted,
+                });
+                self.incoming_packet_count = self.incoming_packet_count.saturating_add(1);
+            }
             SteamworksServerOperation::OutgoingPacketsDrained { packets } => {
                 self.last_outgoing_packets = packets.clone();
+                self.outgoing_packet_drain_count =
+                    self.outgoing_packet_drain_count.saturating_add(1);
             }
-            _ => {}
         }
     }
 }
@@ -548,7 +645,7 @@ impl From<&str> for SteamworksServerLoginToken {
 }
 
 /// A shared-query outgoing packet produced by Steam Game Server.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SteamworksServerOutgoingPacket {
     /// Destination address for this packet.
     pub addr: SocketAddrV4,
@@ -556,8 +653,53 @@ pub struct SteamworksServerOutgoingPacket {
     pub data: Vec<u8>,
 }
 
+impl fmt::Debug for SteamworksServerOutgoingPacket {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SteamworksServerOutgoingPacket")
+            .field("addr", &self.addr)
+            .field("data_len", &self.data.len())
+            .finish()
+    }
+}
+
+/// Auth session ticket issued through the game-server command layer.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksServerIssuedAuthSessionTicket {
+    /// Ticket handle that should be cancelled when no longer needed.
+    pub ticket: steamworks::AuthTicket,
+    /// Raw ticket bytes returned by Steam.
+    ///
+    /// Treat this as credential material; avoid logging it or storing it longer than needed.
+    pub ticket_bytes: Vec<u8>,
+    /// Steam ID used as the network identity for the verifier.
+    pub steam_id: steamworks::SteamId,
+}
+
+impl fmt::Debug for SteamworksServerIssuedAuthSessionTicket {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SteamworksServerIssuedAuthSessionTicket")
+            .field("ticket", &self.ticket)
+            .field("ticket_bytes_len", &self.ticket_bytes.len())
+            .field("steam_id", &self.steam_id)
+            .finish()
+    }
+}
+
+/// Shared-query incoming packet forwarded to Steam Game Server.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerIncomingPacket {
+    /// Source address for the packet.
+    pub addr: SocketAddrV4,
+    /// Number of bytes forwarded.
+    pub bytes: usize,
+    /// Whether Steam accepted the packet.
+    pub accepted: bool,
+}
+
 /// A high-level command for Steam Game Server operations.
-#[derive(Clone, Debug, Message, PartialEq, Eq)]
+#[derive(Clone, Message, PartialEq, Eq)]
 pub enum SteamworksServerCommand {
     /// Read the Steam ID of this game server.
     GetSteamId,
@@ -668,6 +810,96 @@ pub enum SteamworksServerCommand {
     },
     /// Drain queued shared-query outgoing packets from Steam.
     DrainOutgoingPackets,
+}
+
+impl fmt::Debug for SteamworksServerCommand {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::GetSteamId => formatter.write_str("GetSteamId"),
+            Self::GetAuthenticationSessionTicket { steam_id } => formatter
+                .debug_struct("GetAuthenticationSessionTicket")
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::CancelAuthenticationTicket { ticket } => formatter
+                .debug_struct("CancelAuthenticationTicket")
+                .field("ticket", ticket)
+                .finish(),
+            Self::BeginAuthenticationSession { user, ticket } => formatter
+                .debug_struct("BeginAuthenticationSession")
+                .field("user", user)
+                .field("ticket_len", &ticket.len())
+                .finish(),
+            Self::EndAuthenticationSession { user } => formatter
+                .debug_struct("EndAuthenticationSession")
+                .field("user", user)
+                .finish(),
+            Self::HandleIncomingPacket { data, addr } => formatter
+                .debug_struct("HandleIncomingPacket")
+                .field("data_len", &data.len())
+                .field("addr", addr)
+                .finish(),
+            Self::SetProduct { product } => formatter
+                .debug_struct("SetProduct")
+                .field("product", product)
+                .finish(),
+            Self::SetGameDescription { description } => formatter
+                .debug_struct("SetGameDescription")
+                .field("description", description)
+                .finish(),
+            Self::SetGameData { data } => formatter
+                .debug_struct("SetGameData")
+                .field("data", data)
+                .finish(),
+            Self::SetDedicatedServer { dedicated } => formatter
+                .debug_struct("SetDedicatedServer")
+                .field("dedicated", dedicated)
+                .finish(),
+            Self::LogOnAnonymous => formatter.write_str("LogOnAnonymous"),
+            Self::LogOn { token } => formatter
+                .debug_struct("LogOn")
+                .field("token", token)
+                .finish(),
+            Self::SetAdvertiseServerActive { active } => formatter
+                .debug_struct("SetAdvertiseServerActive")
+                .field("active", active)
+                .finish(),
+            Self::SetModDir { mod_dir } => formatter
+                .debug_struct("SetModDir")
+                .field("mod_dir", mod_dir)
+                .finish(),
+            Self::SetMapName { map_name } => formatter
+                .debug_struct("SetMapName")
+                .field("map_name", map_name)
+                .finish(),
+            Self::SetServerName { server_name } => formatter
+                .debug_struct("SetServerName")
+                .field("server_name", server_name)
+                .finish(),
+            Self::SetMaxPlayers { count } => formatter
+                .debug_struct("SetMaxPlayers")
+                .field("count", count)
+                .finish(),
+            Self::SetGameTags { tags } => formatter
+                .debug_struct("SetGameTags")
+                .field("tags", tags)
+                .finish(),
+            Self::SetKeyValue { key, value } => formatter
+                .debug_struct("SetKeyValue")
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::ClearAllKeyValues => formatter.write_str("ClearAllKeyValues"),
+            Self::SetPasswordProtected { protected } => formatter
+                .debug_struct("SetPasswordProtected")
+                .field("protected", protected)
+                .finish(),
+            Self::SetBotPlayerCount { count } => formatter
+                .debug_struct("SetBotPlayerCount")
+                .field("count", count)
+                .finish(),
+            Self::DrainOutgoingPackets => formatter.write_str("DrainOutgoingPackets"),
+        }
+    }
 }
 
 impl SteamworksServerCommand {
@@ -797,7 +1029,7 @@ impl SteamworksServerCommand {
 }
 
 /// A successfully submitted Steam Game Server operation or synchronous read.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum SteamworksServerOperation {
     /// The Steam ID of this game server was read.
     SteamIdRead {
@@ -950,6 +1182,137 @@ pub enum SteamworksServerOperation {
         /// Packets to send through the game server socket.
         packets: Vec<SteamworksServerOutgoingPacket>,
     },
+}
+
+impl fmt::Debug for SteamworksServerOperation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SteamIdRead { steam_id } => formatter
+                .debug_struct("SteamIdRead")
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::AuthenticationSessionTicketIssued {
+                ticket,
+                ticket_bytes,
+                steam_id,
+            } => formatter
+                .debug_struct("AuthenticationSessionTicketIssued")
+                .field("ticket", ticket)
+                .field("ticket_bytes_len", &ticket_bytes.len())
+                .field("steam_id", steam_id)
+                .finish(),
+            Self::AuthenticationTicketCancelled { ticket } => formatter
+                .debug_struct("AuthenticationTicketCancelled")
+                .field("ticket", ticket)
+                .finish(),
+            Self::AuthenticationSessionStarted { user } => formatter
+                .debug_struct("AuthenticationSessionStarted")
+                .field("user", user)
+                .finish(),
+            Self::AuthenticationSessionEnded { user } => formatter
+                .debug_struct("AuthenticationSessionEnded")
+                .field("user", user)
+                .finish(),
+            Self::AuthenticationSessionTicketResponse { response } => formatter
+                .debug_struct("AuthenticationSessionTicketResponse")
+                .field("response", response)
+                .finish(),
+            Self::AuthenticationTicketValidationReceived { validation } => formatter
+                .debug_struct("AuthenticationTicketValidationReceived")
+                .field("validation", validation)
+                .finish(),
+            Self::SteamServerConnectionEventReceived { event } => formatter
+                .debug_struct("SteamServerConnectionEventReceived")
+                .field("event", event)
+                .finish(),
+            Self::ClientApproved { approval } => formatter
+                .debug_struct("ClientApproved")
+                .field("approval", approval)
+                .finish(),
+            Self::ClientDenied { denial } => formatter
+                .debug_struct("ClientDenied")
+                .field("denial", denial)
+                .finish(),
+            Self::ClientKicked { kick } => formatter
+                .debug_struct("ClientKicked")
+                .field("kick", kick)
+                .finish(),
+            Self::ClientGroupStatusReceived { status } => formatter
+                .debug_struct("ClientGroupStatusReceived")
+                .field("status", status)
+                .finish(),
+            Self::IncomingPacketHandled {
+                addr,
+                bytes,
+                accepted,
+            } => formatter
+                .debug_struct("IncomingPacketHandled")
+                .field("addr", addr)
+                .field("bytes", bytes)
+                .field("accepted", accepted)
+                .finish(),
+            Self::ProductSet { product } => formatter
+                .debug_struct("ProductSet")
+                .field("product", product)
+                .finish(),
+            Self::GameDescriptionSet { description } => formatter
+                .debug_struct("GameDescriptionSet")
+                .field("description", description)
+                .finish(),
+            Self::GameDataSet { data } => formatter
+                .debug_struct("GameDataSet")
+                .field("data", data)
+                .finish(),
+            Self::DedicatedServerSet { dedicated } => formatter
+                .debug_struct("DedicatedServerSet")
+                .field("dedicated", dedicated)
+                .finish(),
+            Self::AnonymousLogonSubmitted => formatter.write_str("AnonymousLogonSubmitted"),
+            Self::TokenLogonSubmitted => formatter.write_str("TokenLogonSubmitted"),
+            Self::AdvertiseServerActiveSet { active } => formatter
+                .debug_struct("AdvertiseServerActiveSet")
+                .field("active", active)
+                .finish(),
+            Self::ModDirSet { mod_dir } => formatter
+                .debug_struct("ModDirSet")
+                .field("mod_dir", mod_dir)
+                .finish(),
+            Self::MapNameSet { map_name } => formatter
+                .debug_struct("MapNameSet")
+                .field("map_name", map_name)
+                .finish(),
+            Self::ServerNameSet { server_name } => formatter
+                .debug_struct("ServerNameSet")
+                .field("server_name", server_name)
+                .finish(),
+            Self::MaxPlayersSet { count } => formatter
+                .debug_struct("MaxPlayersSet")
+                .field("count", count)
+                .finish(),
+            Self::GameTagsSet { tags } => formatter
+                .debug_struct("GameTagsSet")
+                .field("tags", tags)
+                .finish(),
+            Self::KeyValueSet { key, value } => formatter
+                .debug_struct("KeyValueSet")
+                .field("key", key)
+                .field("value", value)
+                .finish(),
+            Self::AllKeyValuesCleared => formatter.write_str("AllKeyValuesCleared"),
+            Self::PasswordProtectedSet { protected } => formatter
+                .debug_struct("PasswordProtectedSet")
+                .field("protected", protected)
+                .finish(),
+            Self::BotPlayerCountSet { count } => formatter
+                .debug_struct("BotPlayerCountSet")
+                .field("count", count)
+                .finish(),
+            Self::OutgoingPacketsDrained { packets } => formatter
+                .debug_struct("OutgoingPacketsDrained")
+                .field("packets", packets)
+                .finish(),
+        }
+    }
 }
 
 /// Result message emitted by [`SteamworksServerPlugin`].
@@ -1953,6 +2316,40 @@ mod tests {
     }
 
     #[test]
+    fn debug_redacts_auth_and_packet_bytes() {
+        let user = steamworks::SteamId::from_raw(7);
+        let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 27015);
+        let auth_command =
+            SteamworksServerCommand::begin_authentication_session(user, vec![1, 2, 3]);
+        let packet_command = SteamworksServerCommand::handle_incoming_packet(vec![4, 5, 6], addr);
+        let packet = SteamworksServerOutgoingPacket {
+            addr,
+            data: vec![7, 8, 9],
+        };
+        let operation = SteamworksServerOperation::OutgoingPacketsDrained {
+            packets: vec![packet.clone()],
+        };
+        let result = SteamworksServerResult::Ok(operation.clone());
+
+        let auth_command_debug = format!("{auth_command:?}");
+        let packet_command_debug = format!("{packet_command:?}");
+        let packet_debug = format!("{packet:?}");
+        let operation_debug = format!("{operation:?}");
+        let result_debug = format!("{result:?}");
+
+        assert!(auth_command_debug.contains("ticket_len: 3"));
+        assert!(!auth_command_debug.contains("[1, 2, 3]"));
+        assert!(packet_command_debug.contains("data_len: 3"));
+        assert!(!packet_command_debug.contains("[4, 5, 6]"));
+        assert!(packet_debug.contains("data_len: 3"));
+        assert!(!packet_debug.contains("[7, 8, 9]"));
+        assert!(operation_debug.contains("data_len: 3"));
+        assert!(!operation_debug.contains("[7, 8, 9]"));
+        assert!(result_debug.contains("data_len: 3"));
+        assert!(!result_debug.contains("[7, 8, 9]"));
+    }
+
+    #[test]
     fn validation_rejects_inputs_that_would_panic_upstream() {
         assert_eq!(
             validate_server_command(&SteamworksServerCommand::set_product("bad\0product")),
@@ -2060,6 +2457,7 @@ mod tests {
 
         state.record_operation(&SteamworksServerOperation::SteamIdRead { steam_id });
         state.record_operation(&SteamworksServerOperation::AuthenticationSessionStarted { user });
+        state.record_operation(&SteamworksServerOperation::AuthenticationSessionStarted { user });
         state.record_operation(&SteamworksServerOperation::ProductSet {
             product: "480".to_string(),
         });
@@ -2100,12 +2498,24 @@ mod tests {
             protected: false,
         });
         state.record_operation(&SteamworksServerOperation::BotPlayerCountSet { count: 2 });
+        state.record_operation(&SteamworksServerOperation::IncomingPacketHandled {
+            addr: packet.addr,
+            bytes: packet.data.len(),
+            accepted: true,
+        });
         state.record_operation(&SteamworksServerOperation::OutgoingPacketsDrained {
             packets: vec![packet.clone()],
         });
 
         assert_eq!(state.steam_id(), Some(steam_id));
         assert_eq!(state.authenticated_users(), &[user]);
+        assert!(state.active_auth_tickets().is_empty());
+        assert!(state.last_auth_session_ticket().is_none());
+        assert_eq!(state.auth_session_ticket_issue_count(), 0);
+        assert!(state.last_cancelled_auth_ticket().is_none());
+        assert_eq!(state.auth_ticket_cancel_count(), 0);
+        assert_eq!(state.last_started_authentication_session(), Some(user));
+        assert_eq!(state.authentication_session_start_count(), 2);
         assert_eq!(state.product(), Some("480"));
         assert_eq!(state.game_description(), Some("Spacewar"));
         assert_eq!(state.game_data(), Some("mode=arena"));
@@ -2125,12 +2535,24 @@ mod tests {
         );
         assert_eq!(state.password_protected(), Some(false));
         assert_eq!(state.bot_player_count(), Some(2));
+        assert_eq!(
+            state.last_incoming_packet(),
+            Some(&SteamworksServerIncomingPacket {
+                addr: packet.addr,
+                bytes: packet.data.len(),
+                accepted: true,
+            })
+        );
+        assert_eq!(state.incoming_packet_count(), 1);
         assert_eq!(state.last_outgoing_packets(), &[packet]);
+        assert_eq!(state.outgoing_packet_drain_count(), 1);
 
         state.record_operation(&SteamworksServerOperation::AuthenticationSessionEnded { user });
         state.record_operation(&SteamworksServerOperation::AllKeyValuesCleared);
 
         assert!(state.authenticated_users().is_empty());
+        assert_eq!(state.last_ended_authentication_session(), Some(user));
+        assert_eq!(state.authentication_session_end_count(), 1);
         assert!(state.key_values().is_empty());
     }
 
