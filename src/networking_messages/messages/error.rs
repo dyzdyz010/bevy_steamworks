@@ -3,8 +3,8 @@ use thiserror::Error;
 /// Synchronous command errors from [`crate::SteamworksNetworkingMessagesPlugin`].
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum SteamworksNetworkingMessagesError {
-    /// No [`crate::SteamworksClient`] resource exists.
-    #[error("SteamworksClient resource is not available")]
+    /// No compatible [`crate::SteamworksClient`] or [`crate::SteamworksServer`] resource exists.
+    #[error("Steamworks Networking Messages resource is not available")]
     ClientUnavailable,
     /// A peer identity is invalid.
     #[error("Steam networking peer identity is invalid")]

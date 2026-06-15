@@ -182,7 +182,7 @@ fn main() {
 }
 ```
 
-The server command layer covers server identity reads, anonymous or token logon, metadata, advertisement flags, auth tickets, remote auth sessions, key/value rules, and shared-query incoming/outgoing packet handling. Login tokens use `SteamworksServerLoginToken`, whose `Debug` output is redacted so command tracing does not leak secrets. `SteamworksServerCommand::drain_outgoing_packets()` returns `SteamworksServerOutgoingPacket` values that the app should send through its game server socket; it mirrors upstream's drain-all behavior for packets currently queued by Steam. `SteamworksServerState` caches bounded snapshots for latest auth/session activity, metadata, incoming packet context, outgoing packet drains, and callback results. Packet and auth-ticket `Debug` output reports byte lengths instead of raw bytes. The layer validates strings, game tag lengths, and documented pre-logon-only metadata before calling upstream `steamworks`, so common C string conversion panics and logon-order mistakes become `SteamworksServerError` values. The server plugin also registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors auth ticket, validation, connection, `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` callbacks through both `SteamworksEvent` and `SteamworksServerResult`. Use `SteamworksUgcPlugin` for game-server Workshop initialization and `SteamworksUtilsPlugin` for read-only game-server utility queries. Use the `SteamworksServer` resource directly for upstream safe APIs not yet wrapped by commands, such as game-server networking, networking messages, networking sockets, and apps accessors.
+The server command layer covers server identity reads, anonymous or token logon, metadata, advertisement flags, auth tickets, remote auth sessions, key/value rules, and shared-query incoming/outgoing packet handling. Login tokens use `SteamworksServerLoginToken`, whose `Debug` output is redacted so command tracing does not leak secrets. `SteamworksServerCommand::drain_outgoing_packets()` returns `SteamworksServerOutgoingPacket` values that the app should send through its game server socket; it mirrors upstream's drain-all behavior for packets currently queued by Steam. `SteamworksServerState` caches bounded snapshots for latest auth/session activity, metadata, incoming packet context, outgoing packet drains, and callback results. Packet and auth-ticket `Debug` output reports byte lengths instead of raw bytes. The layer validates strings, game tag lengths, and documented pre-logon-only metadata before calling upstream `steamworks`, so common C string conversion panics and logon-order mistakes become `SteamworksServerError` values. The server plugin also registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors auth ticket, validation, connection, `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` callbacks through both `SteamworksEvent` and `SteamworksServerResult`. Use `SteamworksUgcPlugin` for game-server Workshop initialization, `SteamworksUtilsPlugin` for read-only game-server utility queries, and the networking plugins for game-server networking accessors. Use the `SteamworksServer` resource directly for upstream safe APIs not yet wrapped by commands, such as game-server apps accessors.
 
 Run the dedicated server example with:
 
@@ -476,7 +476,7 @@ cargo run --example input
 
 ## Legacy P2P Networking
 
-`SteamworksNetworkingPlugin` adds command/result messages for Steam's older P2P networking API: accept and close P2P sessions, send packets, poll packet availability, read owned packet snapshots, inspect session state, and mirror `P2PSessionRequest` / `P2PSessionConnectFail` callbacks as Bevy results.
+`SteamworksNetworkingPlugin` adds command/result messages for Steam's older P2P networking API: accept and close P2P sessions, send packets, poll packet availability, read owned packet snapshots, inspect session state, and mirror `P2PSessionRequest` / `P2PSessionConnectFail` callbacks as Bevy results. Commands can run with either `SteamworksClient` or `SteamworksServer`.
 
 New projects should prefer `SteamworksNetworkingMessagesPlugin`; this legacy layer exists for older Steam networking flows and migration work.
 
@@ -543,7 +543,7 @@ cargo run --example networking
 
 ## Networking Messages
 
-`SteamworksNetworkingMessagesPlugin` adds command/result messages for Steam's UDP-like P2P message API: send payloads to Steam IDs, IP endpoints, local host, or prebuilt `NetworkingIdentity` values; receive owned message snapshots by channel; read session connection state; and handle session request/failure callbacks.
+`SteamworksNetworkingMessagesPlugin` adds command/result messages for Steam's UDP-like P2P message API: send payloads to Steam IDs, IP endpoints, local host, or prebuilt `NetworkingIdentity` values; receive owned message snapshots by channel; read session connection state; and handle session request/failure callbacks. Commands and session callbacks can run with either `SteamworksClient` or `SteamworksServer`.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -634,7 +634,7 @@ cargo run --example networking_utils
 
 ## Networking Sockets
 
-`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send one payload or allocated batches with per-message lane/channel settings, receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles.
+`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send one payload or allocated batches with per-message lane/channel settings, receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles. Most commands can run with either `SteamworksClient` or `SteamworksServer`; allocated batch `SendMessages` still requires `SteamworksClient` because the upstream safe message allocator is client-only.
 
 The plugin owns upstream `ListenSocket` and `NetConnection` handles in a private resource and exposes stable IDs such as `SteamworksListenSocketId` and `SteamworksNetworkingSocketsConnectionId`. This prevents accidental handle drops from closing sockets outside the command layer.
 
@@ -688,7 +688,7 @@ fn main() {
 
 Listen socket connection requests must be answered immediately. `PollListenSocketEvents` therefore takes a `SteamworksConnectionRequestPolicy` and accepts or rejects each incoming request in the same frame instead of exposing a cross-frame pending request handle.
 
-This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
+This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries remain accessible through `SteamworksClient::networking_sockets()` or `SteamworksServer::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
 
 Run the Networking Sockets example with:
 

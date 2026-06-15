@@ -4,7 +4,8 @@
 //! [`steamworks::networking_messages::NetworkingMessages`] API. It exposes the
 //! UDP-like Steam P2P message interface through Bevy commands/results while
 //! copying received payloads into owned `Vec<u8>` values that are safe to keep
-//! in ECS state.
+//! in ECS state. Commands and callbacks can run through either the Steam client
+//! or Steam Game Server accessor.
 
 mod callbacks;
 mod commands;
@@ -30,11 +31,13 @@ pub const STEAMWORKS_NETWORKING_MESSAGES_MAX_BATCH_SIZE: usize = 1024;
 
 /// Bevy plugin for high-level Steam Networking Messages commands.
 ///
-/// Add this plugin after [`crate::SteamworksPlugin`]. It registers
+/// Add this plugin after [`crate::SteamworksPlugin`] or
+/// [`crate::SteamworksServerPlugin`]. It registers
 /// [`SteamworksNetworkingMessagesCommand`] and
 /// [`SteamworksNetworkingMessagesResult`] messages, installs the upstream
-/// session callbacks once a [`crate::SteamworksClient`] exists, and processes commands
-/// in [`bevy_app::First`] after Steam callbacks.
+/// session callbacks once a [`crate::SteamworksClient`] or
+/// [`crate::SteamworksServer`] exists, and processes commands in
+/// [`bevy_app::First`] after Steam callbacks.
 #[derive(Clone, Debug)]
 pub struct SteamworksNetworkingMessagesPlugin {
     auto_accept_session_requests: bool,

@@ -3,7 +3,7 @@ use bevy_ecs::{
     prelude::{Res, ResMut},
 };
 
-use crate::{SteamworksClient, SteamworksEvent};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksServer};
 
 use super::{
     callbacks::process_networking_steam_events,
@@ -21,6 +21,7 @@ use super::{
 
 pub(super) fn process_networking_commands(
     client: Option<Res<SteamworksClient>>,
+    server: Option<Res<SteamworksServer>>,
     mut state: ResMut<SteamworksNetworkingState>,
     mut commands: ResMut<Messages<SteamworksNetworkingCommand>>,
     mut steam_events: MessageReader<SteamworksEvent>,
@@ -28,26 +29,8 @@ pub(super) fn process_networking_commands(
 ) {
     process_networking_steam_events(&mut state, &mut steam_events, &mut results);
 
-    let Some(client) = client else {
-        let error = SteamworksNetworkingError::ClientUnavailable;
-        state.record_error(error.clone());
-        for command in commands.drain() {
-            tracing::error!(
-                target: "bevy_steamworks",
-                command = ?command,
-                error = %error,
-                "Steamworks legacy networking command failed"
-            );
-            results.write(SteamworksNetworkingResult::Err {
-                command,
-                error: error.clone(),
-            });
-        }
-        return;
-    };
-
     for command in commands.drain() {
-        match handle_networking_command(&client, &command) {
+        match handle_networking_command(client.as_deref(), server.as_deref(), &command) {
             Ok(operation) => {
                 state.record_operation(&operation);
                 tracing::debug!(
@@ -72,12 +55,13 @@ pub(super) fn process_networking_commands(
 }
 
 fn handle_networking_command(
-    client: &SteamworksClient,
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
     command: &SteamworksNetworkingCommand,
 ) -> Result<SteamworksNetworkingOperation, SteamworksNetworkingError> {
     validate_command(command)?;
 
-    let networking = client.networking();
+    let networking = networking(client, server)?;
     Ok(match command {
         SteamworksNetworkingCommand::AcceptP2pSession { user } => {
             if !networking.accept_p2p_session(*user) {
@@ -177,4 +161,17 @@ fn handle_networking_command(
             }
         }
     })
+}
+
+fn networking(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+) -> Result<steamworks::Networking, SteamworksNetworkingError> {
+    if let Some(client) = client {
+        Ok(client.networking())
+    } else if let Some(server) = server {
+        Ok(server.networking())
+    } else {
+        Err(SteamworksNetworkingError::ClientUnavailable)
+    }
 }

@@ -4,7 +4,10 @@
 //! [`steamworks::networking_sockets::NetworkingSockets`] API. It keeps listen
 //! sockets and connections owned by a private Bevy resource, while exposing
 //! stable integer IDs, owned snapshots, and command/result messages to game
-//! systems.
+//! systems. Most commands can run through either the Steam client or Steam Game
+//! Server accessor; batch [`SteamworksNetworkingSocketsCommand::SendMessages`]
+//! still requires a client because the upstream safe message allocator is
+//! client-only.
 
 /// Maximum number of socket/listen events processed by one poll command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND: usize = 256;
@@ -31,7 +34,8 @@ pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES: usize = 1_048_576;
 
 /// Bevy plugin for high-level Steam Networking Sockets commands.
 ///
-/// Add this plugin after [`crate::SteamworksPlugin`]. It registers
+/// Add this plugin after [`crate::SteamworksPlugin`] or
+/// [`crate::SteamworksServerPlugin`]. It registers
 /// [`SteamworksNetworkingSocketsCommand`] and
 /// [`SteamworksNetworkingSocketsResult`] messages and processes commands in
 /// [`bevy_app::First`] after Steam callbacks.

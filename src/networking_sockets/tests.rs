@@ -91,6 +91,38 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
+fn batch_send_still_requires_client_allocator() {
+    let mut app = App::new();
+    let command = SteamworksNetworkingSocketsCommand::send_messages(vec![
+        SteamworksNetworkingSocketsOutboundMessage::new(
+            connection_id(),
+            steamworks::networking_types::SendFlags::RELIABLE,
+            [1, 2, 3],
+        ),
+    ]);
+
+    app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsCommand>>()
+        .write(command.clone());
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksNetworkingSocketsResult::Err {
+            command,
+            error: SteamworksNetworkingSocketsError::ClientUnavailable,
+        }]
+    );
+}
+
+#[test]
 fn validation_rejects_invalid_inputs() {
     assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::poll_connection_events(

@@ -3,7 +3,7 @@ use bevy_ecs::{
     prelude::{Res, ResMut},
 };
 
-use crate::SteamworksClient;
+use crate::{SteamworksClient, SteamworksServer};
 
 use super::{
     handles::{
@@ -25,36 +25,24 @@ use super::{
 
 pub(super) fn process_networking_sockets_commands(
     client: Option<Res<SteamworksClient>>,
+    server: Option<Res<SteamworksServer>>,
     mut state: ResMut<SteamworksNetworkingSocketsState>,
     handles: Res<SteamworksNetworkingSocketsHandles>,
     mut commands: ResMut<Messages<SteamworksNetworkingSocketsCommand>>,
     mut results: MessageWriter<SteamworksNetworkingSocketsResult>,
 ) {
-    let Some(client) = client else {
-        let error = SteamworksNetworkingSocketsError::ClientUnavailable;
-        state.record_error(error.clone());
-        for command in commands.drain() {
-            tracing::error!(
-                target: "bevy_steamworks",
-                command = ?command,
-                error = %error,
-                "Steamworks networking sockets command failed"
-            );
-            results.write(SteamworksNetworkingSocketsResult::Err {
-                command,
-                error: error.clone(),
-            });
-        }
-        return;
-    };
-
     let mut handles = handles
         .storage
         .lock()
         .expect("Steamworks Networking Sockets handle storage mutex was poisoned");
 
     for command in commands.drain() {
-        match handle_networking_sockets_command(&client, &mut handles, &command) {
+        match handle_networking_sockets_command(
+            client.as_deref(),
+            server.as_deref(),
+            &mut handles,
+            &command,
+        ) {
             Ok(operation) => {
                 state.record_operation(&operation);
                 state.sync_handle_counts(&handles);
@@ -95,13 +83,22 @@ pub(super) fn process_networking_sockets_commands(
 }
 
 fn handle_networking_sockets_command(
-    client: &SteamworksClient,
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
     handles: &mut SteamworksNetworkingSocketsHandleStorage,
     command: &SteamworksNetworkingSocketsCommand,
 ) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
     validate_command(command)?;
 
-    let sockets = client.networking_sockets();
+    if matches!(
+        command,
+        SteamworksNetworkingSocketsCommand::SendMessages { .. }
+    ) && client.is_none()
+    {
+        return Err(SteamworksNetworkingSocketsError::ClientUnavailable);
+    }
+
+    let sockets = networking_sockets(client, server)?;
     Ok(match command {
         SteamworksNetworkingSocketsCommand::InitAuthentication => {
             SteamworksNetworkingSocketsOperation::AuthenticationInitialized {
@@ -248,6 +245,7 @@ fn handle_networking_sockets_command(
             }
         }
         SteamworksNetworkingSocketsCommand::SendMessages { messages } => {
+            let client = client.expect("SendMessages requires SteamworksClient");
             let mut outbound = Vec::with_capacity(messages.len());
             for message in messages {
                 let connection_ref = handles.connections.get(&message.connection).ok_or(
@@ -458,6 +456,19 @@ fn handle_networking_sockets_command(
             }
         }
     })
+}
+
+fn networking_sockets(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+) -> Result<steamworks::networking_sockets::NetworkingSockets, SteamworksNetworkingSocketsError> {
+    if let Some(client) = client {
+        Ok(client.networking_sockets())
+    } else if let Some(server) = server {
+        Ok(server.networking_sockets())
+    } else {
+        Err(SteamworksNetworkingSocketsError::ClientUnavailable)
+    }
 }
 
 fn allocate_outbound_message(

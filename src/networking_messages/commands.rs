@@ -3,7 +3,7 @@ use bevy_ecs::{
     prelude::{Res, ResMut},
 };
 
-use crate::SteamworksClient;
+use crate::{SteamworksClient, SteamworksServer};
 
 use super::{
     messages::{
@@ -17,6 +17,7 @@ use super::{
 
 pub(super) fn process_networking_messages_commands(
     client: Option<Res<SteamworksClient>>,
+    server: Option<Res<SteamworksServer>>,
     mut state: ResMut<SteamworksNetworkingMessagesState>,
     mut commands: ResMut<Messages<SteamworksNetworkingMessagesCommand>>,
     mut results: MessageWriter<SteamworksNetworkingMessagesResult>,
@@ -54,7 +55,8 @@ pub(super) fn process_networking_messages_commands(
             continue;
         }
 
-        let Some(client) = client.as_ref() else {
+        let Some(networking_messages) = networking_messages(client.as_deref(), server.as_deref())
+        else {
             let error = SteamworksNetworkingMessagesError::ClientUnavailable;
             state.record_error(error.clone());
             tracing::error!(
@@ -67,7 +69,7 @@ pub(super) fn process_networking_messages_commands(
             continue;
         };
 
-        match handle_networking_messages_command(client, command.clone()) {
+        match handle_networking_messages_command(&networking_messages, command.clone()) {
             Ok(operation) => {
                 state.record_operation(&operation);
                 tracing::debug!(
@@ -104,10 +106,9 @@ fn record_networking_messages_result(
 }
 
 fn handle_networking_messages_command(
-    client: &SteamworksClient,
+    networking_messages: &steamworks::networking_messages::NetworkingMessages,
     command: SteamworksNetworkingMessagesCommand,
 ) -> Result<SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesError> {
-    let networking_messages = client.networking_messages();
     Ok(match command {
         SteamworksNetworkingMessagesCommand::SendMessage {
             peer,
@@ -154,4 +155,15 @@ fn handle_networking_messages_command(
             SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled }
         }
     })
+}
+
+fn networking_messages(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+) -> Option<steamworks::networking_messages::NetworkingMessages> {
+    if let Some(client) = client {
+        Some(client.networking_messages())
+    } else {
+        server.map(|server| server.networking_messages())
+    }
 }

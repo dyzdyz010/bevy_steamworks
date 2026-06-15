@@ -8,8 +8,12 @@ use super::super::{
 /// Synchronous command errors from [`crate::SteamworksNetworkingSocketsPlugin`].
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum SteamworksNetworkingSocketsError {
-    /// No [`crate::SteamworksClient`] resource exists.
-    #[error("SteamworksClient resource is not available")]
+    /// No compatible [`crate::SteamworksClient`] or [`crate::SteamworksServer`] resource exists.
+    ///
+    /// [`crate::SteamworksNetworkingSocketsCommand::SendMessages`] still
+    /// requires a client because the upstream safe message allocator is
+    /// client-only.
+    #[error("Steamworks Networking Sockets resource is not available")]
     ClientUnavailable,
     /// A listen socket ID is not owned by this plugin.
     #[error("Steam Networking Sockets listen socket {id:?} was not found")]

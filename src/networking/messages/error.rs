@@ -3,8 +3,8 @@ use thiserror::Error;
 /// Synchronous command errors from [`crate::SteamworksNetworkingPlugin`].
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum SteamworksNetworkingError {
-    /// No [`crate::SteamworksClient`] resource exists.
-    #[error("SteamworksClient resource is not available")]
+    /// No compatible [`crate::SteamworksClient`] or [`crate::SteamworksServer`] resource exists.
+    #[error("Steamworks networking resource is not available")]
     ClientUnavailable,
     /// A Steam ID was zero.
     #[error("Steam networking command requires a non-zero Steam ID")]
