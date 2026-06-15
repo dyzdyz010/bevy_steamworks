@@ -18,3 +18,10 @@ pub enum SteamworksTimelineResult {
         error: SteamworksTimelineError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksTimelineResult,
+    SteamworksTimelineOperation,
+    SteamworksTimelineCommand,
+    SteamworksTimelineError
+);

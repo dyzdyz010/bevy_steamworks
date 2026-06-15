@@ -18,3 +18,10 @@ pub enum SteamworksStatsResult {
         error: SteamworksStatsError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksStatsResult,
+    SteamworksStatsOperation,
+    SteamworksStatsCommand,
+    SteamworksStatsError
+);

@@ -15,3 +15,10 @@ pub enum SteamworksFriendsResult {
         error: SteamworksFriendsError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksFriendsResult,
+    SteamworksFriendsOperation,
+    SteamworksFriendsCommand,
+    SteamworksFriendsError
+);

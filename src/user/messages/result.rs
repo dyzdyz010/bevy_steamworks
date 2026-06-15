@@ -15,3 +15,10 @@ pub enum SteamworksUserResult {
         error: SteamworksUserError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksUserResult,
+    SteamworksUserOperation,
+    SteamworksUserCommand,
+    SteamworksUserError
+);

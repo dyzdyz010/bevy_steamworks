@@ -17,3 +17,10 @@ pub enum SteamworksUgcResult {
         error: SteamworksUgcError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksUgcResult,
+    SteamworksUgcOperation,
+    SteamworksUgcCommand,
+    SteamworksUgcError
+);

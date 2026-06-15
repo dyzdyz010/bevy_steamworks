@@ -110,6 +110,25 @@ fn steam_callbacks(mut callbacks: MessageReader<SteamworksEvent>) {
 
 You can also register typed callbacks through the underlying `steamworks::Client`; keep the returned handles alive with `SteamworksCallbackRegistry`.
 
+## Reading Command Results
+
+Every high-level command plugin emits `Steamworks*Result` messages with the same helper API. Use `as_result()` when reading borrowed messages, or `into_result()` after draining/cloning a result you want to consume. Consumed failures are returned as a boxed `SteamworksCommandError<Command, Error>` so large command enums do not bloat the `Result` error branch:
+
+```rust,no_run
+# use bevy::prelude::*;
+# use bevy_steamworks::prelude::*;
+fn read_apps(mut results: MessageReader<SteamworksAppsResult>) {
+    for result in results.read() {
+        match result.as_result() {
+            Ok(operation) => info!("Steam apps operation: {operation:?}"),
+            Err((command, error)) => warn!(?command, %error, "Steam apps command failed"),
+        }
+    }
+}
+```
+
+For quick filters, results also expose `is_ok()`, `is_err()`, `operation()`, `command()`, and `error()`.
+
 ## Dedicated Game Servers
 
 `SteamworksServerPlugin` initializes the upstream `steamworks::Server`, inserts `SteamworksServer` as a Bevy resource, registers `SteamworksServerCommand` / `SteamworksServerResult`, and pumps Steam Game Server callbacks into the shared `SteamworksEvent` message stream. Dedicated server initialization is separate from `SteamworksPlugin`; use one lifecycle for the process unless you have a specific reason to initialize both.

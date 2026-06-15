@@ -18,3 +18,10 @@ pub enum SteamworksMatchmakingServersResult {
         error: SteamworksMatchmakingServersError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksMatchmakingServersResult,
+    SteamworksMatchmakingServersOperation,
+    SteamworksMatchmakingServersCommand,
+    SteamworksMatchmakingServersError
+);

@@ -17,3 +17,10 @@ pub enum SteamworksRemoteStorageResult {
         error: SteamworksRemoteStorageError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksRemoteStorageResult,
+    SteamworksRemoteStorageOperation,
+    SteamworksRemoteStorageCommand,
+    SteamworksRemoteStorageError
+);

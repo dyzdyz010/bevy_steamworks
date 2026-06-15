@@ -18,3 +18,10 @@ pub enum SteamworksServerResult {
         error: SteamworksServerError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksServerResult,
+    SteamworksServerOperation,
+    SteamworksServerCommand,
+    SteamworksServerError
+);

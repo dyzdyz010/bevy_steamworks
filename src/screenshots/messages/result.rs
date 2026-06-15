@@ -17,3 +17,10 @@ pub enum SteamworksScreenshotsResult {
         error: SteamworksScreenshotsError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksScreenshotsResult,
+    SteamworksScreenshotsOperation,
+    SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError
+);

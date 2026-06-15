@@ -57,6 +57,13 @@ pub enum SteamworksNetworkingUtilsResult {
     },
 }
 
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksNetworkingUtilsResult,
+    SteamworksNetworkingUtilsOperation,
+    SteamworksNetworkingUtilsCommand,
+    SteamworksNetworkingUtilsError
+);
+
 /// Synchronous errors from [`crate::SteamworksNetworkingUtilsPlugin`].
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum SteamworksNetworkingUtilsError {

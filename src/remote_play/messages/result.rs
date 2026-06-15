@@ -17,3 +17,10 @@ pub enum SteamworksRemotePlayResult {
         error: SteamworksRemotePlayError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksRemotePlayResult,
+    SteamworksRemotePlayOperation,
+    SteamworksRemotePlayCommand,
+    SteamworksRemotePlayError
+);

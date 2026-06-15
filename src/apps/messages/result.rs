@@ -15,3 +15,10 @@ pub enum SteamworksAppsResult {
         error: SteamworksAppsError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksAppsResult,
+    SteamworksAppsOperation,
+    SteamworksAppsCommand,
+    SteamworksAppsError
+);

@@ -5,7 +5,7 @@ pub use crate::{
     SteamworksAppsResult, SteamworksAppsState, SteamworksAuthSessionError,
     SteamworksAuthSessionTicketResponse, SteamworksAuthSessionValidateError,
     SteamworksAuthTicketValidation, SteamworksAvatar, SteamworksAvatarSize,
-    SteamworksCallbackRegistry, SteamworksClient, SteamworksClientPlugins,
+    SteamworksCallbackRegistry, SteamworksClient, SteamworksClientPlugins, SteamworksCommandError,
     SteamworksConnectionRequestPolicy, SteamworksCoplayFriendInfo, SteamworksCurrentAppInfo,
     SteamworksEvent, SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
     SteamworksFriendAvatar, SteamworksFriendGameInfo, SteamworksFriendInfo,

@@ -15,3 +15,10 @@ pub enum SteamworksInputResult {
         error: SteamworksInputError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksInputResult,
+    SteamworksInputOperation,
+    SteamworksInputCommand,
+    SteamworksInputError
+);

@@ -5,7 +5,8 @@ use bevy_steamworks::{
         SteamworksAppsError as PreludeAppsError, SteamworksAppsOperation as PreludeAppsOperation,
         SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
         SteamworksCallbackRegistry as PreludeCallbackRegistry, SteamworksClient as PreludeClient,
-        SteamworksClientPlugins as PreludeClientPlugins, SteamworksEvent as PreludeEvent,
+        SteamworksClientPlugins as PreludeClientPlugins,
+        SteamworksCommandError as PreludeCommandError, SteamworksEvent as PreludeEvent,
         SteamworksFailurePolicy as PreludeFailurePolicy,
         SteamworksFriendsCommand as PreludeFriendsCommand,
         SteamworksFriendsError as PreludeFriendsError,
@@ -95,10 +96,10 @@ use bevy_steamworks::{
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
     SteamworksAppsPlugin, SteamworksAppsResult, SteamworksCallbackRegistry, SteamworksClient,
-    SteamworksClientPlugins, SteamworksEvent, SteamworksFailurePolicy, SteamworksFriendsCommand,
-    SteamworksFriendsError, SteamworksFriendsOperation, SteamworksFriendsPlugin,
-    SteamworksFriendsResult, SteamworksInitMode, SteamworksInputCommand, SteamworksInputError,
-    SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
+    SteamworksClientPlugins, SteamworksCommandError, SteamworksEvent, SteamworksFailurePolicy,
+    SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
+    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksInitMode, SteamworksInputCommand,
+    SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
     SteamworksLobbyListFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
     SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
     SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
@@ -132,6 +133,7 @@ use bevy_steamworks::{
     SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
     SteamworksUtilsResult,
 };
+use std::error::Error;
 
 #[test]
 fn core_api_is_exported_from_root_and_prelude() {
@@ -326,6 +328,78 @@ fn apps_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeAppsPlugin::new(), command, operation, result, error);
+}
+
+#[test]
+fn result_helper_api_is_exported_from_root_and_prelude() {
+    fn accepts_root_command_error(
+        _error: SteamworksCommandError<SteamworksAppsCommand, SteamworksAppsError>,
+    ) {
+    }
+
+    fn accepts_prelude_command_error(
+        _error: PreludeCommandError<PreludeAppsCommand, PreludeAppsError>,
+    ) {
+    }
+
+    let operation = SteamworksAppsOperation::SubscriptionRead { subscribed: true };
+    let ok = SteamworksAppsResult::Ok(operation.clone());
+
+    assert!(ok.is_ok());
+    assert!(!ok.is_err());
+    assert_eq!(ok.operation(), Some(&operation));
+    assert_eq!(ok.command(), None);
+    assert_eq!(ok.error(), None);
+    assert_eq!(ok.as_result(), Ok(&operation));
+    assert_eq!(ok.into_result(), Ok(operation));
+
+    let command = SteamworksAppsCommand::IsSubscribed;
+    let error = SteamworksAppsError::ClientUnavailable;
+    let err = SteamworksAppsResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+
+    assert!(!err.is_ok());
+    assert!(err.is_err());
+    assert_eq!(err.operation(), None);
+    assert_eq!(err.command(), Some(&command));
+    assert_eq!(err.error(), Some(&error));
+    assert_eq!(err.as_result(), Err((&command, &error)));
+    let failure = err.into_result().expect_err("apps result should fail");
+    assert_eq!(failure.command(), &command);
+    assert_eq!(failure.error(), &error);
+    assert_eq!(
+        failure.to_string(),
+        "Steamworks command IsSubscribed failed: SteamworksClient resource is not available"
+    );
+    assert_eq!(
+        failure.source().map(ToString::to_string),
+        Some("SteamworksClient resource is not available".into())
+    );
+    assert_eq!(failure.into_parts(), (command.clone(), error.clone()));
+    accepts_root_command_error(SteamworksCommandError::new(command, error));
+
+    let operation = PreludeAppsOperation::SubscriptionRead { subscribed: false };
+    let ok = PreludeAppsResult::Ok(operation.clone());
+    assert_eq!(ok.operation(), Some(&operation));
+    assert_eq!(ok.as_result(), Ok(&operation));
+    assert_eq!(ok.into_result(), Ok(operation));
+    accepts_prelude_command_error(PreludeCommandError::new(
+        PreludeAppsCommand::IsSubscribed,
+        PreludeAppsError::ClientUnavailable,
+    ));
+
+    let command = SteamworksServerCommand::GetSteamId;
+    let error = SteamworksServerError::ServerUnavailable;
+    let err = SteamworksServerResult::Err {
+        command: command.clone(),
+        error: error.clone(),
+    };
+    assert_eq!(err.command(), Some(&command));
+    assert_eq!(err.error(), Some(&error));
+    let failure = err.into_result().expect_err("server result should fail");
+    assert_eq!(failure.into_parts(), (command, error));
 }
 
 #[test]

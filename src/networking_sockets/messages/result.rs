@@ -18,3 +18,10 @@ pub enum SteamworksNetworkingSocketsResult {
         error: SteamworksNetworkingSocketsError,
     },
 }
+
+crate::result_ext::impl_steamworks_result_helpers!(
+    SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsCommand,
+    SteamworksNetworkingSocketsError
+);
