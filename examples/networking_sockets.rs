@@ -37,26 +37,40 @@ fn configure_networking_sockets(
     }
 
     if let Some(address) = env_socket_addr("BEVY_STEAMWORKS_SOCKETS_LISTEN_IP") {
-        commands.write(SteamworksNetworkingSocketsCommand::create_listen_socket_ip(
-            address,
-        ));
+        commands.write(
+            SteamworksNetworkingSocketsCommand::create_listen_socket_ip_with_options(
+                address,
+                env_socket_options(),
+            ),
+        );
     }
 
     if let Some(port) = env_i32("BEVY_STEAMWORKS_SOCKETS_LISTEN_P2P") {
-        commands.write(SteamworksNetworkingSocketsCommand::create_listen_socket_p2p(port));
+        commands.write(
+            SteamworksNetworkingSocketsCommand::create_listen_socket_p2p_with_options(
+                port,
+                env_socket_options(),
+            ),
+        );
     }
 
     if let Some(address) = env_socket_addr("BEVY_STEAMWORKS_SOCKETS_CONNECT_IP") {
-        commands.write(SteamworksNetworkingSocketsCommand::connect_by_ip_address(
-            address,
-        ));
+        commands.write(
+            SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+                address,
+                env_socket_options(),
+            ),
+        );
     }
 
     if let Some(steam_id) = env_steam_id("BEVY_STEAMWORKS_SOCKETS_CONNECT_STEAM_ID") {
-        commands.write(SteamworksNetworkingSocketsCommand::connect_p2p_steam_id(
-            steam_id,
-            env_i32("BEVY_STEAMWORKS_SOCKETS_REMOTE_PORT").unwrap_or(0),
-        ));
+        commands.write(
+            SteamworksNetworkingSocketsCommand::connect_p2p_steam_id_with_options(
+                steam_id,
+                env_i32("BEVY_STEAMWORKS_SOCKETS_REMOTE_PORT").unwrap_or(0),
+                env_socket_options(),
+            ),
+        );
     }
 }
 
@@ -246,6 +260,17 @@ fn env_steam_id(name: &str) -> Option<SteamId> {
 
 fn env_i32(name: &str) -> Option<i32> {
     std::env::var(name).ok()?.parse().ok()
+}
+
+fn env_socket_options() -> Vec<SteamworksNetworkingSocketsConfigEntry> {
+    if std::env::var("BEVY_STEAMWORKS_SOCKETS_ALLOW_NO_AUTH").as_deref() == Ok("1") {
+        vec![SteamworksNetworkingSocketsConfigEntry::int32(
+            steamworks::networking_types::NetworkingConfigValue::IPAllowWithoutAuth,
+            1,
+        )]
+    } else {
+        Vec::new()
+    }
 }
 
 fn main() {

@@ -73,6 +73,115 @@ impl Default for SteamworksConnectionRequestPolicy {
     }
 }
 
+/// Initial Steam Networking Sockets configuration entry for listen/connect commands.
+///
+/// This owned wrapper keeps command messages comparable and debuggable while
+/// converting to upstream [`steamworks::networking_types::NetworkingConfigEntry`]
+/// only after validation.
+#[derive(Clone, PartialEq)]
+pub enum SteamworksNetworkingSocketsConfigEntry {
+    /// Signed 32-bit integer config value.
+    Int32 {
+        /// Upstream config key.
+        value: steamworks::networking_types::NetworkingConfigValue,
+        /// Config value.
+        data: i32,
+    },
+    /// Signed 64-bit integer config value.
+    Int64 {
+        /// Upstream config key.
+        value: steamworks::networking_types::NetworkingConfigValue,
+        /// Config value.
+        data: i64,
+    },
+    /// Floating-point config value.
+    Float {
+        /// Upstream config key.
+        value: steamworks::networking_types::NetworkingConfigValue,
+        /// Config value.
+        data: f32,
+    },
+    /// String config value.
+    String {
+        /// Upstream config key.
+        value: steamworks::networking_types::NetworkingConfigValue,
+        /// Config value.
+        data: String,
+    },
+}
+
+impl std::fmt::Debug for SteamworksNetworkingSocketsConfigEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Int32 { value, data } => f
+                .debug_struct("Int32")
+                .field("value", value)
+                .field("data", data)
+                .finish(),
+            Self::Int64 { value, data } => f
+                .debug_struct("Int64")
+                .field("value", value)
+                .field("data", data)
+                .finish(),
+            Self::Float { value, data } => f
+                .debug_struct("Float")
+                .field("value", value)
+                .field("data", data)
+                .finish(),
+            Self::String { value, data } => f
+                .debug_struct("String")
+                .field("value", value)
+                .field("data_len", &data.len())
+                .finish(),
+        }
+    }
+}
+
+impl SteamworksNetworkingSocketsConfigEntry {
+    /// Creates an integer config entry.
+    pub fn int32(value: steamworks::networking_types::NetworkingConfigValue, data: i32) -> Self {
+        Self::Int32 { value, data }
+    }
+
+    /// Creates a 64-bit integer config entry.
+    pub fn int64(value: steamworks::networking_types::NetworkingConfigValue, data: i64) -> Self {
+        Self::Int64 { value, data }
+    }
+
+    /// Creates a floating-point config entry.
+    pub fn float(value: steamworks::networking_types::NetworkingConfigValue, data: f32) -> Self {
+        Self::Float { value, data }
+    }
+
+    /// Creates a string config entry.
+    pub fn string(
+        value: steamworks::networking_types::NetworkingConfigValue,
+        data: impl Into<String>,
+    ) -> Self {
+        Self::String {
+            value,
+            data: data.into(),
+        }
+    }
+
+    pub(super) fn to_steam(&self) -> steamworks::networking_types::NetworkingConfigEntry {
+        match self {
+            Self::Int32 { value, data } => {
+                steamworks::networking_types::NetworkingConfigEntry::new_int32(*value, *data)
+            }
+            Self::Int64 { value, data } => {
+                steamworks::networking_types::NetworkingConfigEntry::new_int64(*value, *data)
+            }
+            Self::Float { value, data } => {
+                steamworks::networking_types::NetworkingConfigEntry::new_float(*value, *data)
+            }
+            Self::String { value, data } => {
+                steamworks::networking_types::NetworkingConfigEntry::new_string(*value, data)
+            }
+        }
+    }
+}
+
 /// Listen socket creation snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingSocketsListenSocketCreated {

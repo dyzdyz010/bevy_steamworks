@@ -634,7 +634,7 @@ cargo run --example networking_utils
 
 ## Networking Sockets
 
-`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send one payload or allocated batches with per-message lane/channel settings, receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles. Most commands can run with either `SteamworksClient` or `SteamworksServer`; allocated batch `SendMessages` still requires `SteamworksClient` because the upstream safe message allocator is client-only.
+`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets with initial config entries, connect to IP or Steam identity peers with initial config entries, poll listen-socket and connection events, send one payload or allocated batches with per-message lane/channel settings, receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles. Most commands can run with either `SteamworksClient` or `SteamworksServer`; allocated batch `SendMessages` still requires `SteamworksClient` because the upstream safe message allocator is client-only.
 
 The plugin owns upstream `ListenSocket` and `NetConnection` handles in a private resource and exposes stable IDs such as `SteamworksListenSocketId` and `SteamworksNetworkingSocketsConnectionId`. This prevents accidental handle drops from closing sockets outside the command layer.
 
@@ -650,9 +650,15 @@ Poll group messages are returned as `SteamworksNetworkingSocketsPollGroupMessage
 # use bevy_steamworks::prelude::*;
 fn open_socket(mut sockets: MessageWriter<SteamworksNetworkingSocketsCommand>) {
     sockets.write(SteamworksNetworkingSocketsCommand::init_authentication());
-    sockets.write(SteamworksNetworkingSocketsCommand::create_listen_socket_ip(
-        SocketAddr::from((Ipv4Addr::UNSPECIFIED, 27015)),
-    ));
+    sockets.write(
+        SteamworksNetworkingSocketsCommand::create_listen_socket_ip_with_options(
+            SocketAddr::from((Ipv4Addr::UNSPECIFIED, 27015)),
+            [SteamworksNetworkingSocketsConfigEntry::int32(
+                steamworks::networking_types::NetworkingConfigValue::IPAllowWithoutAuth,
+                1,
+            )],
+        ),
+    );
 }
 
 fn poll_socket(
@@ -688,7 +694,7 @@ fn main() {
 
 Listen socket connection requests must be answered immediately. `PollListenSocketEvents` therefore takes a `SteamworksConnectionRequestPolicy` and accepts or rejects each incoming request in the same frame instead of exposing a cross-frame pending request handle.
 
-This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries remain accessible through `SteamworksClient::networking_sockets()` or `SteamworksServer::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
+This command layer covers the safe handle-oriented Networking Sockets workflow. Use `SteamworksNetworkingSocketsConfigEntry::{int32,int64,float,string}` with the `*_with_options` listen/connect constructors for initial socket configuration. Entries are validated before calling upstream Steamworks so type mismatches, non-finite floats, oversize option lists, and interior-NUL strings become `SteamworksNetworkingSocketsError` values. Lower-level specialized flows remain accessible through `SteamworksClient::networking_sockets()` or `SteamworksServer::networking_sockets()`.
 
 Run the Networking Sockets example with:
 
@@ -696,6 +702,7 @@ Run the Networking Sockets example with:
 cargo run --example networking_sockets
 $env:BEVY_STEAMWORKS_SOCKETS_LISTEN_IP = "0.0.0.0:27015"
 $env:BEVY_STEAMWORKS_SOCKETS_ACCEPT = "1"
+$env:BEVY_STEAMWORKS_SOCKETS_ALLOW_NO_AUTH = "1"
 cargo run --example networking_sockets
 $env:BEVY_STEAMWORKS_SOCKETS_CONNECT_IP = "127.0.0.1:27015"
 $env:BEVY_STEAMWORKS_SOCKETS_MESSAGE = "hello"

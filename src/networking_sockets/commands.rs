@@ -16,11 +16,11 @@ use super::{
         snapshot_realtime_status,
     },
     validation::validate_command,
-    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConnectionTarget,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsResult,
-    SteamworksNetworkingSocketsState,
+    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConfigEntry,
+    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsResult, SteamworksNetworkingSocketsState,
 };
 
 pub(super) fn process_networking_sockets_commands(
@@ -110,9 +110,13 @@ fn handle_networking_sockets_command(
                 availability: sockets.get_authentication_status(),
             }
         }
-        SteamworksNetworkingSocketsCommand::CreateListenSocketIp { local_address } => {
+        SteamworksNetworkingSocketsCommand::CreateListenSocketIp {
+            local_address,
+            options,
+        } => {
+            let options = steam_config_entries(options);
             let socket = sockets
-                .create_listen_socket_ip(*local_address, [])
+                .create_listen_socket_ip(*local_address, options)
                 .map_err(|_| {
                     SteamworksNetworkingSocketsError::invalid_handle(
                         "networking_sockets.create_listen_socket_ip",
@@ -124,9 +128,13 @@ fn handle_networking_sockets_command(
                 endpoint: SteamworksNetworkingSocketsListenEndpoint::Ip(*local_address),
             }
         }
-        SteamworksNetworkingSocketsCommand::CreateListenSocketP2p { local_virtual_port } => {
+        SteamworksNetworkingSocketsCommand::CreateListenSocketP2p {
+            local_virtual_port,
+            options,
+        } => {
+            let options = steam_config_entries(options);
             let socket = sockets
-                .create_listen_socket_p2p(*local_virtual_port, [])
+                .create_listen_socket_p2p(*local_virtual_port, options)
                 .map_err(|_| {
                     SteamworksNetworkingSocketsError::invalid_handle(
                         "networking_sockets.create_listen_socket_p2p",
@@ -140,12 +148,15 @@ fn handle_networking_sockets_command(
                 },
             }
         }
-        SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address } => {
-            let connection = sockets.connect_by_ip_address(*address, []).map_err(|_| {
-                SteamworksNetworkingSocketsError::invalid_handle(
-                    "networking_sockets.connect_by_ip_address",
-                )
-            })?;
+        SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address, options } => {
+            let options = steam_config_entries(options);
+            let connection = sockets
+                .connect_by_ip_address(*address, options)
+                .map_err(|_| {
+                    SteamworksNetworkingSocketsError::invalid_handle(
+                        "networking_sockets.connect_by_ip_address",
+                    )
+                })?;
             let connection = handles.insert_connection(
                 connection,
                 SteamworksNetworkingSocketsConnectionMetadata::independent(),
@@ -158,9 +169,11 @@ fn handle_networking_sockets_command(
         SteamworksNetworkingSocketsCommand::ConnectP2p {
             identity,
             remote_virtual_port,
+            options,
         } => {
+            let options = steam_config_entries(options);
             let connection = sockets
-                .connect_p2p(identity.clone(), *remote_virtual_port, [])
+                .connect_p2p(identity.clone(), *remote_virtual_port, options)
                 .map_err(|_| {
                     SteamworksNetworkingSocketsError::invalid_handle(
                         "networking_sockets.connect_p2p",
@@ -456,6 +469,15 @@ fn handle_networking_sockets_command(
             }
         }
     })
+}
+
+fn steam_config_entries(
+    options: &[SteamworksNetworkingSocketsConfigEntry],
+) -> Vec<steamworks::networking_types::NetworkingConfigEntry> {
+    options
+        .iter()
+        .map(SteamworksNetworkingSocketsConfigEntry::to_steam)
+        .collect()
 }
 
 fn networking_sockets(

@@ -110,6 +110,38 @@ pub enum SteamworksNetworkingSocketsError {
         /// Maximum accepted lane count.
         max_supported: usize,
     },
+    /// A listen/connect command exceeded this crate's initial config cap.
+    #[error("Steam Networking Sockets config entry count {requested} exceeds max {max_supported}")]
+    TooManyConfigEntries {
+        /// Requested config entry count.
+        requested: usize,
+        /// Maximum accepted config entry count.
+        max_supported: usize,
+    },
+    /// A config entry constructor did not match the upstream config value type.
+    #[error(
+        "Steam Networking Sockets config entry {index} has type {actual:?}, expected {expected:?}"
+    )]
+    InvalidConfigEntryType {
+        /// Invalid config entry index.
+        index: usize,
+        /// Type required by the upstream config key.
+        expected: steamworks::networking_types::NetworkingConfigDataType,
+        /// Type supplied by the command entry.
+        actual: steamworks::networking_types::NetworkingConfigDataType,
+    },
+    /// A string config entry contained an interior NUL byte.
+    #[error("Steam Networking Sockets config entry {index} string contains an interior NUL byte")]
+    InvalidConfigString {
+        /// Invalid config entry index.
+        index: usize,
+    },
+    /// A float config entry was NaN or infinite.
+    #[error("Steam Networking Sockets config entry {index} float must be finite")]
+    InvalidConfigFloat {
+        /// Invalid config entry index.
+        index: usize,
+    },
     /// A virtual port was negative.
     #[error("Steam Networking Sockets virtual port {port} must not be negative")]
     InvalidVirtualPort {

@@ -4,8 +4,8 @@ use bevy_ecs::message::Message;
 
 use super::super::{
     SteamworksConnectionRequestPolicy, SteamworksListenSocketId,
-    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsOutboundMessage,
-    SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPollGroupId,
 };
 
 /// A high-level command for Steam Networking Sockets workflows.
@@ -19,16 +19,22 @@ pub enum SteamworksNetworkingSocketsCommand {
     CreateListenSocketIp {
         /// Local socket address to bind.
         local_address: SocketAddr,
+        /// Initial Steam Networking Sockets config entries.
+        options: Vec<SteamworksNetworkingSocketsConfigEntry>,
     },
     /// Create a P2P listen socket.
     CreateListenSocketP2p {
         /// Local virtual port.
         local_virtual_port: i32,
+        /// Initial Steam Networking Sockets config entries.
+        options: Vec<SteamworksNetworkingSocketsConfigEntry>,
     },
     /// Connect to an IP endpoint.
     ConnectByIpAddress {
         /// Remote socket address.
         address: SocketAddr,
+        /// Initial Steam Networking Sockets config entries.
+        options: Vec<SteamworksNetworkingSocketsConfigEntry>,
     },
     /// Connect to a Steam networking identity using P2P.
     ConnectP2p {
@@ -36,6 +42,8 @@ pub enum SteamworksNetworkingSocketsCommand {
         identity: steamworks::networking_types::NetworkingIdentity,
         /// Remote virtual port.
         remote_virtual_port: i32,
+        /// Initial Steam Networking Sockets config entries.
+        options: Vec<SteamworksNetworkingSocketsConfigEntry>,
     },
     /// Create a poll group for receiving messages from many connections.
     CreatePollGroup,
@@ -156,25 +164,36 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
         match self {
             Self::InitAuthentication => f.write_str("InitAuthentication"),
             Self::GetAuthenticationStatus => f.write_str("GetAuthenticationStatus"),
-            Self::CreateListenSocketIp { local_address } => f
+            Self::CreateListenSocketIp {
+                local_address,
+                options,
+            } => f
                 .debug_struct("CreateListenSocketIp")
                 .field("local_address", local_address)
+                .field("options", options)
                 .finish(),
-            Self::CreateListenSocketP2p { local_virtual_port } => f
+            Self::CreateListenSocketP2p {
+                local_virtual_port,
+                options,
+            } => f
                 .debug_struct("CreateListenSocketP2p")
                 .field("local_virtual_port", local_virtual_port)
+                .field("options", options)
                 .finish(),
-            Self::ConnectByIpAddress { address } => f
+            Self::ConnectByIpAddress { address, options } => f
                 .debug_struct("ConnectByIpAddress")
                 .field("address", address)
+                .field("options", options)
                 .finish(),
             Self::ConnectP2p {
                 identity,
                 remote_virtual_port,
+                options,
             } => f
                 .debug_struct("ConnectP2p")
                 .field("identity", identity)
                 .field("remote_virtual_port", remote_virtual_port)
+                .field("options", options)
                 .finish(),
             Self::CreatePollGroup => f.write_str("CreatePollGroup"),
             Self::PollListenSocketEvents {
@@ -305,17 +324,50 @@ impl SteamworksNetworkingSocketsCommand {
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::CreateListenSocketIp`] command.
     pub fn create_listen_socket_ip(local_address: SocketAddr) -> Self {
-        Self::CreateListenSocketIp { local_address }
+        Self::create_listen_socket_ip_with_options(local_address, [])
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CreateListenSocketIp`] command with config.
+    pub fn create_listen_socket_ip_with_options(
+        local_address: SocketAddr,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
+        Self::CreateListenSocketIp {
+            local_address,
+            options: options.into(),
+        }
     }
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::CreateListenSocketP2p`] command.
     pub fn create_listen_socket_p2p(local_virtual_port: i32) -> Self {
-        Self::CreateListenSocketP2p { local_virtual_port }
+        Self::create_listen_socket_p2p_with_options(local_virtual_port, [])
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CreateListenSocketP2p`] command with config.
+    pub fn create_listen_socket_p2p_with_options(
+        local_virtual_port: i32,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
+        Self::CreateListenSocketP2p {
+            local_virtual_port,
+            options: options.into(),
+        }
     }
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::ConnectByIpAddress`] command.
     pub fn connect_by_ip_address(address: SocketAddr) -> Self {
-        Self::ConnectByIpAddress { address }
+        Self::connect_by_ip_address_with_options(address, [])
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::ConnectByIpAddress`] command with config.
+    pub fn connect_by_ip_address_with_options(
+        address: SocketAddr,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
+        Self::ConnectByIpAddress {
+            address,
+            options: options.into(),
+        }
     }
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::ConnectP2p`] command.
@@ -323,17 +375,37 @@ impl SteamworksNetworkingSocketsCommand {
         identity: steamworks::networking_types::NetworkingIdentity,
         remote_virtual_port: i32,
     ) -> Self {
+        Self::connect_p2p_with_options(identity, remote_virtual_port, [])
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::ConnectP2p`] command with config.
+    pub fn connect_p2p_with_options(
+        identity: steamworks::networking_types::NetworkingIdentity,
+        remote_virtual_port: i32,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
         Self::ConnectP2p {
             identity,
             remote_virtual_port,
+            options: options.into(),
         }
     }
 
     /// Creates a P2P connect command for a Steam user.
     pub fn connect_p2p_steam_id(steam_id: steamworks::SteamId, remote_virtual_port: i32) -> Self {
-        Self::connect_p2p(
+        Self::connect_p2p_steam_id_with_options(steam_id, remote_virtual_port, [])
+    }
+
+    /// Creates a P2P connect command for a Steam user with config.
+    pub fn connect_p2p_steam_id_with_options(
+        steam_id: steamworks::SteamId,
+        remote_virtual_port: i32,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
+        Self::connect_p2p_with_options(
             steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id),
             remote_virtual_port,
+            options,
         )
     }
 

@@ -25,6 +25,9 @@ pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES: u32 = 64;
 /// Maximum lanes configured by one lane configuration command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES: usize = 64;
 
+/// Maximum initial config entries accepted by one listen/connect command.
+pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES: usize = 32;
+
 /// Conservative maximum message payload size accepted by this command layer.
 ///
 /// The upstream Steamworks API can reject oversize messages at send time. This

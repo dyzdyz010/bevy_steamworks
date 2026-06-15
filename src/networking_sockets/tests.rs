@@ -39,6 +39,13 @@ fn localhost() -> SocketAddr {
     SocketAddr::from((Ipv4Addr::LOCALHOST, 27015))
 }
 
+fn no_auth_config() -> SteamworksNetworkingSocketsConfigEntry {
+    SteamworksNetworkingSocketsConfigEntry::int32(
+        steamworks::networking_types::NetworkingConfigValue::IPAllowWithoutAuth,
+        1,
+    )
+}
+
 #[test]
 fn networking_sockets_plugin_registers_resources_and_messages() {
     let mut app = App::new();
@@ -272,6 +279,58 @@ fn validation_rejects_invalid_inputs() {
         })
     );
     assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::create_listen_socket_ip_with_options(
+                localhost(),
+                vec![no_auth_config(); STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES + 1],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::TooManyConfigEntries {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+                localhost(),
+                vec![SteamworksNetworkingSocketsConfigEntry::int32(
+                    steamworks::networking_types::NetworkingConfigValue::P2PSTUNServerList,
+                    1,
+                )],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidConfigEntryType {
+            index: 0,
+            expected: steamworks::networking_types::NetworkingConfigDataType::String,
+            actual: steamworks::networking_types::NetworkingConfigDataType::Int32,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+                localhost(),
+                vec![SteamworksNetworkingSocketsConfigEntry::string(
+                    steamworks::networking_types::NetworkingConfigValue::P2PSTUNServerList,
+                    "bad\0server",
+                )],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidConfigString { index: 0 })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+                localhost(),
+                vec![SteamworksNetworkingSocketsConfigEntry::float(
+                    steamworks::networking_types::NetworkingConfigValue::FakePacketLossSend,
+                    f32::NAN,
+                )],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidConfigFloat { index: 0 })
+    );
+    assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::create_listen_socket_p2p(-1,)),
         Err(SteamworksNetworkingSocketsError::InvalidVirtualPort { port: -1 })
     );
@@ -303,11 +362,45 @@ fn constructors_preserve_inputs() {
         SteamworksNetworkingSocketsCommand::create_listen_socket_ip(address),
         SteamworksNetworkingSocketsCommand::CreateListenSocketIp {
             local_address: address,
+            options: Vec::new(),
         }
     );
     assert_eq!(
         SteamworksNetworkingSocketsCommand::connect_by_ip_address(address),
-        SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address }
+        SteamworksNetworkingSocketsCommand::ConnectByIpAddress {
+            address,
+            options: Vec::new(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_listen_socket_ip_with_options(
+            address,
+            vec![no_auth_config()],
+        ),
+        SteamworksNetworkingSocketsCommand::CreateListenSocketIp {
+            local_address: address,
+            options: vec![no_auth_config()],
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_listen_socket_p2p_with_options(
+            3,
+            vec![no_auth_config()],
+        ),
+        SteamworksNetworkingSocketsCommand::CreateListenSocketP2p {
+            local_virtual_port: 3,
+            options: vec![no_auth_config()],
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+            address,
+            vec![no_auth_config()],
+        ),
+        SteamworksNetworkingSocketsCommand::ConnectByIpAddress {
+            address,
+            options: vec![no_auth_config()],
+        }
     );
     assert_eq!(
         SteamworksNetworkingSocketsCommand::poll_listen_socket_events(
@@ -416,6 +509,26 @@ fn constructors_preserve_inputs() {
             enable_linger: false,
         }
     );
+}
+
+#[test]
+fn debug_redacts_config_entry_strings() {
+    let entry = SteamworksNetworkingSocketsConfigEntry::string(
+        steamworks::networking_types::NetworkingConfigValue::P2PSTUNServerList,
+        "secret.stun.example",
+    );
+    let command = SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
+        localhost(),
+        vec![entry.clone()],
+    );
+
+    let entry_debug = format!("{entry:?}");
+    let command_debug = format!("{command:?}");
+
+    assert!(entry_debug.contains("data_len: 19"));
+    assert!(!entry_debug.contains("secret.stun.example"));
+    assert!(command_debug.contains("data_len: 19"));
+    assert!(!command_debug.contains("secret.stun.example"));
 }
 
 #[test]
@@ -951,6 +1064,7 @@ fn p2p_connect_constructor_accepts_steam_id() {
     let SteamworksNetworkingSocketsCommand::ConnectP2p {
         identity,
         remote_virtual_port,
+        options,
     } = command
     else {
         panic!("expected ConnectP2p command");
@@ -958,6 +1072,7 @@ fn p2p_connect_constructor_accepts_steam_id() {
 
     assert_eq!(identity.debug_string(), "steamid:123");
     assert_eq!(remote_virtual_port, 0);
+    assert!(options.is_empty());
 }
 
 #[test]

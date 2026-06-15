@@ -1,6 +1,8 @@
 use super::{
     SteamworksConnectionRequestPolicy, SteamworksNetworkingSocketsCommand,
-    SteamworksNetworkingSocketsError, STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES,
+    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsError,
+    STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIGURED_LANES,
+    STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
     STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
     STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
     STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
@@ -11,13 +13,27 @@ pub(super) fn validate_command(
     command: &SteamworksNetworkingSocketsCommand,
 ) -> Result<(), SteamworksNetworkingSocketsError> {
     match command {
-        SteamworksNetworkingSocketsCommand::CreateListenSocketP2p { local_virtual_port } => {
-            validate_virtual_port(*local_virtual_port)
+        SteamworksNetworkingSocketsCommand::CreateListenSocketIp { options, .. } => {
+            validate_config_entries(options)
+        }
+        SteamworksNetworkingSocketsCommand::CreateListenSocketP2p {
+            local_virtual_port,
+            options,
+        } => {
+            validate_virtual_port(*local_virtual_port)?;
+            validate_config_entries(options)
+        }
+        SteamworksNetworkingSocketsCommand::ConnectByIpAddress { options, .. } => {
+            validate_config_entries(options)
         }
         SteamworksNetworkingSocketsCommand::ConnectP2p {
             remote_virtual_port,
+            options,
             ..
-        } => validate_virtual_port(*remote_virtual_port),
+        } => {
+            validate_virtual_port(*remote_virtual_port)?;
+            validate_config_entries(options)
+        }
         SteamworksNetworkingSocketsCommand::PollListenSocketEvents {
             max_events,
             request_policy,
@@ -148,6 +164,81 @@ fn validate_lane_configuration(
         });
     }
     Ok(())
+}
+
+fn validate_config_entries(
+    options: &[SteamworksNetworkingSocketsConfigEntry],
+) -> Result<(), SteamworksNetworkingSocketsError> {
+    if options.len() > STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES {
+        return Err(SteamworksNetworkingSocketsError::TooManyConfigEntries {
+            requested: options.len(),
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
+        });
+    }
+
+    for (index, option) in options.iter().enumerate() {
+        validate_config_entry(index, option)?;
+    }
+
+    Ok(())
+}
+
+fn validate_config_entry(
+    index: usize,
+    option: &SteamworksNetworkingSocketsConfigEntry,
+) -> Result<(), SteamworksNetworkingSocketsError> {
+    use steamworks::networking_types::NetworkingConfigDataType;
+
+    match option {
+        SteamworksNetworkingSocketsConfigEntry::Int32 { value, .. }
+            if value.data_type() != NetworkingConfigDataType::Int32 =>
+        {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigEntryType {
+                index,
+                expected: value.data_type(),
+                actual: NetworkingConfigDataType::Int32,
+            })
+        }
+        SteamworksNetworkingSocketsConfigEntry::Int64 { value, .. }
+            if value.data_type() != NetworkingConfigDataType::Int64 =>
+        {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigEntryType {
+                index,
+                expected: value.data_type(),
+                actual: NetworkingConfigDataType::Int64,
+            })
+        }
+        SteamworksNetworkingSocketsConfigEntry::Float { value, data }
+            if value.data_type() != NetworkingConfigDataType::Float =>
+        {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigEntryType {
+                index,
+                expected: value.data_type(),
+                actual: NetworkingConfigDataType::Float,
+            })
+        }
+        SteamworksNetworkingSocketsConfigEntry::Float { data, .. } if !data.is_finite() => {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigFloat { index })
+        }
+        SteamworksNetworkingSocketsConfigEntry::String { value, .. }
+            if value.data_type() != NetworkingConfigDataType::String =>
+        {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigEntryType {
+                index,
+                expected: value.data_type(),
+                actual: NetworkingConfigDataType::String,
+            })
+        }
+        SteamworksNetworkingSocketsConfigEntry::String { data, .. }
+            if data.as_bytes().contains(&0) =>
+        {
+            Err(SteamworksNetworkingSocketsError::InvalidConfigString { index })
+        }
+        SteamworksNetworkingSocketsConfigEntry::Int32 { .. }
+        | SteamworksNetworkingSocketsConfigEntry::Int64 { .. }
+        | SteamworksNetworkingSocketsConfigEntry::Float { .. }
+        | SteamworksNetworkingSocketsConfigEntry::String { .. } => Ok(()),
+    }
 }
 
 fn validate_virtual_port(port: i32) -> Result<(), SteamworksNetworkingSocketsError> {
