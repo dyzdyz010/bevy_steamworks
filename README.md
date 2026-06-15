@@ -759,8 +759,8 @@ cargo run --example screenshots
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_storage(mut storage: MessageWriter<SteamworksRemoteStorageCommand>) {
-    storage.write(SteamworksRemoteStorageCommand::GetCloudInfo);
-    storage.write(SteamworksRemoteStorageCommand::ListFiles);
+    storage.write(SteamworksRemoteStorageCommand::get_cloud_info());
+    storage.write(SteamworksRemoteStorageCommand::list_files());
     storage.write(SteamworksRemoteStorageCommand::get_file_info("save.dat"));
     storage.write(SteamworksRemoteStorageCommand::write_file(
         "save.dat",
@@ -786,7 +786,7 @@ fn main() {
 }
 ```
 
-`SteamworksRemoteStorageCommand::{ReadFile, WriteFile, ShareFile}` emit `FileReadRequested`, `FileWriteRequested`, or `FileShareRequested` immediately with plugin-assigned `request_id` values. File payload reads and writes run on background workers and later emit `FileRead`, `FileWritten`, or a structured async error through `SteamworksRemoteStorageResult`; async read errors include the request ID for correlation. `FileWritten` means the upstream writer accepted the bytes and the stream close was issued; the upstream `steamworks` crate does not expose a close result. File payload `Debug` output reports byte lengths instead of raw bytes. File names are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksRemoteStorageError::InvalidString` instead of panicking in a C string conversion.
+`SteamworksRemoteStorageCommand::read_file(...)`, `write_file(...)`, and `share_file(...)` emit `FileReadRequested`, `FileWriteRequested`, or `FileShareRequested` immediately with plugin-assigned `request_id` values. File payload reads and writes run on background workers and later emit `FileRead`, `FileWritten`, or a structured async error through `SteamworksRemoteStorageResult`; async read errors include the request ID for correlation. `FileWritten` means the upstream writer accepted the bytes and the stream close was issued; the upstream `steamworks` crate does not expose a close result. File payload `Debug` output reports byte lengths instead of raw bytes. File names are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksRemoteStorageError::InvalidString` instead of panicking in a C string conversion.
 
 Run the Remote Storage example with:
 
@@ -888,7 +888,7 @@ cargo run --example ugc
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_remote_play(mut remote_play: MessageWriter<SteamworksRemotePlayCommand>) {
-    remote_play.write(SteamworksRemotePlayCommand::ListSessions);
+    remote_play.write(SteamworksRemotePlayCommand::list_sessions());
 }
 
 fn read_remote_play(mut results: MessageReader<SteamworksRemotePlayResult>) {
@@ -908,11 +908,11 @@ fn main() {
 }
 ```
 
-`SteamworksRemotePlayCommand::ListSessions` returns session snapshots with user, client name, form factor, and resolution. The upstream bulk listing API does not expose session IDs, so use `SteamworksRemotePlayOperation::SessionConnected` to capture a `RemotePlaySessionId`, then call `SteamworksRemotePlayCommand::GetSession` for ID-based session reads. Remote Play connect/disconnect callbacks are still available through `SteamworksEvent`, and are mirrored as `SteamworksRemotePlayResult` messages for module-local systems.
+`SteamworksRemotePlayCommand::list_sessions()` returns session snapshots with user, client name, form factor, and resolution. The upstream bulk listing API does not expose session IDs, so use `SteamworksRemotePlayOperation::SessionConnected` to capture a `RemotePlaySessionId`, then call `SteamworksRemotePlayCommand::get_session(...)` for ID-based session reads. Remote Play connect/disconnect callbacks are still available through `SteamworksEvent`, and are mirrored as `SteamworksRemotePlayResult` messages for module-local systems.
 
 `SteamworksRemotePlayState` caches the latest bulk session list, ID-based known session snapshots, callback-observed connected session IDs, the latest submitted Remote Play Together invite, and successful invite count. Systems can query specific ID-based snapshots with `known_session`, check callback-observed connectivity with `is_session_observed_connected`, and inspect the last invite through `last_submitted_invite`.
 
-The current upstream Rust wrapper exposes Remote Play Together invites through `steamworks::RemotePlaySession`, but the underlying invite result only confirms whether Steam accepted an invite for the friend. `SteamworksRemotePlayCommand::Invite` therefore treats the session ID as caller-provided context, not proof that Steam created a session-specific invite.
+The current upstream Rust wrapper exposes Remote Play Together invites through `steamworks::RemotePlaySession`, but the underlying invite result only confirms whether Steam accepted an invite for the friend. `SteamworksRemotePlayCommand::invite(...)` therefore treats the session ID as caller-provided context, not proof that Steam created a session-specific invite.
 
 Run the Remote Play example with:
 

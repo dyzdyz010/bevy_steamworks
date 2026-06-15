@@ -1052,7 +1052,7 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksRemoteStorageCommand::GetCloudInfo;
+    let command = SteamworksRemoteStorageCommand::get_cloud_info();
     let operation = SteamworksRemoteStorageOperation::CloudEnabledForAppRead { enabled: true };
     let error = SteamworksRemoteStorageError::ClientUnavailable;
     let result = SteamworksRemoteStorageResult::Err {
@@ -1066,6 +1066,15 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+    );
+    accepts_root_exports(
+        SteamworksRemoteStoragePlugin::new(),
+        SteamworksRemoteStorageCommand::list_files(),
+        SteamworksRemoteStorageOperation::FilesListed { files: Vec::new() },
+        SteamworksRemoteStorageResult::Ok(
+            SteamworksRemoteStorageOperation::CloudEnabledForAccountRead { enabled: true },
+        ),
+        SteamworksRemoteStorageError::ClientUnavailable,
     );
 
     let write = SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
@@ -1102,7 +1111,7 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         bytes: 7,
     };
 
-    let command = PreludeRemoteStorageCommand::GetCloudInfo;
+    let command = PreludeRemoteStorageCommand::get_cloud_info();
     let operation = PreludeRemoteStorageOperation::CloudEnabledForAppRead { enabled: true };
     let error = PreludeRemoteStorageError::ClientUnavailable;
     let result = PreludeRemoteStorageResult::Err {
@@ -1116,6 +1125,15 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+    );
+    accepts_prelude_exports(
+        PreludeRemoteStoragePlugin::new(),
+        PreludeRemoteStorageCommand::is_cloud_enabled_for_app(),
+        PreludeRemoteStorageOperation::CloudEnabledForAppRead { enabled: true },
+        PreludeRemoteStorageResult::Ok(PreludeRemoteStorageOperation::CloudEnabledForAccountRead {
+            enabled: true,
+        }),
+        PreludeRemoteStorageError::ClientUnavailable,
     );
 
     let write = PreludeRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
@@ -1168,7 +1186,7 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksRemotePlayCommand::ListSessions;
+    let command = SteamworksRemotePlayCommand::list_sessions();
     let operation = SteamworksRemotePlayOperation::SessionsListed { sessions: vec![] };
     let error = SteamworksRemotePlayError::ClientUnavailable;
     let result = SteamworksRemotePlayResult::Err {
@@ -1184,7 +1202,7 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
         error,
     );
 
-    let command = PreludeRemotePlayCommand::ListSessions;
+    let command = PreludeRemotePlayCommand::list_sessions();
     let operation = PreludeRemotePlayOperation::SessionsListed { sessions: vec![] };
     let error = PreludeRemotePlayError::ClientUnavailable;
     let result = PreludeRemotePlayResult::Err {

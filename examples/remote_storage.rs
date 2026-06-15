@@ -21,8 +21,8 @@ fn request_remote_storage(
         return;
     }
 
-    commands.write(SteamworksRemoteStorageCommand::GetCloudInfo);
-    commands.write(SteamworksRemoteStorageCommand::ListFiles);
+    commands.write(SteamworksRemoteStorageCommand::get_cloud_info());
+    commands.write(SteamworksRemoteStorageCommand::list_files());
 
     if let Ok(name) = std::env::var("BEVY_STEAMWORKS_REMOTE_STORAGE_FILE") {
         commands.write(SteamworksRemoteStorageCommand::get_file_info(name.clone()));

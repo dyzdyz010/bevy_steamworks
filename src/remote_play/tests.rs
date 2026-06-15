@@ -42,7 +42,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksRemotePlayPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksRemotePlayCommand>>()
-        .write(SteamworksRemotePlayCommand::ListSessions);
+        .write(SteamworksRemotePlayCommand::list_sessions());
 
     app.update();
 
@@ -71,6 +71,10 @@ fn constructors_preserve_session_context() {
     let session = steamworks::RemotePlaySessionId::from_raw(7);
     let friend = steamworks::SteamId::from_raw(42);
 
+    assert_eq!(
+        SteamworksRemotePlayCommand::list_sessions(),
+        SteamworksRemotePlayCommand::ListSessions
+    );
     assert_eq!(
         SteamworksRemotePlayCommand::get_session(session),
         SteamworksRemotePlayCommand::GetSession { session }

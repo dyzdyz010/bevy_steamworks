@@ -45,7 +45,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksRemoteStoragePlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksRemoteStorageCommand>>()
-        .write(SteamworksRemoteStorageCommand::GetCloudInfo);
+        .write(SteamworksRemoteStorageCommand::get_cloud_info());
 
     app.update();
 
@@ -66,6 +66,82 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksRemoteStorageError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let platforms =
+        steamworks::RemoteStoragePlatforms::WINDOWS | steamworks::RemoteStoragePlatforms::LINUX;
+
+    assert_eq!(
+        SteamworksRemoteStorageCommand::get_cloud_info(),
+        SteamworksRemoteStorageCommand::GetCloudInfo
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::is_cloud_enabled_for_app(),
+        SteamworksRemoteStorageCommand::IsCloudEnabledForApp
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::is_cloud_enabled_for_account(),
+        SteamworksRemoteStorageCommand::IsCloudEnabledForAccount
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::set_cloud_enabled_for_app(true),
+        SteamworksRemoteStorageCommand::SetCloudEnabledForApp { enabled: true }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::list_files(),
+        SteamworksRemoteStorageCommand::ListFiles
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::get_file_info("save.dat"),
+        SteamworksRemoteStorageCommand::GetFileInfo {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::read_file("save.dat"),
+        SteamworksRemoteStorageCommand::ReadFile {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::write_file("save.dat", b"payload".to_vec()),
+        SteamworksRemoteStorageCommand::WriteFile {
+            write: SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec()),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::delete_file("save.dat"),
+        SteamworksRemoteStorageCommand::DeleteFile {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::forget_file("save.dat"),
+        SteamworksRemoteStorageCommand::ForgetFile {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::get_sync_platforms("save.dat"),
+        SteamworksRemoteStorageCommand::GetSyncPlatforms {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::set_sync_platforms("save.dat", platforms),
+        SteamworksRemoteStorageCommand::SetSyncPlatforms {
+            name: "save.dat".to_owned(),
+            platforms,
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::share_file("save.dat"),
+        SteamworksRemoteStorageCommand::ShareFile {
+            name: "save.dat".to_owned(),
+        }
     );
 }
 

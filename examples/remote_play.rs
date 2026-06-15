@@ -21,7 +21,7 @@ fn request_remote_play(
         return;
     }
 
-    commands.write(SteamworksRemotePlayCommand::ListSessions);
+    commands.write(SteamworksRemotePlayCommand::list_sessions());
 
     if let (Some(session), Some(friend)) = (
         env_u32("BEVY_STEAMWORKS_REMOTE_PLAY_SESSION"),

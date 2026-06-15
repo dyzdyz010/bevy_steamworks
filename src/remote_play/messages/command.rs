@@ -25,6 +25,11 @@ pub enum SteamworksRemotePlayCommand {
 }
 
 impl SteamworksRemotePlayCommand {
+    /// Creates a [`crate::SteamworksRemotePlayCommand::ListSessions`] command.
+    pub fn list_sessions() -> Self {
+        Self::ListSessions
+    }
+
     /// Creates a [`crate::SteamworksRemotePlayCommand::GetSession`] command.
     pub fn get_session(session: steamworks::RemotePlaySessionId) -> Self {
         Self::GetSession { session }

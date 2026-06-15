@@ -63,9 +63,29 @@ pub enum SteamworksRemoteStorageCommand {
 }
 
 impl SteamworksRemoteStorageCommand {
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::GetCloudInfo`] command.
+    pub fn get_cloud_info() -> Self {
+        Self::GetCloudInfo
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::IsCloudEnabledForApp`] command.
+    pub fn is_cloud_enabled_for_app() -> Self {
+        Self::IsCloudEnabledForApp
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::IsCloudEnabledForAccount`] command.
+    pub fn is_cloud_enabled_for_account() -> Self {
+        Self::IsCloudEnabledForAccount
+    }
+
     /// Creates a [`crate::SteamworksRemoteStorageCommand::SetCloudEnabledForApp`] command.
     pub fn set_cloud_enabled_for_app(enabled: bool) -> Self {
         Self::SetCloudEnabledForApp { enabled }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::ListFiles`] command.
+    pub fn list_files() -> Self {
+        Self::ListFiles
     }
 
     /// Creates a [`crate::SteamworksRemoteStorageCommand::GetFileInfo`] command.
