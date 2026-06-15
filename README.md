@@ -987,7 +987,7 @@ cargo run --example timeline
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_app_info(mut apps: MessageWriter<SteamworksAppsCommand>) {
-    apps.write(SteamworksAppsCommand::GetCurrentAppInfo);
+    apps.write(SteamworksAppsCommand::get_current_app_info());
     apps.write(SteamworksAppsCommand::is_dlc_installed(123456));
     apps.write(SteamworksAppsCommand::get_launch_query_param("connect"));
 }
@@ -1009,7 +1009,7 @@ fn main() {
 }
 ```
 
-`SteamworksAppsCommand::GetCurrentAppInfo` combines the most commonly needed app checks into one `SteamworksCurrentAppInfo` snapshot. `SteamworksAppsState` also caches the latest individual subscription, install directory, language, beta branch, launch command line, and launch query parameter reads for systems that prefer resource lookups over retaining message history. Use `current_beta_name_result()` when you need to distinguish an unread beta branch from a completed read that reported no beta branch. Launch query keys are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksAppsError::InvalidString` instead of panicking. If Steam delivers new URL launch parameters while the app is already running, `SteamworksEvent::NewUrlLaunchParameters` is also mirrored as `SteamworksAppsOperation::NewUrlLaunchParametersReceived`; send `GetLaunchCommandLine` or `GetLaunchQueryParam` afterwards to read the latest values.
+`SteamworksAppsCommand::get_current_app_info()` combines the most commonly needed app checks into one `SteamworksCurrentAppInfo` snapshot. `SteamworksAppsState` also caches the latest individual subscription, install directory, language, beta branch, launch command line, and launch query parameter reads for systems that prefer resource lookups over retaining message history. Use `current_beta_name_result()` when you need to distinguish an unread beta branch from a completed read that reported no beta branch. Launch query keys are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksAppsError::InvalidString` instead of panicking. If Steam delivers new URL launch parameters while the app is already running, `SteamworksEvent::NewUrlLaunchParameters` is also mirrored as `SteamworksAppsOperation::NewUrlLaunchParametersReceived`; send `get_launch_command_line()` or `get_launch_query_param(...)` afterwards to read the latest values.
 
 Run the app info example with:
 

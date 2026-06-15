@@ -333,7 +333,7 @@ fn apps_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksAppsCommand::IsSubscribed;
+    let command = SteamworksAppsCommand::get_current_app_info();
     let operation = SteamworksAppsOperation::SubscriptionRead { subscribed: true };
     let error = SteamworksAppsError::ClientUnavailable;
     let result = SteamworksAppsResult::Err {
@@ -348,8 +348,17 @@ fn apps_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    accepts_root_exports(
+        SteamworksAppsPlugin::new(),
+        SteamworksAppsCommand::get_launch_command_line(),
+        SteamworksAppsOperation::LaunchCommandLineRead {
+            command_line: "+connect 127.0.0.1".to_owned(),
+        },
+        SteamworksAppsResult::Ok(SteamworksAppsOperation::AppBuildIdRead { build_id: 1 }),
+        SteamworksAppsError::ClientUnavailable,
+    );
 
-    let command = PreludeAppsCommand::IsSubscribed;
+    let command = PreludeAppsCommand::is_subscribed();
     let operation = PreludeAppsOperation::SubscriptionRead { subscribed: true };
     let error = PreludeAppsError::ClientUnavailable;
     let result = PreludeAppsResult::Err {
@@ -358,6 +367,17 @@ fn apps_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeAppsPlugin::new(), command, operation, result, error);
+    accepts_prelude_exports(
+        PreludeAppsPlugin::new(),
+        PreludeAppsCommand::get_available_game_languages(),
+        PreludeAppsOperation::AvailableGameLanguagesRead {
+            languages: Vec::new(),
+        },
+        PreludeAppsResult::Ok(PreludeAppsOperation::CurrentGameLanguageRead {
+            language: "english".to_owned(),
+        }),
+        PreludeAppsError::ClientUnavailable,
+    );
 }
 
 #[test]
@@ -383,7 +403,7 @@ fn result_helper_api_is_exported_from_root_and_prelude() {
     assert_eq!(ok.as_result(), Ok(&operation));
     assert_eq!(ok.into_result(), Ok(operation));
 
-    let command = SteamworksAppsCommand::IsSubscribed;
+    let command = SteamworksAppsCommand::is_subscribed();
     let error = SteamworksAppsError::ClientUnavailable;
     let err = SteamworksAppsResult::Err {
         command: command.clone(),
@@ -416,7 +436,7 @@ fn result_helper_api_is_exported_from_root_and_prelude() {
     assert_eq!(ok.as_result(), Ok(&operation));
     assert_eq!(ok.into_result(), Ok(operation));
     accepts_prelude_command_error(PreludeCommandError::new(
-        PreludeAppsCommand::IsSubscribed,
+        PreludeAppsCommand::is_subscribed(),
         PreludeAppsError::ClientUnavailable,
     ));
 

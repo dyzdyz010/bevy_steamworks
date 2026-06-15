@@ -36,7 +36,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksAppsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksAppsCommand>>()
-        .write(SteamworksAppsCommand::GetCurrentAppInfo);
+        .write(SteamworksAppsCommand::get_current_app_info());
 
     app.update();
 
@@ -57,6 +57,82 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksAppsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let app_id = steamworks::AppId(480);
+
+    assert_eq!(
+        SteamworksAppsCommand::get_current_app_info(),
+        SteamworksAppsCommand::GetCurrentAppInfo
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_subscribed(),
+        SteamworksAppsCommand::IsSubscribed
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_app_installed(app_id),
+        SteamworksAppsCommand::IsAppInstalled { app_id }
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_dlc_installed(app_id),
+        SteamworksAppsCommand::IsDlcInstalled { app_id }
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_subscribed_app(app_id),
+        SteamworksAppsCommand::IsSubscribedApp { app_id }
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_subscribed_from_free_weekend(),
+        SteamworksAppsCommand::IsSubscribedFromFreeWeekend
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_vac_banned(),
+        SteamworksAppsCommand::IsVacBanned
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_cybercafe(),
+        SteamworksAppsCommand::IsCybercafe
+    );
+    assert_eq!(
+        SteamworksAppsCommand::is_low_violence(),
+        SteamworksAppsCommand::IsLowViolence
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_app_build_id(),
+        SteamworksAppsCommand::GetAppBuildId
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_app_install_dir(app_id),
+        SteamworksAppsCommand::GetAppInstallDir { app_id }
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_app_owner(),
+        SteamworksAppsCommand::GetAppOwner
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_available_game_languages(),
+        SteamworksAppsCommand::GetAvailableGameLanguages
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_current_game_language(),
+        SteamworksAppsCommand::GetCurrentGameLanguage
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_current_beta_name(),
+        SteamworksAppsCommand::GetCurrentBetaName
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_launch_command_line(),
+        SteamworksAppsCommand::GetLaunchCommandLine
+    );
+    assert_eq!(
+        SteamworksAppsCommand::get_launch_query_param("connect"),
+        SteamworksAppsCommand::GetLaunchQueryParam {
+            key: "connect".to_owned(),
+        }
     );
 }
 

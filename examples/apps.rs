@@ -16,8 +16,8 @@ fn request_app_info(
         return;
     }
 
-    commands.write(SteamworksAppsCommand::GetCurrentAppInfo);
-    commands.write(SteamworksAppsCommand::GetLaunchCommandLine);
+    commands.write(SteamworksAppsCommand::get_current_app_info());
+    commands.write(SteamworksAppsCommand::get_launch_command_line());
 
     if let Ok(key) = std::env::var("BEVY_STEAMWORKS_LAUNCH_PARAM") {
         commands.write(SteamworksAppsCommand::get_launch_query_param(key));
