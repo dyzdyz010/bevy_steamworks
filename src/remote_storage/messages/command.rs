@@ -1,5 +1,7 @@
 use bevy_ecs::message::Message;
 
+use super::super::SteamworksRemoteStorageFileWrite;
+
 /// A high-level command for Steam Remote Storage metadata and sharing workflows.
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksRemoteStorageCommand {
@@ -20,6 +22,16 @@ pub enum SteamworksRemoteStorageCommand {
     GetFileInfo {
         /// File name in Steam Remote Storage.
         name: String,
+    },
+    /// Read one file's bytes on a background worker.
+    ReadFile {
+        /// File name in Steam Remote Storage.
+        name: String,
+    },
+    /// Write one file's bytes on a background worker.
+    WriteFile {
+        /// File write payload.
+        write: SteamworksRemoteStorageFileWrite,
     },
     /// Delete one file locally and remotely.
     DeleteFile {
@@ -59,6 +71,18 @@ impl SteamworksRemoteStorageCommand {
     /// Creates a [`crate::SteamworksRemoteStorageCommand::GetFileInfo`] command.
     pub fn get_file_info(name: impl Into<String>) -> Self {
         Self::GetFileInfo { name: name.into() }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::ReadFile`] command.
+    pub fn read_file(name: impl Into<String>) -> Self {
+        Self::ReadFile { name: name.into() }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::WriteFile`] command.
+    pub fn write_file(name: impl Into<String>, data: impl Into<Vec<u8>>) -> Self {
+        Self::WriteFile {
+            write: SteamworksRemoteStorageFileWrite::new(name, data),
+        }
     }
 
     /// Creates a [`crate::SteamworksRemoteStorageCommand::DeleteFile`] command.

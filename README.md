@@ -753,7 +753,7 @@ cargo run --example screenshots
 
 ## Remote Storage
 
-`SteamworksRemoteStoragePlugin` adds command/result messages for Steam Cloud availability, file listing, file metadata, delete/forget, sync platforms, and asynchronous file sharing.
+`SteamworksRemoteStoragePlugin` adds command/result messages for Steam Cloud availability, file listing, file metadata, background file reads and writes, delete/forget, sync platforms, and asynchronous file sharing.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -762,6 +762,11 @@ fn request_storage(mut storage: MessageWriter<SteamworksRemoteStorageCommand>) {
     storage.write(SteamworksRemoteStorageCommand::GetCloudInfo);
     storage.write(SteamworksRemoteStorageCommand::ListFiles);
     storage.write(SteamworksRemoteStorageCommand::get_file_info("save.dat"));
+    storage.write(SteamworksRemoteStorageCommand::write_file(
+        "save.dat",
+        b"checkpoint=12".to_vec(),
+    ));
+    storage.write(SteamworksRemoteStorageCommand::read_file("save.dat"));
 }
 
 fn read_storage(mut results: MessageReader<SteamworksRemoteStorageResult>) {
@@ -781,9 +786,7 @@ fn main() {
 }
 ```
 
-This command layer intentionally does not wrap upstream `SteamFileReader` and `SteamFileWriter`, because the current upstream reader busy-waits for async file reads and file payload IO should not run in a Bevy frame loop. Use `SteamworksClient::remote_storage()` directly from your own background/file-IO layer for payload reads and writes.
-
-`SteamworksRemoteStorageCommand::ShareFile` emits `FileShareRequested` immediately with a plugin-assigned `request_id`, then emits `FileShared` or an async error after `SteamworksSystem::RunCallbacks` pumps the Steam call result. File names are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksRemoteStorageError::InvalidString` instead of panicking in a C string conversion.
+`SteamworksRemoteStorageCommand::{ReadFile, WriteFile, ShareFile}` emit `FileReadRequested`, `FileWriteRequested`, or `FileShareRequested` immediately with plugin-assigned `request_id` values. File payload reads and writes run on background workers and later emit `FileRead`, `FileWritten`, or a structured async error through `SteamworksRemoteStorageResult`; async read errors include the request ID for correlation. `FileWritten` means the upstream writer accepted the bytes and the stream close was issued; the upstream `steamworks` crate does not expose a close result. File payload `Debug` output reports byte lengths instead of raw bytes. File names are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksRemoteStorageError::InvalidString` instead of panicking in a C string conversion.
 
 Run the Remote Storage example with:
 
@@ -791,9 +794,14 @@ Run the Remote Storage example with:
 cargo run --example remote_storage
 $env:BEVY_STEAMWORKS_REMOTE_STORAGE_FILE = "save.dat"
 cargo run --example remote_storage
+$env:BEVY_STEAMWORKS_REMOTE_STORAGE_WRITE = "checkpoint=12"
+$env:BEVY_STEAMWORKS_REMOTE_STORAGE_READ = "1"
+cargo run --example remote_storage
 $env:BEVY_STEAMWORKS_REMOTE_STORAGE_SHARE = "1"
 cargo run --example remote_storage
 ```
+
+When both `BEVY_STEAMWORKS_REMOTE_STORAGE_WRITE` and `BEVY_STEAMWORKS_REMOTE_STORAGE_READ=1` are set, the example waits for `FileWritten` before submitting the read request so the two background operations are not started concurrently.
 
 ## Workshop / UGC
 

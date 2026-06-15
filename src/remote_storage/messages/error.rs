@@ -28,11 +28,31 @@ pub enum SteamworksRemoteStorageError {
         /// File name submitted.
         name: String,
     },
+    /// The requested file is not available for an async Steam Remote Storage request.
+    #[error("Steamworks Remote Storage file is not available for request {request_id}: {name}")]
+    FileUnavailableForRequest {
+        /// Plugin request ID for the background operation.
+        request_id: u64,
+        /// File name submitted.
+        name: String,
+    },
     /// The upstream Steamworks API rejected the operation.
     #[error("Steamworks Remote Storage operation failed: {operation}")]
     OperationFailed {
         /// Operation that failed.
         operation: &'static str,
+    },
+    /// A background file IO worker failed.
+    #[error("Steamworks Remote Storage file IO operation {operation} failed: {message}")]
+    FileIo {
+        /// Operation that failed.
+        operation: &'static str,
+        /// Plugin request ID for the background operation.
+        request_id: u64,
+        /// File name submitted.
+        name: String,
+        /// IO error text.
+        message: String,
     },
 }
 
@@ -57,7 +77,31 @@ impl SteamworksRemoteStorageError {
         Self::FileUnavailable { name: name.into() }
     }
 
+    pub(in crate::remote_storage) fn file_unavailable_for_request(
+        request_id: u64,
+        name: impl Into<String>,
+    ) -> Self {
+        Self::FileUnavailableForRequest {
+            request_id,
+            name: name.into(),
+        }
+    }
+
     pub(in crate::remote_storage) fn operation_failed(operation: &'static str) -> Self {
         Self::OperationFailed { operation }
+    }
+
+    pub(in crate::remote_storage) fn file_io(
+        operation: &'static str,
+        request_id: u64,
+        name: impl Into<String>,
+        source: impl ToString,
+    ) -> Self {
+        Self::FileIo {
+            operation,
+            request_id,
+            name: name.into(),
+            message: source.to_string(),
+        }
     }
 }

@@ -71,6 +71,9 @@ use bevy_steamworks::{
         SteamworksRemotePlayResult as PreludeRemotePlayResult,
         SteamworksRemoteStorageCommand as PreludeRemoteStorageCommand,
         SteamworksRemoteStorageError as PreludeRemoteStorageError,
+        SteamworksRemoteStorageFileContents as PreludeRemoteStorageFileContents,
+        SteamworksRemoteStorageFileWrite as PreludeRemoteStorageFileWrite,
+        SteamworksRemoteStorageFileWritten as PreludeRemoteStorageFileWritten,
         SteamworksRemoteStorageOperation as PreludeRemoteStorageOperation,
         SteamworksRemoteStoragePlugin as PreludeRemoteStoragePlugin,
         SteamworksRemoteStorageResult as PreludeRemoteStorageResult,
@@ -137,7 +140,9 @@ use bevy_steamworks::{
     SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
     SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
     SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
-    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
+    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
     SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
     SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
     SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
@@ -1022,6 +1027,40 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         error,
     );
 
+    let write = SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
+    accepts_root_exports(
+        SteamworksRemoteStoragePlugin::new(),
+        SteamworksRemoteStorageCommand::write_file("save.dat", b"payload".to_vec()),
+        SteamworksRemoteStorageOperation::FileWriteRequested {
+            request_id: 0,
+            name: "save.dat".to_owned(),
+            bytes: 7,
+        },
+        SteamworksRemoteStorageResult::Ok(SteamworksRemoteStorageOperation::FileRead {
+            contents: SteamworksRemoteStorageFileContents {
+                request_id: 1,
+                name: "save.dat".to_owned(),
+                data: b"payload".to_vec(),
+            },
+        }),
+        SteamworksRemoteStorageError::FileIo {
+            operation: "remote_storage.file.write",
+            request_id: 0,
+            name: "save.dat".to_owned(),
+            message: "failed".to_owned(),
+        },
+    );
+    let _unavailable = SteamworksRemoteStorageError::FileUnavailableForRequest {
+        request_id: 3,
+        name: "save.dat".to_owned(),
+    };
+    assert_eq!(write.bytes(), 7);
+    let _written = SteamworksRemoteStorageFileWritten {
+        request_id: 2,
+        name: "save.dat".to_owned(),
+        bytes: 7,
+    };
+
     let command = PreludeRemoteStorageCommand::GetCloudInfo;
     let operation = PreludeRemoteStorageOperation::CloudEnabledForAppRead { enabled: true };
     let error = PreludeRemoteStorageError::ClientUnavailable;
@@ -1037,6 +1076,35 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+
+    let write = PreludeRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
+    accepts_prelude_exports(
+        PreludeRemoteStoragePlugin::new(),
+        PreludeRemoteStorageCommand::read_file("save.dat"),
+        PreludeRemoteStorageOperation::FileReadRequested {
+            request_id: 0,
+            name: "save.dat".to_owned(),
+        },
+        PreludeRemoteStorageResult::Ok(PreludeRemoteStorageOperation::FileWritten {
+            written: PreludeRemoteStorageFileWritten {
+                request_id: 1,
+                name: "save.dat".to_owned(),
+                bytes: 7,
+            },
+        }),
+        PreludeRemoteStorageError::FileIo {
+            operation: "remote_storage.file.read",
+            request_id: 0,
+            name: "save.dat".to_owned(),
+            message: "failed".to_owned(),
+        },
+    );
+    assert_eq!(write.bytes(), 7);
+    let _contents = PreludeRemoteStorageFileContents {
+        request_id: 2,
+        name: "save.dat".to_owned(),
+        data: b"payload".to_vec(),
+    };
 }
 
 #[test]

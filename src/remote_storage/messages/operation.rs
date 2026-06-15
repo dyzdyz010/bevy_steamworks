@@ -1,6 +1,7 @@
 use super::super::{
-    SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageFileInfo,
-    SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageSharedFile,
+    SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageFileContents,
+    SteamworksRemoteStorageFileInfo, SteamworksRemoteStorageFileSummary,
+    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageSharedFile,
 };
 
 /// A successfully processed Steam Remote Storage operation.
@@ -35,6 +36,32 @@ pub enum SteamworksRemoteStorageOperation {
     FileInfoRead {
         /// File metadata snapshot.
         info: SteamworksRemoteStorageFileInfo,
+    },
+    /// File read was requested.
+    FileReadRequested {
+        /// Plugin-assigned request ID.
+        request_id: u64,
+        /// File name submitted.
+        name: String,
+    },
+    /// File bytes were read.
+    FileRead {
+        /// Read file contents.
+        contents: SteamworksRemoteStorageFileContents,
+    },
+    /// File write was requested.
+    FileWriteRequested {
+        /// Plugin-assigned request ID.
+        request_id: u64,
+        /// File name submitted.
+        name: String,
+        /// Number of bytes submitted to the worker.
+        bytes: usize,
+    },
+    /// File bytes were accepted by the upstream writer.
+    FileWritten {
+        /// Completed write submission snapshot.
+        written: SteamworksRemoteStorageFileWritten,
     },
     /// File delete was submitted.
     FileDeleted {

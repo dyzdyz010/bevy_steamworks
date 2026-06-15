@@ -1,12 +1,12 @@
 //! High-level Bevy ECS integration for Steam Remote Storage.
 //!
 //! This module builds on top of the upstream [`steamworks::RemoteStorage`] API.
-//! It intentionally avoids the upstream blocking file reader/writer helpers in
-//! Bevy systems; games can still access those through [`crate::SteamworksClient`]
-//! when they can move file IO out of the frame-critical path.
+//! Payload reads and writes are submitted from Bevy systems and completed on
+//! background workers so upstream file IO does not block the frame loop.
 
 mod async_results;
 mod commands;
+mod file_io;
 mod messages;
 mod plugin;
 mod state;

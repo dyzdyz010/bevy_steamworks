@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// Steam Cloud availability for the current app and account.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SteamworksRemoteStorageCloudInfo {
@@ -29,6 +31,80 @@ pub struct SteamworksRemoteStorageFileInfo {
     pub timestamp: i64,
     /// Platforms the file is configured to sync to.
     pub sync_platforms: steamworks::RemoteStoragePlatforms,
+}
+
+/// Owned Steam Remote Storage file payload to write.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileWrite {
+    /// File name in Steam Remote Storage.
+    pub name: String,
+    /// File bytes to write.
+    pub data: Vec<u8>,
+}
+
+impl SteamworksRemoteStorageFileWrite {
+    /// Creates a file write payload.
+    pub fn new(name: impl Into<String>, data: impl Into<Vec<u8>>) -> Self {
+        Self {
+            name: name.into(),
+            data: data.into(),
+        }
+    }
+
+    /// Returns the number of bytes that will be written.
+    pub fn bytes(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl fmt::Debug for SteamworksRemoteStorageFileWrite {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SteamworksRemoteStorageFileWrite")
+            .field("name", &self.name)
+            .field("data_len", &self.data.len())
+            .finish()
+    }
+}
+
+/// Owned Steam Remote Storage file payload read by the plugin.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileContents {
+    /// Plugin-assigned request ID for correlating submitted and completed work.
+    pub request_id: u64,
+    /// File name in Steam Remote Storage.
+    pub name: String,
+    /// File bytes read from Steam Remote Storage.
+    pub data: Vec<u8>,
+}
+
+impl SteamworksRemoteStorageFileContents {
+    /// Returns the number of bytes read.
+    pub fn bytes(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl fmt::Debug for SteamworksRemoteStorageFileContents {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SteamworksRemoteStorageFileContents")
+            .field("request_id", &self.request_id)
+            .field("name", &self.name)
+            .field("data_len", &self.data.len())
+            .finish()
+    }
+}
+
+/// Completed Steam Remote Storage file write submission.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileWritten {
+    /// Plugin-assigned request ID for correlating submitted and completed work.
+    pub request_id: u64,
+    /// File name submitted to Steam Remote Storage.
+    pub name: String,
+    /// Number of bytes accepted by the upstream writer before stream close.
+    pub bytes: usize,
 }
 
 /// Opaque handle returned by Steam after a successful file share.

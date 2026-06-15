@@ -7,6 +7,7 @@ use crate::SteamworksClient;
 
 use super::{
     async_results::SteamworksRemoteStorageAsyncResults,
+    file_io::{spawn_file_read, spawn_file_write},
     messages::{
         SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
         SteamworksRemoteStorageOperation, SteamworksRemoteStorageResult,
@@ -101,8 +102,13 @@ fn async_command_request_id(
     command: &SteamworksRemoteStorageCommand,
     state: &mut SteamworksRemoteStorageState,
 ) -> Option<u64> {
-    matches!(command, SteamworksRemoteStorageCommand::ShareFile { .. })
-        .then(|| state.next_request_id())
+    matches!(
+        command,
+        SteamworksRemoteStorageCommand::ReadFile { .. }
+            | SteamworksRemoteStorageCommand::WriteFile { .. }
+            | SteamworksRemoteStorageCommand::ShareFile { .. }
+    )
+    .then(|| state.next_request_id())
 }
 
 fn handle_remote_storage_command(
@@ -147,6 +153,31 @@ fn handle_remote_storage_command(
             let file = remote_storage.file(&name);
             Ok(SteamworksRemoteStorageOperation::FileInfoRead {
                 info: snapshot_file_info(name, &file),
+            })
+        }
+        SteamworksRemoteStorageCommand::ReadFile { name } => {
+            let request_id = request_id.expect("async Remote Storage command missing request id");
+            spawn_file_read(
+                client.clone_inner(),
+                async_results.clone(),
+                request_id,
+                name.clone(),
+            )?;
+            Ok(SteamworksRemoteStorageOperation::FileReadRequested { request_id, name })
+        }
+        SteamworksRemoteStorageCommand::WriteFile { write } => {
+            let request_id = request_id.expect("async Remote Storage command missing request id");
+            let bytes = write.bytes();
+            spawn_file_write(
+                client.clone_inner(),
+                async_results.clone(),
+                request_id,
+                write.clone(),
+            )?;
+            Ok(SteamworksRemoteStorageOperation::FileWriteRequested {
+                request_id,
+                name: write.name,
+                bytes,
             })
         }
         SteamworksRemoteStorageCommand::DeleteFile { name } => {
@@ -234,11 +265,15 @@ fn validate_command(
 ) -> Result<(), SteamworksRemoteStorageError> {
     match command {
         SteamworksRemoteStorageCommand::GetFileInfo { name }
+        | SteamworksRemoteStorageCommand::ReadFile { name }
         | SteamworksRemoteStorageCommand::DeleteFile { name }
         | SteamworksRemoteStorageCommand::ForgetFile { name }
         | SteamworksRemoteStorageCommand::GetSyncPlatforms { name }
         | SteamworksRemoteStorageCommand::SetSyncPlatforms { name, .. }
         | SteamworksRemoteStorageCommand::ShareFile { name } => validate_steam_string("name", name),
+        SteamworksRemoteStorageCommand::WriteFile { write } => {
+            validate_steam_string("name", &write.name)
+        }
         SteamworksRemoteStorageCommand::GetCloudInfo
         | SteamworksRemoteStorageCommand::IsCloudEnabledForApp
         | SteamworksRemoteStorageCommand::IsCloudEnabledForAccount
@@ -277,6 +312,20 @@ mod tests {
             validate_command(&command),
             Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
         );
+
+        let command = SteamworksRemoteStorageCommand::read_file("save\0bad.dat");
+
+        assert_eq!(
+            validate_command(&command),
+            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
+        );
+
+        let command = SteamworksRemoteStorageCommand::write_file("save\0bad.dat", b"payload");
+
+        assert_eq!(
+            validate_command(&command),
+            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
+        );
     }
 
     #[test]
@@ -286,6 +335,20 @@ mod tests {
 
         assert_eq!(async_command_request_id(&command, &mut state), Some(0));
         assert_eq!(async_command_request_id(&command, &mut state), Some(1));
+        assert_eq!(
+            async_command_request_id(
+                &SteamworksRemoteStorageCommand::read_file("save.dat"),
+                &mut state
+            ),
+            Some(2)
+        );
+        assert_eq!(
+            async_command_request_id(
+                &SteamworksRemoteStorageCommand::write_file("save.dat", b"payload"),
+                &mut state
+            ),
+            Some(3)
+        );
         assert_eq!(
             async_command_request_id(&SteamworksRemoteStorageCommand::GetCloudInfo, &mut state),
             None

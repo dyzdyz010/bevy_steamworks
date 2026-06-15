@@ -3,8 +3,9 @@ use bevy_ecs::prelude::Resource;
 use super::{
     messages::{SteamworksRemoteStorageError, SteamworksRemoteStorageOperation},
     types::{
-        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageFileInfo,
-        SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageSharedFile,
+        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageFileContents,
+        SteamworksRemoteStorageFileInfo, SteamworksRemoteStorageFileSummary,
+        SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageSharedFile,
     },
 };
 
@@ -15,7 +16,11 @@ pub struct SteamworksRemoteStorageState {
     cloud_info: Option<SteamworksRemoteStorageCloudInfo>,
     files: Vec<SteamworksRemoteStorageFileSummary>,
     last_file_info: Option<SteamworksRemoteStorageFileInfo>,
+    last_file_contents: Option<SteamworksRemoteStorageFileContents>,
+    last_file_written: Option<SteamworksRemoteStorageFileWritten>,
     last_shared_file: Option<SteamworksRemoteStorageSharedFile>,
+    read_count: u64,
+    write_count: u64,
     share_count: u64,
     next_request_id: u64,
 }
@@ -41,9 +46,29 @@ impl SteamworksRemoteStorageState {
         self.last_file_info.as_ref()
     }
 
+    /// Returns the most recent file contents read through the plugin.
+    pub fn last_file_contents(&self) -> Option<&SteamworksRemoteStorageFileContents> {
+        self.last_file_contents.as_ref()
+    }
+
+    /// Returns the most recent file write completed through the plugin.
+    pub fn last_file_written(&self) -> Option<&SteamworksRemoteStorageFileWritten> {
+        self.last_file_written.as_ref()
+    }
+
     /// Returns the most recent file share completed through the plugin.
     pub fn last_shared_file(&self) -> Option<&SteamworksRemoteStorageSharedFile> {
         self.last_shared_file.as_ref()
+    }
+
+    /// Returns the number of completed file reads observed through the plugin.
+    pub fn read_count(&self) -> u64 {
+        self.read_count
+    }
+
+    /// Returns the number of completed file writes observed through the plugin.
+    pub fn write_count(&self) -> u64 {
+        self.write_count
     }
 
     /// Returns the number of completed file shares observed through the plugin.
@@ -81,6 +106,15 @@ impl SteamworksRemoteStorageState {
             SteamworksRemoteStorageOperation::FileInfoRead { info } => {
                 self.last_file_info = Some(info.clone());
             }
+            SteamworksRemoteStorageOperation::FileRead { contents } => {
+                self.last_file_contents = Some(contents.clone());
+                self.read_count = self.read_count.saturating_add(1);
+            }
+            SteamworksRemoteStorageOperation::FileWritten { written } => {
+                upsert_file_summary(&mut self.files, &written.name, written.bytes as u64);
+                self.last_file_written = Some(written.clone());
+                self.write_count = self.write_count.saturating_add(1);
+            }
             SteamworksRemoteStorageOperation::FileDeleted { name, deleted } => {
                 if *deleted {
                     self.files.retain(|file| file.name != *name);
@@ -115,7 +149,9 @@ impl SteamworksRemoteStorageState {
                 self.last_shared_file = Some(shared_file.clone());
                 self.share_count = self.share_count.saturating_add(1);
             }
-            SteamworksRemoteStorageOperation::FileShareRequested { .. } => {}
+            SteamworksRemoteStorageOperation::FileReadRequested { .. }
+            | SteamworksRemoteStorageOperation::FileWriteRequested { .. }
+            | SteamworksRemoteStorageOperation::FileShareRequested { .. } => {}
         }
     }
 
@@ -123,5 +159,20 @@ impl SteamworksRemoteStorageState {
         let request_id = self.next_request_id;
         self.next_request_id = self.next_request_id.wrapping_add(1);
         request_id
+    }
+}
+
+fn upsert_file_summary(
+    files: &mut Vec<SteamworksRemoteStorageFileSummary>,
+    name: &str,
+    size_bytes: u64,
+) {
+    if let Some(file) = files.iter_mut().find(|file| file.name == name) {
+        file.size_bytes = size_bytes;
+    } else {
+        files.push(SteamworksRemoteStorageFileSummary {
+            name: name.to_owned(),
+            size_bytes,
+        });
     }
 }
