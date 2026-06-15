@@ -46,7 +46,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksScreenshotsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksScreenshotsCommand>>()
-        .write(SteamworksScreenshotsCommand::IsScreenshotsHooked);
+        .write(SteamworksScreenshotsCommand::is_screenshots_hooked());
 
     app.update();
 
@@ -67,6 +67,36 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksScreenshotsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    assert_eq!(
+        SteamworksScreenshotsCommand::hook_screenshots(true),
+        SteamworksScreenshotsCommand::HookScreenshots { hook: true }
+    );
+    assert_eq!(
+        SteamworksScreenshotsCommand::is_screenshots_hooked(),
+        SteamworksScreenshotsCommand::IsScreenshotsHooked
+    );
+    assert_eq!(
+        SteamworksScreenshotsCommand::trigger_screenshot(),
+        SteamworksScreenshotsCommand::TriggerScreenshot
+    );
+    assert_eq!(
+        SteamworksScreenshotsCommand::add_screenshot_to_library(
+            "shot.png",
+            Some("thumb.png"),
+            1920,
+            1080,
+        ),
+        SteamworksScreenshotsCommand::AddScreenshotToLibrary {
+            filename: PathBuf::from("shot.png"),
+            thumbnail_filename: Some(PathBuf::from("thumb.png")),
+            width: 1920,
+            height: 1080,
+        }
     );
 }
 

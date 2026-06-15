@@ -21,14 +21,14 @@ fn request_screenshots(
         return;
     }
 
-    commands.write(SteamworksScreenshotsCommand::IsScreenshotsHooked);
+    commands.write(SteamworksScreenshotsCommand::is_screenshots_hooked());
 
     if std::env::var("BEVY_STEAMWORKS_HOOK_SCREENSHOTS").as_deref() == Ok("1") {
         commands.write(SteamworksScreenshotsCommand::hook_screenshots(true));
     }
 
     if std::env::var("BEVY_STEAMWORKS_TRIGGER_SCREENSHOT").as_deref() == Ok("1") {
-        commands.write(SteamworksScreenshotsCommand::TriggerScreenshot);
+        commands.write(SteamworksScreenshotsCommand::trigger_screenshot());
     }
 
     if let Ok(filename) = std::env::var("BEVY_STEAMWORKS_SCREENSHOT_FILE") {

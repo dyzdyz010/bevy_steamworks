@@ -51,6 +51,16 @@ impl SteamworksScreenshotsCommand {
         Self::HookScreenshots { hook }
     }
 
+    /// Creates a [`crate::SteamworksScreenshotsCommand::IsScreenshotsHooked`] command.
+    pub fn is_screenshots_hooked() -> Self {
+        Self::IsScreenshotsHooked
+    }
+
+    /// Creates a [`crate::SteamworksScreenshotsCommand::TriggerScreenshot`] command.
+    pub fn trigger_screenshot() -> Self {
+        Self::TriggerScreenshot
+    }
+
     /// Creates a [`crate::SteamworksScreenshotsCommand::AddScreenshotToLibrary`] command.
     pub fn add_screenshot_to_library(
         filename: impl Into<PathBuf>,

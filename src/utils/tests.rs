@@ -45,7 +45,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksUtilsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksUtilsCommand>>()
-        .write(SteamworksUtilsCommand::GetCurrentInfo);
+        .write(SteamworksUtilsCommand::get_current_info());
 
     app.update();
 
@@ -66,6 +66,71 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksUtilsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let gamepad_request = SteamworksGamepadTextInputRequest::new("Name", 32);
+    let floating_request = SteamworksFloatingGamepadTextInputRequest::new(
+        SteamworksFloatingGamepadTextInputMode::SingleLine,
+        1,
+        2,
+        300,
+        40,
+    );
+
+    assert_eq!(
+        SteamworksUtilsCommand::get_current_info(),
+        SteamworksUtilsCommand::GetCurrentInfo
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::get_app_id(),
+        SteamworksUtilsCommand::GetAppId
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::get_ip_country(),
+        SteamworksUtilsCommand::GetIpCountry
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::is_overlay_enabled(),
+        SteamworksUtilsCommand::IsOverlayEnabled
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::get_ui_language(),
+        SteamworksUtilsCommand::GetUiLanguage
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::get_server_real_time(),
+        SteamworksUtilsCommand::GetServerRealTime
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::is_steam_in_big_picture_mode(),
+        SteamworksUtilsCommand::IsSteamInBigPictureMode
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::is_steam_running_on_steam_deck(),
+        SteamworksUtilsCommand::IsSteamRunningOnSteamDeck
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::set_overlay_notification_position(
+            SteamworksNotificationPosition::BottomRight,
+        ),
+        SteamworksUtilsCommand::SetOverlayNotificationPosition {
+            position: SteamworksNotificationPosition::BottomRight,
+        }
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::show_gamepad_text_input(gamepad_request.clone()),
+        SteamworksUtilsCommand::ShowGamepadTextInput {
+            request: gamepad_request,
+        }
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::show_floating_gamepad_text_input(floating_request.clone()),
+        SteamworksUtilsCommand::ShowFloatingGamepadTextInput {
+            request: floating_request,
+        }
     );
 }
 

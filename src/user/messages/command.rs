@@ -93,6 +93,26 @@ impl std::fmt::Debug for SteamworksUserCommand {
 }
 
 impl SteamworksUserCommand {
+    /// Creates a [`crate::SteamworksUserCommand::GetCurrentUserInfo`] command.
+    pub fn get_current_user_info() -> Self {
+        Self::GetCurrentUserInfo
+    }
+
+    /// Creates a [`crate::SteamworksUserCommand::GetSteamId`] command.
+    pub fn get_steam_id() -> Self {
+        Self::GetSteamId
+    }
+
+    /// Creates a [`crate::SteamworksUserCommand::GetLevel`] command.
+    pub fn get_level() -> Self {
+        Self::GetLevel
+    }
+
+    /// Creates a [`crate::SteamworksUserCommand::IsLoggedOn`] command.
+    pub fn is_logged_on() -> Self {
+        Self::IsLoggedOn
+    }
+
     /// Creates a [`crate::SteamworksUserCommand::GetAuthenticationSessionTicket`] command.
     pub fn get_authentication_session_ticket(steam_id: steamworks::SteamId) -> Self {
         Self::GetAuthenticationSessionTicket { steam_id }

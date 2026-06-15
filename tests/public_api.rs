@@ -1236,6 +1236,18 @@ fn screenshots_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    accepts_root_exports(
+        SteamworksScreenshotsPlugin::new(),
+        SteamworksScreenshotsCommand::trigger_screenshot(),
+        SteamworksScreenshotsOperation::ScreenshotTriggered,
+        SteamworksScreenshotsResult::Ok(SteamworksScreenshotsOperation::ScreenshotRequested {
+            count: 1,
+        }),
+        SteamworksScreenshotsError::InvalidDimensions {
+            width: 0,
+            height: 1,
+        },
+    );
 
     let command = PreludeScreenshotsCommand::hook_screenshots(true);
     let operation = PreludeScreenshotsOperation::ScreenshotsHookSet { hook: true };
@@ -1251,6 +1263,13 @@ fn screenshots_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+    );
+    accepts_prelude_exports(
+        PreludeScreenshotsPlugin::new(),
+        PreludeScreenshotsCommand::is_screenshots_hooked(),
+        PreludeScreenshotsOperation::ScreenshotsHookedRead { hooked: true },
+        PreludeScreenshotsResult::Ok(PreludeScreenshotsOperation::ScreenshotTriggered),
+        PreludeScreenshotsError::ClientUnavailable,
     );
 }
 
@@ -1331,7 +1350,7 @@ fn user_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksUserCommand::GetLevel;
+    let command = SteamworksUserCommand::get_level();
     let operation = SteamworksUserOperation::LevelRead { level: 1 };
     let error = SteamworksUserError::ClientUnavailable;
     let result = SteamworksUserResult::Err {
@@ -1347,7 +1366,7 @@ fn user_api_is_exported_from_root_and_prelude() {
         error,
     );
 
-    let command = PreludeUserCommand::GetLevel;
+    let command = PreludeUserCommand::get_level();
     let operation = PreludeUserOperation::LevelRead { level: 1 };
     let error = PreludeUserError::ClientUnavailable;
     let result = PreludeUserResult::Err {
@@ -1734,6 +1753,15 @@ fn utils_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    accepts_root_exports(
+        SteamworksUtilsPlugin::new(),
+        SteamworksUtilsCommand::is_overlay_enabled(),
+        SteamworksUtilsOperation::OverlayEnabledRead { enabled: true },
+        SteamworksUtilsResult::Ok(SteamworksUtilsOperation::ServerRealTimeRead {
+            unix_epoch_seconds: 1,
+        }),
+        SteamworksUtilsError::ClientUnavailable,
+    );
 
     accepts_root_exports(
         SteamworksUtilsPlugin::new(),
@@ -1818,6 +1846,23 @@ fn utils_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeUtilsPlugin::new(), command, operation, result, error);
+    accepts_prelude_exports(
+        PreludeUtilsPlugin::new(),
+        PreludeUtilsCommand::get_current_info(),
+        PreludeUtilsOperation::CurrentInfoRead {
+            info: bevy_steamworks::prelude::SteamworksUtilsInfo {
+                app_id: steamworks::AppId(480),
+                ip_country: "US".to_owned(),
+                overlay_enabled: true,
+                ui_language: "english".to_owned(),
+                server_real_time: 1,
+                steam_in_big_picture_mode: false,
+                steam_running_on_steam_deck: false,
+            },
+        },
+        PreludeUtilsResult::Ok(PreludeUtilsOperation::OverlayEnabledRead { enabled: true }),
+        PreludeUtilsError::ClientUnavailable,
+    );
     accepts_prelude_exports(
         PreludeUtilsPlugin::new(),
         PreludeUtilsCommand::show_gamepad_text_input(gamepad_request.clone()),

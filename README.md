@@ -332,8 +332,8 @@ cargo run --example matchmaking_servers
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_user(mut user: MessageWriter<SteamworksUserCommand>) {
-    user.write(SteamworksUserCommand::GetCurrentUserInfo);
-    user.write(SteamworksUserCommand::IsLoggedOn);
+    user.write(SteamworksUserCommand::get_current_user_info());
+    user.write(SteamworksUserCommand::is_logged_on());
 }
 
 fn read_user(mut results: MessageReader<SteamworksUserResult>) {
@@ -353,11 +353,11 @@ fn main() {
 }
 ```
 
-`SteamworksUserCommand::GetAuthenticationSessionTicket` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through both `SteamworksEvent::AuthSessionTicketResponse` and `SteamworksUserOperation::AuthenticationSessionTicketResponse`. `SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse` and `SteamworksUserOperation::WebApiAuthenticationTicketReceived`. Remote ticket validation callbacks are also mirrored as `SteamworksUserOperation::AuthenticationTicketValidationReceived` with an owned, comparable validation result.
+`SteamworksUserCommand::get_authentication_session_ticket(...)` immediately returns a ticket handle and bytes in `SteamworksUserResult`, then final Steam confirmation arrives through both `SteamworksEvent::AuthSessionTicketResponse` and `SteamworksUserOperation::AuthenticationSessionTicketResponse`. `SteamworksUserCommand::get_authentication_session_ticket_for_web_api(...)` returns the handle first; the Web API ticket bytes arrive through `SteamworksEvent::TicketForWebApiResponse` and `SteamworksUserOperation::WebApiAuthenticationTicketReceived`. Remote ticket validation callbacks are also mirrored as `SteamworksUserOperation::AuthenticationTicketValidationReceived` with an owned, comparable validation result.
 
 Steam server connection callbacks are mirrored as `SteamworksUserOperation::SteamServerConnectionEventReceived` and update `SteamworksUserState::steam_server_connected()`. `SteamworksEvent::MicroTxnAuthorizationResponse` is mirrored as `SteamworksUserOperation::MicroTxnAuthorizationResponseReceived` with app ID, order ID, and authorization state.
 
-Call `SteamworksUserCommand::CancelAuthenticationTicket` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::EndAuthenticationSession` when a remote authenticated session ends. The command layer tracks issued ticket handles and sessions started through its own commands in `SteamworksUserState`; validation failure callbacks prune matching started sessions without creating new ones from unrelated global events.
+Call `SteamworksUserCommand::cancel_authentication_ticket(...)` when a locally issued ticket is no longer needed, and `SteamworksUserCommand::end_authentication_session(...)` when a remote authenticated session ends. The command layer tracks issued ticket handles and sessions started through its own commands in `SteamworksUserState`; validation failure callbacks prune matching started sessions without creating new ones from unrelated global events.
 
 `SteamworksUserState` also caches bounded query snapshots for the latest Steam ID and level reads, latest issued auth session ticket, latest Web API ticket request, latest cancelled ticket, latest started/ended remote authentication session, latest app-license check, and counters for those command-layer events. It keeps active ticket/session sets for lifecycle management, but only last snapshots for ticket bytes and license checks. Treat cached ticket bytes as credential material: cancel tickets promptly and avoid dumping state snapshots to logs.
 
@@ -379,8 +379,8 @@ cargo run --example user
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_utils(mut utils: MessageWriter<SteamworksUtilsCommand>) {
-    utils.write(SteamworksUtilsCommand::GetCurrentInfo);
-    utils.write(SteamworksUtilsCommand::IsOverlayEnabled);
+    utils.write(SteamworksUtilsCommand::get_current_info());
+    utils.write(SteamworksUtilsCommand::is_overlay_enabled());
     utils.write(SteamworksUtilsCommand::set_overlay_notification_position(
         SteamworksNotificationPosition::BottomRight,
     ));
@@ -712,7 +712,7 @@ cargo run --example networking_sockets
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_screenshots(mut screenshots: MessageWriter<SteamworksScreenshotsCommand>) {
-    screenshots.write(SteamworksScreenshotsCommand::IsScreenshotsHooked);
+    screenshots.write(SteamworksScreenshotsCommand::is_screenshots_hooked());
 }
 
 fn read_screenshots(mut results: MessageReader<SteamworksScreenshotsResult>) {
@@ -732,7 +732,7 @@ fn main() {
 }
 ```
 
-`SteamworksScreenshotsCommand::AddScreenshotToLibrary` returns a screenshot handle when Steam accepts the request. Final save confirmation arrives later through both `SteamworksEvent::ScreenshotReady` and `SteamworksScreenshotsOperation::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
+`SteamworksScreenshotsCommand::add_screenshot_to_library(...)` returns a screenshot handle when Steam accepts the request. Final save confirmation arrives later through both `SteamworksEvent::ScreenshotReady` and `SteamworksScreenshotsOperation::ScreenshotReady`. Width and height are validated before calling upstream `steamworks`, and path/save failures are reported as `SteamworksScreenshotsError::LibraryAddFailed`.
 
 `SteamworksScreenshotsState` caches the latest hook state, successful trigger count, screenshot request callback count, accepted library submission metadata, and the latest screenshot ready callback. Systems can keep using `added_screenshots` for handle-only compatibility or query `submitted_screenshots`, `submitted_screenshot`, and `last_submitted_screenshot` when they need the submitted path and dimensions.
 

@@ -21,8 +21,8 @@ fn request_user_info(
         return;
     };
 
-    commands.write(SteamworksUserCommand::GetCurrentUserInfo);
-    commands.write(SteamworksUserCommand::IsLoggedOn);
+    commands.write(SteamworksUserCommand::get_current_user_info());
+    commands.write(SteamworksUserCommand::is_logged_on());
 
     let steam_id = steam.user().steam_id();
     if std::env::var("BEVY_STEAMWORKS_AUTH_TICKET").as_deref() == Ok("1") {

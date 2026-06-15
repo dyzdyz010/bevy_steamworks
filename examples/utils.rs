@@ -16,9 +16,9 @@ fn request_utils(
         return;
     }
 
-    commands.write(SteamworksUtilsCommand::GetCurrentInfo);
-    commands.write(SteamworksUtilsCommand::IsOverlayEnabled);
-    commands.write(SteamworksUtilsCommand::IsSteamRunningOnSteamDeck);
+    commands.write(SteamworksUtilsCommand::get_current_info());
+    commands.write(SteamworksUtilsCommand::is_overlay_enabled());
+    commands.write(SteamworksUtilsCommand::is_steam_running_on_steam_deck());
 
     if std::env::var("BEVY_STEAMWORKS_OVERLAY_BOTTOM_RIGHT").as_deref() == Ok("1") {
         commands.write(SteamworksUtilsCommand::set_overlay_notification_position(

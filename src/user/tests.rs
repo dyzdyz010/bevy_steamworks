@@ -36,7 +36,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksUserPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksUserCommand>>()
-        .write(SteamworksUserCommand::GetCurrentUserInfo);
+        .write(SteamworksUserCommand::get_current_user_info());
 
     app.update();
 
@@ -57,6 +57,59 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksUserError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let steam_id = steamworks::SteamId::from_raw(1);
+    let app_id = steamworks::AppId(480);
+
+    assert_eq!(
+        SteamworksUserCommand::get_current_user_info(),
+        SteamworksUserCommand::GetCurrentUserInfo
+    );
+    assert_eq!(
+        SteamworksUserCommand::get_steam_id(),
+        SteamworksUserCommand::GetSteamId
+    );
+    assert_eq!(
+        SteamworksUserCommand::get_level(),
+        SteamworksUserCommand::GetLevel
+    );
+    assert_eq!(
+        SteamworksUserCommand::is_logged_on(),
+        SteamworksUserCommand::IsLoggedOn
+    );
+    assert_eq!(
+        SteamworksUserCommand::get_authentication_session_ticket(steam_id),
+        SteamworksUserCommand::GetAuthenticationSessionTicket { steam_id }
+    );
+    assert_eq!(
+        SteamworksUserCommand::get_authentication_session_ticket_for_web_api("service"),
+        SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi {
+            identity: "service".to_owned(),
+        }
+    );
+    let _cancel_constructor: fn(steamworks::AuthTicket) -> SteamworksUserCommand =
+        SteamworksUserCommand::cancel_authentication_ticket;
+    assert_eq!(
+        SteamworksUserCommand::begin_authentication_session(steam_id, [1, 2, 3]),
+        SteamworksUserCommand::BeginAuthenticationSession {
+            user: steam_id,
+            ticket: vec![1, 2, 3],
+        }
+    );
+    assert_eq!(
+        SteamworksUserCommand::end_authentication_session(steam_id),
+        SteamworksUserCommand::EndAuthenticationSession { user: steam_id }
+    );
+    assert_eq!(
+        SteamworksUserCommand::user_has_license_for_app(steam_id, app_id),
+        SteamworksUserCommand::UserHasLicenseForApp {
+            user: steam_id,
+            app_id,
+        }
     );
 }
 
