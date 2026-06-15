@@ -144,6 +144,51 @@ fn validation_rejects_invalid_inputs() {
         })
     );
     assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::send_messages(Vec::<
+            SteamworksNetworkingSocketsOutboundMessage,
+        >::new(
+        ))),
+        Err(SteamworksNetworkingSocketsError::EmptyMessageBatch)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::send_messages(vec![
+            SteamworksNetworkingSocketsOutboundMessage::new(
+                connection_id(),
+                steamworks::networking_types::SendFlags::RELIABLE,
+                Vec::<u8>::new(),
+            );
+            STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1
+        ])),
+        Err(SteamworksNetworkingSocketsError::SendBatchTooLarge {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::send_messages(vec![
+            SteamworksNetworkingSocketsOutboundMessage::new(
+                connection_id(),
+                steamworks::networking_types::SendFlags::RELIABLE,
+                vec![0; STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES + 1],
+            )
+        ])),
+        Err(SteamworksNetworkingSocketsError::MessageTooLarge {
+            bytes: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
+        })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::send_messages(vec![
+            SteamworksNetworkingSocketsOutboundMessage::new(
+                connection_id(),
+                steamworks::networking_types::SendFlags::RELIABLE,
+                Vec::<u8>::new(),
+            )
+            .with_channel(-1)
+        ])),
+        Err(SteamworksNetworkingSocketsError::InvalidMessageChannel { channel: -1 })
+    );
+    assert_eq!(
         validate_command(
             &SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus {
                 connection: connection_id(),
@@ -254,6 +299,19 @@ fn constructors_preserve_inputs() {
             batch_size: 16,
         }
     );
+    let outbound = SteamworksNetworkingSocketsOutboundMessage::new(
+        connection_id(),
+        steamworks::networking_types::SendFlags::RELIABLE,
+        [1, 2, 3],
+    )
+    .with_channel(1)
+    .with_user_data(99);
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::send_messages(vec![outbound.clone()]),
+        SteamworksNetworkingSocketsCommand::SendMessages {
+            messages: vec![outbound],
+        }
+    );
     assert_eq!(
         SteamworksNetworkingSocketsCommand::flush_messages(connection_id()),
         SteamworksNetworkingSocketsCommand::FlushMessages {
@@ -328,6 +386,14 @@ fn debug_redacts_message_payload_bytes() {
         steamworks::networking_types::SendFlags::RELIABLE,
         vec![1, 2, 3],
     );
+    let outbound = SteamworksNetworkingSocketsOutboundMessage::new(
+        connection_id(),
+        steamworks::networking_types::SendFlags::RELIABLE,
+        vec![10, 11, 12],
+    )
+    .with_channel(2)
+    .with_user_data(5);
+    let batch_command = SteamworksNetworkingSocketsCommand::send_messages(vec![outbound]);
     let message = SteamworksNetworkingSocketsMessage {
         connection: connection_id(),
         peer: peer.clone(),
@@ -358,6 +424,7 @@ fn debug_redacts_message_payload_bytes() {
     );
 
     let command_debug = format!("{command:?}");
+    let batch_command_debug = format!("{batch_command:?}");
     let message_debug = format!("{message:?}");
     let poll_group_debug = format!("{poll_group_message:?}");
     let operation_debug = format!("{operation:?}");
@@ -365,6 +432,8 @@ fn debug_redacts_message_payload_bytes() {
 
     assert!(command_debug.contains("data_len: 3"));
     assert!(!command_debug.contains("[1, 2, 3]"));
+    assert!(batch_command_debug.contains("data_len: 3"));
+    assert!(!batch_command_debug.contains("[10, 11, 12]"));
     assert!(message_debug.contains("data_len: 3"));
     assert!(!message_debug.contains("[4, 5, 6]"));
     assert!(poll_group_debug.contains("data_len: 3"));
@@ -506,6 +575,27 @@ fn state_records_operations_without_unbounded_message_history() {
         message_number: 3,
         bytes: 2,
     });
+    let send_results = vec![
+        SteamworksNetworkingSocketsMessageSendResult {
+            connection: connection_id(),
+            send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+            channel: 1,
+            bytes: 4,
+            user_data: 10,
+            result: Ok(5),
+        },
+        SteamworksNetworkingSocketsMessageSendResult {
+            connection: connection_id(),
+            send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
+            channel: 2,
+            bytes: 6,
+            user_data: 11,
+            result: Err(steamworks::SteamError::InvalidState),
+        },
+    ];
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesSent {
+        messages: send_results.clone(),
+    });
     state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesFlushed {
         connection: connection_id(),
     });
@@ -583,7 +673,7 @@ fn state_records_operations_without_unbounded_message_history() {
     assert_eq!(state.last_connection_info(), Some(&info));
     assert_eq!(state.last_realtime_status(), Some(&realtime_status));
     assert_eq!(state.received_count(), 3);
-    assert_eq!(state.sent_count(), 1);
+    assert_eq!(state.sent_count(), 2);
     assert_eq!(
         state.last_sent_message(),
         Some(&SteamworksNetworkingSocketsSentMessage {
@@ -592,6 +682,7 @@ fn state_records_operations_without_unbounded_message_history() {
             bytes: 2,
         })
     );
+    assert_eq!(state.last_sent_messages(), send_results.as_slice());
     assert_eq!(state.last_received_messages(), &[second]);
     assert_eq!(state.last_poll_group_messages(), &[poll_group_message]);
     assert_eq!(state.last_flushed_connection(), Some(connection_id()));

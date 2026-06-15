@@ -3,8 +3,8 @@ use super::super::{
     SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionId,
     SteamworksNetworkingSocketsConnectionInfo, SteamworksNetworkingSocketsConnectionTarget,
     SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessage,
-    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsPollGroupMessage,
-    SteamworksNetworkingSocketsRealtimeStatus,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsPollGroupMessage, SteamworksNetworkingSocketsRealtimeStatus,
 };
 
 /// A successfully submitted Networking Sockets operation, read, or event.
@@ -73,6 +73,11 @@ pub enum SteamworksNetworkingSocketsOperation {
         message_number: u64,
         /// Payload size in bytes.
         bytes: usize,
+    },
+    /// Multiple allocated messages were submitted.
+    MessagesSent {
+        /// Per-message send outcomes in command order.
+        messages: Vec<SteamworksNetworkingSocketsMessageSendResult>,
     },
     /// Messages were received.
     MessagesReceived {

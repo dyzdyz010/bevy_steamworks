@@ -18,7 +18,8 @@ use super::{
     validation::validate_command,
     SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConnectionTarget,
     SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsResult,
     SteamworksNetworkingSocketsState,
 };
 
@@ -246,6 +247,46 @@ fn handle_networking_sockets_command(
                 bytes: data.len(),
             }
         }
+        SteamworksNetworkingSocketsCommand::SendMessages { messages } => {
+            let mut outbound = Vec::with_capacity(messages.len());
+            for message in messages {
+                let connection_ref = handles.connections.get(&message.connection).ok_or(
+                    SteamworksNetworkingSocketsError::ConnectionNotFound {
+                        id: message.connection,
+                    },
+                )?;
+                outbound.push(allocate_outbound_message(client, connection_ref, message)?);
+            }
+
+            let send_results = sockets.send_messages(outbound);
+            let messages: Vec<SteamworksNetworkingSocketsMessageSendResult> = messages
+                .iter()
+                .zip(send_results)
+                .map(
+                    |(message, result)| SteamworksNetworkingSocketsMessageSendResult {
+                        connection: message.connection,
+                        send_flags: message.send_flags,
+                        channel: message.channel,
+                        bytes: message.data.len(),
+                        user_data: message.user_data,
+                        result: result.map(u64::from),
+                    },
+                )
+                .collect();
+            if messages
+                .iter()
+                .any(|message: &SteamworksNetworkingSocketsMessageSendResult| {
+                    message.result.is_err()
+                })
+            {
+                tracing::warn!(
+                    target: "bevy_steamworks",
+                    messages = ?messages,
+                    "Steamworks networking sockets batch send had per-message failures"
+                );
+            }
+            SteamworksNetworkingSocketsOperation::MessagesSent { messages }
+        }
         SteamworksNetworkingSocketsCommand::ReceiveMessages {
             connection,
             batch_size,
@@ -417,4 +458,31 @@ fn handle_networking_sockets_command(
             }
         }
     })
+}
+
+fn allocate_outbound_message(
+    client: &SteamworksClient,
+    connection: &steamworks::networking_sockets::NetConnection,
+    message: &SteamworksNetworkingSocketsOutboundMessage,
+) -> Result<steamworks::networking_types::NetworkingMessage, SteamworksNetworkingSocketsError> {
+    let mut outbound = client
+        .networking_utils()
+        .allocate_message(message.data.len());
+    outbound.set_connection(connection);
+    outbound.set_send_flags(message.send_flags);
+    outbound.set_channel(message.channel);
+    outbound.set_user_data(message.user_data);
+
+    if !message.data.is_empty() {
+        outbound
+            .copy_data_into_buffer(&message.data)
+            .map_err(|source| {
+                SteamworksNetworkingSocketsError::message_error(
+                    "networking_utils.allocate_message.copy_data_into_buffer",
+                    source,
+                )
+            })?;
+    }
+
+    Ok(outbound)
 }

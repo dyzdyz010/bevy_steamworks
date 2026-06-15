@@ -4,7 +4,8 @@ use bevy_ecs::message::Message;
 
 use super::super::{
     SteamworksConnectionRequestPolicy, SteamworksListenSocketId,
-    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsPollGroupId,
 };
 
 /// A high-level command for Steam Networking Sockets workflows.
@@ -74,6 +75,11 @@ pub enum SteamworksNetworkingSocketsCommand {
         send_flags: steamworks::networking_types::SendFlags,
         /// Payload.
         data: Vec<u8>,
+    },
+    /// Send multiple allocated messages with per-message lane/channel support.
+    SendMessages {
+        /// Outbound messages to submit.
+        messages: Vec<SteamworksNetworkingSocketsOutboundMessage>,
     },
     /// Receive messages from one connection.
     ReceiveMessages {
@@ -207,6 +213,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("connection", connection)
                 .field("send_flags", send_flags)
                 .field("data_len", &data.len())
+                .finish(),
+            Self::SendMessages { messages } => f
+                .debug_struct("SendMessages")
+                .field("messages", messages)
                 .finish(),
             Self::ReceiveMessages {
                 connection,
@@ -369,6 +379,15 @@ impl SteamworksNetworkingSocketsCommand {
             connection,
             send_flags,
             data: data.into(),
+        }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::SendMessages`] command.
+    pub fn send_messages(
+        messages: impl Into<Vec<SteamworksNetworkingSocketsOutboundMessage>>,
+    ) -> Self {
+        Self::SendMessages {
+            messages: messages.into(),
         }
     }
 

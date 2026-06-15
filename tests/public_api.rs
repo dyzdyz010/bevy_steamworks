@@ -38,8 +38,11 @@ use bevy_steamworks::{
         SteamworksNetworkingPlugin as PreludeNetworkingPlugin,
         SteamworksNetworkingResult as PreludeNetworkingResult,
         SteamworksNetworkingSocketsCommand as PreludeNetworkingSocketsCommand,
+        SteamworksNetworkingSocketsConnectionId as PreludeNetworkingSocketsConnectionId,
         SteamworksNetworkingSocketsError as PreludeNetworkingSocketsError,
+        SteamworksNetworkingSocketsMessageSendResult as PreludeNetworkingSocketsMessageSendResult,
         SteamworksNetworkingSocketsOperation as PreludeNetworkingSocketsOperation,
+        SteamworksNetworkingSocketsOutboundMessage as PreludeNetworkingSocketsOutboundMessage,
         SteamworksNetworkingSocketsPlugin as PreludeNetworkingSocketsPlugin,
         SteamworksNetworkingSocketsPollGroupId as PreludeNetworkingSocketsPollGroupId,
         SteamworksNetworkingSocketsResult as PreludeNetworkingSocketsResult,
@@ -109,23 +112,24 @@ use bevy_steamworks::{
     SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
     SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
     SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsPollGroupId,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
-    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
-    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksPlugin, SteamworksPlugins,
-    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
-    SteamworksRemoteStorageError, SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin,
-    SteamworksRemoteStorageResult, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
-    SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
-    SteamworksServerCommand, SteamworksServerConfig, SteamworksServerError,
-    SteamworksServerInitMode, SteamworksServerListFilters, SteamworksServerListKind,
-    SteamworksServerListRequestId, SteamworksServerOperation, SteamworksServerPlugin,
-    SteamworksServerResult, SteamworksServerUnavailable, SteamworksStatsCommand,
-    SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
-    SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
+    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
+    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksServerError, SteamworksServerInitMode, SteamworksServerListFilters,
+    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
+    SteamworksServerPlugin, SteamworksServerResult, SteamworksServerUnavailable,
+    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+    SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
     SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
     SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand,
@@ -805,6 +809,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         _operation: SteamworksNetworkingSocketsOperation,
         _result: SteamworksNetworkingSocketsResult,
         _error: SteamworksNetworkingSocketsError,
+        _outbound: SteamworksNetworkingSocketsOutboundMessage,
+        _send_result: SteamworksNetworkingSocketsMessageSendResult,
     ) {
     }
 
@@ -814,6 +820,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         _operation: PreludeNetworkingSocketsOperation,
         _result: PreludeNetworkingSocketsResult,
         _error: PreludeNetworkingSocketsError,
+        _outbound: PreludeNetworkingSocketsOutboundMessage,
+        _send_result: PreludeNetworkingSocketsMessageSendResult,
     ) {
     }
 
@@ -825,6 +833,22 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let connection = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+    let outbound = SteamworksNetworkingSocketsOutboundMessage::new(
+        connection,
+        steamworks::networking_types::SendFlags::RELIABLE,
+        [1, 2, 3],
+    )
+    .with_channel(1)
+    .with_user_data(7);
+    let send_result = SteamworksNetworkingSocketsMessageSendResult {
+        connection,
+        send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+        channel: 1,
+        bytes: 3,
+        user_data: 7,
+        result: Ok(42),
+    };
 
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
@@ -832,6 +856,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+        outbound,
+        send_result,
     );
 
     let poll_group = PreludeNetworkingSocketsPollGroupId::from_raw(1);
@@ -842,6 +868,22 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let connection = PreludeNetworkingSocketsConnectionId::from_raw(2);
+    let outbound = PreludeNetworkingSocketsOutboundMessage::new(
+        connection,
+        steamworks::networking_types::SendFlags::RELIABLE,
+        [1, 2, 3],
+    )
+    .with_channel(1)
+    .with_user_data(7);
+    let send_result = PreludeNetworkingSocketsMessageSendResult {
+        connection,
+        send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+        channel: 1,
+        bytes: 3,
+        user_data: 7,
+        result: Ok(42),
+    };
 
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),
@@ -849,6 +891,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+        outbound,
+        send_result,
     );
 }
 

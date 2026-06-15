@@ -36,11 +36,13 @@ pub(super) fn validate_command(
             validate_message_batch_size(*batch_size)
         }
         SteamworksNetworkingSocketsCommand::SendMessage { data, .. } => {
-            if data.len() > STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES {
-                return Err(SteamworksNetworkingSocketsError::MessageTooLarge {
-                    bytes: data.len(),
-                    max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
-                });
+            validate_message_payload_len(data.len())
+        }
+        SteamworksNetworkingSocketsCommand::SendMessages { messages } => {
+            validate_send_message_batch_size(messages.len())?;
+            for message in messages {
+                validate_message_payload_len(message.data.len())?;
+                validate_message_channel(message.channel)?;
             }
             Ok(())
         }
@@ -93,6 +95,38 @@ fn validate_message_batch_size(batch_size: usize) -> Result<(), SteamworksNetwor
             requested: batch_size,
             max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
         });
+    }
+    Ok(())
+}
+
+fn validate_send_message_batch_size(
+    batch_size: usize,
+) -> Result<(), SteamworksNetworkingSocketsError> {
+    if batch_size == 0 {
+        return Err(SteamworksNetworkingSocketsError::EmptyMessageBatch);
+    }
+    if batch_size > STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND {
+        return Err(SteamworksNetworkingSocketsError::SendBatchTooLarge {
+            requested: batch_size,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        });
+    }
+    Ok(())
+}
+
+fn validate_message_payload_len(bytes: usize) -> Result<(), SteamworksNetworkingSocketsError> {
+    if bytes > STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES {
+        return Err(SteamworksNetworkingSocketsError::MessageTooLarge {
+            bytes,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGE_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn validate_message_channel(channel: i32) -> Result<(), SteamworksNetworkingSocketsError> {
+    if channel < 0 {
+        return Err(SteamworksNetworkingSocketsError::InvalidMessageChannel { channel });
     }
     Ok(())
 }

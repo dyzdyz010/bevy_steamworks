@@ -609,7 +609,7 @@ fn main() {
 
 Relay status callbacks arrive through the main `SteamworksEvent::RelayNetworkStatusCallback` stream. This plugin observes those events after `SteamworksSystem::RunCallbacks`, reads the current detailed relay status, and emits an owned `SteamworksNetworkingUtilsResult::Ok` snapshot. Detailed status is copied into `SteamworksRelayNetworkStatus`, including Steam's diagnostic debug string, so the snapshot can be stored in ECS state safely.
 
-This layer intentionally leaves `NetworkingUtils::allocate_message` to the future `networking_sockets` command layer, because allocated message handles are part of low-level socket send workflows rather than relay diagnostics.
+Allocated `NetworkingUtils::allocate_message` handles are owned by the `networking_sockets` command layer through `SteamworksNetworkingSocketsCommand::send_messages`, because they are part of low-level socket send workflows rather than relay diagnostics.
 
 Run the Networking Utils example with:
 
@@ -621,7 +621,7 @@ cargo run --example networking_utils
 
 ## Networking Sockets
 
-`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send and receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles.
+`SteamworksNetworkingSocketsPlugin` adds command/result messages for Steam's modern connection-oriented Networking Sockets API. It can initialize networking authentication, create IP or P2P listen sockets, connect to IP or Steam identity peers, poll listen-socket and connection events, send one payload or allocated batches with per-message lane/channel settings, receive owned message snapshots, create poll groups, configure connection lanes, read connection status, set user data, flush, and close handles.
 
 The plugin owns upstream `ListenSocket` and `NetConnection` handles in a private resource and exposes stable IDs such as `SteamworksListenSocketId` and `SteamworksNetworkingSocketsConnectionId`. This prevents accidental handle drops from closing sockets outside the command layer.
 
@@ -629,7 +629,7 @@ Accepted listen-socket connections are tracked against their parent listen socke
 
 Poll group messages are returned as `SteamworksNetworkingSocketsPollGroupMessage`. The upstream safe wrapper does not expose the raw connection handle carried by those messages, so the poll-group snapshot includes Steam's `connection_user_data` instead of a plugin connection ID. If you need to map poll-group messages back to game state, set unique connection user data through `SteamworksNetworkingSocketsCommand::set_connection_user_data`.
 
-`SteamworksNetworkingSocketsState` caches bounded snapshots for the latest created and closed handles, polled event batches, connection info, realtime status, sent message context, received message batches, flushes, poll-group assignments, lane configuration, and user-data updates. It keeps only the most recent received message batches; message and command `Debug` output reports payload lengths instead of raw bytes so tracing does not dump packet contents.
+`SteamworksNetworkingSocketsState` caches bounded snapshots for the latest created and closed handles, polled event batches, connection info, realtime status, sent message context, batch send outcomes, received message batches, flushes, poll-group assignments, lane configuration, and user-data updates. It keeps only the most recent received message batches and batch send outcomes; message and command `Debug` output reports payload lengths instead of raw bytes so tracing does not dump packet contents.
 
 ```rust,no_run
 # use std::net::{Ipv4Addr, SocketAddr};
@@ -675,7 +675,7 @@ fn main() {
 
 Listen socket connection requests must be answered immediately. `PollListenSocketEvents` therefore takes a `SteamworksConnectionRequestPolicy` and accepts or rejects each incoming request in the same frame instead of exposing a cross-frame pending request handle.
 
-This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries and zero-copy allocated messages remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
+This command layer covers the safe handle-oriented Networking Sockets workflow. Low-level configuration entries remain accessible through `SteamworksClient::networking_sockets()` for specialized engines and can be promoted into typed commands in later layers.
 
 Run the Networking Sockets example with:
 

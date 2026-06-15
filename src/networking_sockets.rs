@@ -9,7 +9,7 @@
 /// Maximum number of socket/listen events processed by one poll command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND: usize = 256;
 
-/// Maximum number of messages received by one socket receive command.
+/// Maximum number of messages sent or received by one socket command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND: usize = 1024;
 
 /// Maximum realtime lane statuses requested by one status command.

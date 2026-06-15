@@ -16,6 +16,7 @@ pub struct SteamworksNetworkingSocketsState {
     last_connection_info: Option<SteamworksNetworkingSocketsConnectionInfo>,
     last_realtime_status: Option<SteamworksNetworkingSocketsRealtimeStatus>,
     last_sent_message: Option<SteamworksNetworkingSocketsSentMessage>,
+    last_sent_messages: Vec<SteamworksNetworkingSocketsMessageSendResult>,
     last_received_messages: Vec<SteamworksNetworkingSocketsMessage>,
     last_poll_group_messages: Vec<SteamworksNetworkingSocketsPollGroupMessage>,
     last_flushed_connection: Option<SteamworksNetworkingSocketsConnectionId>,
@@ -88,6 +89,11 @@ impl SteamworksNetworkingSocketsState {
     /// Returns the most recent sent-message snapshot.
     pub fn last_sent_message(&self) -> Option<&SteamworksNetworkingSocketsSentMessage> {
         self.last_sent_message.as_ref()
+    }
+
+    /// Returns the most recent batch send outcomes.
+    pub fn last_sent_messages(&self) -> &[SteamworksNetworkingSocketsMessageSendResult] {
+        &self.last_sent_messages
     }
 
     /// Returns the most recent batch of received messages.
@@ -165,7 +171,7 @@ impl SteamworksNetworkingSocketsState {
         self.poll_group_count
     }
 
-    /// Returns the number of successful send commands observed through the plugin.
+    /// Returns the number of successful messages submitted through the plugin.
     pub fn sent_count(&self) -> u64 {
         self.sent_count
     }
@@ -251,6 +257,16 @@ impl SteamworksNetworkingSocketsState {
                     message_number: *message_number,
                     bytes: *bytes,
                 });
+            }
+            SteamworksNetworkingSocketsOperation::MessagesSent { messages } => {
+                let successful = messages
+                    .iter()
+                    .filter(|message| message.result.is_ok())
+                    .count();
+                self.sent_count = self
+                    .sent_count
+                    .saturating_add(successful.try_into().unwrap_or(u64::MAX));
+                self.last_sent_messages.clone_from(messages);
             }
             SteamworksNetworkingSocketsOperation::MessagesReceived { messages, .. } => {
                 self.received_count = self

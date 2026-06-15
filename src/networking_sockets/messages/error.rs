@@ -51,6 +51,19 @@ pub enum SteamworksNetworkingSocketsError {
         /// Maximum accepted batch size.
         max_supported: usize,
     },
+    /// A send-message batch was empty.
+    #[error("Steam Networking Sockets send message batch must not be empty")]
+    EmptyMessageBatch,
+    /// A send-message batch exceeded this crate's per-command cap.
+    #[error(
+        "Steam Networking Sockets send message batch size {requested} exceeds max {max_supported}"
+    )]
+    SendBatchTooLarge {
+        /// Requested batch size.
+        requested: usize,
+        /// Maximum accepted batch size.
+        max_supported: usize,
+    },
     /// A message payload exceeded this crate's per-message cap.
     #[error("Steam Networking Sockets message size {bytes} exceeds max {max_supported}")]
     MessageTooLarge {
@@ -58,6 +71,12 @@ pub enum SteamworksNetworkingSocketsError {
         bytes: usize,
         /// Maximum accepted payload size.
         max_supported: usize,
+    },
+    /// A message lane/channel was negative.
+    #[error("Steam Networking Sockets message channel {channel} must not be negative")]
+    InvalidMessageChannel {
+        /// Invalid message channel.
+        channel: i32,
     },
     /// A lane count exceeded this crate's per-command cap.
     #[error("Steam Networking Sockets lane count {lanes} exceeds max {max_supported}")]
@@ -113,6 +132,14 @@ pub enum SteamworksNetworkingSocketsError {
         /// Error returned by Steam.
         source: steamworks::SteamError,
     },
+    /// The upstream message allocation wrapper rejected a payload buffer.
+    #[error("{operation} failed: {message}")]
+    MessageError {
+        /// Operation that failed.
+        operation: &'static str,
+        /// Error returned by the upstream message wrapper.
+        message: String,
+    },
     /// Steam returned `false` for a boolean operation.
     #[error("{operation} failed")]
     OperationFailed {
@@ -135,6 +162,16 @@ impl SteamworksNetworkingSocketsError {
         source: steamworks::SteamError,
     ) -> Self {
         Self::SteamError { operation, source }
+    }
+
+    pub(in crate::networking_sockets) fn message_error(
+        operation: &'static str,
+        source: impl std::error::Error,
+    ) -> Self {
+        Self::MessageError {
+            operation,
+            message: source.to_string(),
+        }
     }
 
     pub(in crate::networking_sockets) fn operation_failed(operation: &'static str) -> Self {
