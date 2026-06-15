@@ -19,6 +19,16 @@ impl SteamworksNetworkingUtilsCommand {
     pub fn init_relay_network_access() -> Self {
         Self::InitRelayNetworkAccess
     }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::GetRelayNetworkStatus`] command.
+    pub fn get_relay_network_status() -> Self {
+        Self::GetRelayNetworkStatus
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus`] command.
+    pub fn get_detailed_relay_network_status() -> Self {
+        Self::GetDetailedRelayNetworkStatus
+    }
 }
 
 /// A successfully submitted Steam Networking Utils operation or synchronous read.

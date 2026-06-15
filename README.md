@@ -600,7 +600,7 @@ cargo run --example networking_messages
 # use bevy_steamworks::prelude::*;
 fn request_relay_status(mut utils: MessageWriter<SteamworksNetworkingUtilsCommand>) {
     utils.write(SteamworksNetworkingUtilsCommand::init_relay_network_access());
-    utils.write(SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus);
+    utils.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
 }
 
 fn read_relay_status(mut results: MessageReader<SteamworksNetworkingUtilsResult>) {
@@ -649,7 +649,7 @@ Poll group messages are returned as `SteamworksNetworkingSocketsPollGroupMessage
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn open_socket(mut sockets: MessageWriter<SteamworksNetworkingSocketsCommand>) {
-    sockets.write(SteamworksNetworkingSocketsCommand::InitAuthentication);
+    sockets.write(SteamworksNetworkingSocketsCommand::init_authentication());
     sockets.write(SteamworksNetworkingSocketsCommand::create_listen_socket_ip(
         SocketAddr::from((Ipv4Addr::UNSPECIFIED, 27015)),
     ));

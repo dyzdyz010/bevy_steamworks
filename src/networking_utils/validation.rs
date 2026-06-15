@@ -17,15 +17,17 @@ mod tests {
             SteamworksNetworkingUtilsCommand::InitRelayNetworkAccess
         );
         assert_eq!(
-            validate_command(&SteamworksNetworkingUtilsCommand::InitRelayNetworkAccess),
+            validate_command(&SteamworksNetworkingUtilsCommand::init_relay_network_access()),
             Ok(())
         );
         assert_eq!(
-            validate_command(&SteamworksNetworkingUtilsCommand::GetRelayNetworkStatus),
+            validate_command(&SteamworksNetworkingUtilsCommand::get_relay_network_status()),
             Ok(())
         );
         assert_eq!(
-            validate_command(&SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus),
+            validate_command(
+                &SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status(),
+            ),
             Ok(())
         );
     }

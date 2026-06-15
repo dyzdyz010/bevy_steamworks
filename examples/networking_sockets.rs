@@ -29,8 +29,8 @@ fn configure_networking_sockets(
         return;
     }
 
-    commands.write(SteamworksNetworkingSocketsCommand::InitAuthentication);
-    commands.write(SteamworksNetworkingSocketsCommand::GetAuthenticationStatus);
+    commands.write(SteamworksNetworkingSocketsCommand::init_authentication());
+    commands.write(SteamworksNetworkingSocketsCommand::get_authentication_status());
 
     if std::env::var("BEVY_STEAMWORKS_SOCKETS_POLL_GROUP").as_deref() == Ok("1") {
         commands.write(SteamworksNetworkingSocketsCommand::create_poll_group());

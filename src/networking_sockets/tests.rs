@@ -66,7 +66,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksNetworkingSocketsCommand>>()
-        .write(SteamworksNetworkingSocketsCommand::GetAuthenticationStatus);
+        .write(SteamworksNetworkingSocketsCommand::get_authentication_status());
 
     app.update();
 
@@ -259,6 +259,14 @@ fn validation_rejects_invalid_inputs() {
 #[test]
 fn constructors_preserve_inputs() {
     let address = localhost();
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::init_authentication(),
+        SteamworksNetworkingSocketsCommand::InitAuthentication
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::get_authentication_status(),
+        SteamworksNetworkingSocketsCommand::GetAuthenticationStatus
+    );
     assert_eq!(
         SteamworksNetworkingSocketsCommand::create_listen_socket_ip(address),
         SteamworksNetworkingSocketsCommand::CreateListenSocketIp {

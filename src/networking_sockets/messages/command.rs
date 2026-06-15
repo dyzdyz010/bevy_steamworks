@@ -293,6 +293,16 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
 }
 
 impl SteamworksNetworkingSocketsCommand {
+    /// Creates a [`SteamworksNetworkingSocketsCommand::InitAuthentication`] command.
+    pub fn init_authentication() -> Self {
+        Self::InitAuthentication
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::GetAuthenticationStatus`] command.
+    pub fn get_authentication_status() -> Self {
+        Self::GetAuthenticationStatus
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::CreateListenSocketIp`] command.
     pub fn create_listen_socket_ip(local_address: SocketAddr) -> Self {
         Self::CreateListenSocketIp { local_address }

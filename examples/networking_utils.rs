@@ -28,8 +28,8 @@ fn configure_networking_utils(
         commands.write(SteamworksNetworkingUtilsCommand::init_relay_network_access());
     }
 
-    commands.write(SteamworksNetworkingUtilsCommand::GetRelayNetworkStatus);
-    commands.write(SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus);
+    commands.write(SteamworksNetworkingUtilsCommand::get_relay_network_status());
+    commands.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
 }
 
 fn poll_relay_status(
@@ -37,7 +37,7 @@ fn poll_relay_status(
     mut commands: MessageWriter<SteamworksNetworkingUtilsCommand>,
 ) {
     if countdown.0 == 0 {
-        commands.write(SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus);
+        commands.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
         countdown.0 = env_u32("BEVY_STEAMWORKS_RELAY_POLL_FRAMES").unwrap_or(30);
     } else {
         countdown.0 -= 1;

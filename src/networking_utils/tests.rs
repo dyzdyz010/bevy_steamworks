@@ -54,7 +54,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksNetworkingUtilsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksNetworkingUtilsCommand>>()
-        .write(SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus);
+        .write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
 
     app.update();
 
@@ -75,6 +75,22 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksNetworkingUtilsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::init_relay_network_access(),
+        SteamworksNetworkingUtilsCommand::InitRelayNetworkAccess
+    );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::get_relay_network_status(),
+        SteamworksNetworkingUtilsCommand::GetRelayNetworkStatus
+    );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status(),
+        SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus
     );
 }
 
