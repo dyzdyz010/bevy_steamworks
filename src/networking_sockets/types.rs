@@ -331,6 +331,24 @@ pub struct SteamworksNetworkingSocketsConnectionUserData {
     pub user_data: i64,
 }
 
+/// Connection debug-name mutation snapshot.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksNetworkingSocketsConnectionName {
+    /// Connection updated.
+    pub connection: SteamworksNetworkingSocketsConnectionId,
+    /// Debug name submitted to Steam.
+    pub name: String,
+}
+
+impl std::fmt::Debug for SteamworksNetworkingSocketsConnectionName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteamworksNetworkingSocketsConnectionName")
+            .field("connection", &self.connection)
+            .field("name_len", &self.name.len())
+            .finish()
+    }
+}
+
 /// Connection close snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingSocketsConnectionClosed {

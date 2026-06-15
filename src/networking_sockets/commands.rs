@@ -431,6 +431,17 @@ fn handle_networking_sockets_command(
                 user_data: *user_data,
             }
         }
+        SteamworksNetworkingSocketsCommand::SetConnectionName { connection, name } => {
+            let connection_ref = handles
+                .connections
+                .get(connection)
+                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
+            connection_ref.set_connection_name(name);
+            SteamworksNetworkingSocketsOperation::ConnectionNameSet {
+                connection: *connection,
+                name: name.clone(),
+            }
+        }
         SteamworksNetworkingSocketsCommand::CloseConnection {
             connection,
             reason,

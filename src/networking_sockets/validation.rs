@@ -85,6 +85,12 @@ pub(super) fn validate_command(
             }
             Ok(())
         }
+        SteamworksNetworkingSocketsCommand::SetConnectionName { name, .. } => {
+            if name.as_bytes().contains(&0) {
+                return Err(SteamworksNetworkingSocketsError::invalid_string("name"));
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }

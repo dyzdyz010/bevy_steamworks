@@ -51,12 +51,12 @@ use bevy_steamworks::{
         SteamworksNetworkingSocketsCommand as PreludeNetworkingSocketsCommand,
         SteamworksNetworkingSocketsConfigEntry as PreludeNetworkingSocketsConfigEntry,
         SteamworksNetworkingSocketsConnectionId as PreludeNetworkingSocketsConnectionId,
+        SteamworksNetworkingSocketsConnectionName as PreludeNetworkingSocketsConnectionName,
         SteamworksNetworkingSocketsError as PreludeNetworkingSocketsError,
         SteamworksNetworkingSocketsMessageSendResult as PreludeNetworkingSocketsMessageSendResult,
         SteamworksNetworkingSocketsOperation as PreludeNetworkingSocketsOperation,
         SteamworksNetworkingSocketsOutboundMessage as PreludeNetworkingSocketsOutboundMessage,
         SteamworksNetworkingSocketsPlugin as PreludeNetworkingSocketsPlugin,
-        SteamworksNetworkingSocketsPollGroupId as PreludeNetworkingSocketsPollGroupId,
         SteamworksNetworkingSocketsResult as PreludeNetworkingSocketsResult,
         SteamworksNetworkingUtilsCommand as PreludeNetworkingUtilsCommand,
         SteamworksNetworkingUtilsError as PreludeNetworkingUtilsError,
@@ -140,9 +140,9 @@ use bevy_steamworks::{
     SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
     SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsMessageSendResult,
-    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
-    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
     SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
     SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
     SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
@@ -882,6 +882,7 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
 
     fn accepts_root_message_exports(
         _config: SteamworksNetworkingSocketsConfigEntry,
+        _name: SteamworksNetworkingSocketsConnectionName,
         _outbound: SteamworksNetworkingSocketsOutboundMessage,
         _send_result: SteamworksNetworkingSocketsMessageSendResult,
     ) {
@@ -898,14 +899,18 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
 
     fn accepts_prelude_message_exports(
         _config: PreludeNetworkingSocketsConfigEntry,
+        _name: PreludeNetworkingSocketsConnectionName,
         _outbound: PreludeNetworkingSocketsOutboundMessage,
         _send_result: PreludeNetworkingSocketsMessageSendResult,
     ) {
     }
 
-    let poll_group = SteamworksNetworkingSocketsPollGroupId::from_raw(1);
-    let command = SteamworksNetworkingSocketsCommand::create_poll_group();
-    let operation = SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group };
+    let connection = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+    let command = SteamworksNetworkingSocketsCommand::set_connection_name(connection, "player-1");
+    let operation = SteamworksNetworkingSocketsOperation::ConnectionNameSet {
+        connection,
+        name: "player-1".to_owned(),
+    };
     let error = SteamworksNetworkingSocketsError::ClientUnavailable;
     let result = SteamworksNetworkingSocketsResult::Err {
         command: command.clone(),
@@ -915,7 +920,10 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         steamworks::networking_types::NetworkingConfigValue::IPAllowWithoutAuth,
         1,
     );
-    let connection = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+    let connection_name = SteamworksNetworkingSocketsConnectionName {
+        connection,
+        name: "player-1".to_owned(),
+    };
     let outbound = SteamworksNetworkingSocketsOutboundMessage::new(
         connection,
         steamworks::networking_types::SendFlags::RELIABLE,
@@ -939,7 +947,7 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
-    accepts_root_message_exports(config, outbound, send_result);
+    accepts_root_message_exports(config, connection_name, outbound, send_result);
     assert_eq!(
         bevy_steamworks::STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
         bevy_steamworks::prelude::STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
@@ -965,9 +973,12 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         bevy_steamworks::prelude::STEAMWORKS_NETWORKING_SOCKETS_MAX_REALTIME_LANES,
     );
 
-    let poll_group = PreludeNetworkingSocketsPollGroupId::from_raw(1);
-    let command = PreludeNetworkingSocketsCommand::create_poll_group();
-    let operation = PreludeNetworkingSocketsOperation::PollGroupCreated { poll_group };
+    let connection = PreludeNetworkingSocketsConnectionId::from_raw(2);
+    let command = PreludeNetworkingSocketsCommand::set_connection_name(connection, "player-1");
+    let operation = PreludeNetworkingSocketsOperation::ConnectionNameSet {
+        connection,
+        name: "player-1".to_owned(),
+    };
     let error = PreludeNetworkingSocketsError::ClientUnavailable;
     let result = PreludeNetworkingSocketsResult::Err {
         command: command.clone(),
@@ -977,7 +988,10 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         steamworks::networking_types::NetworkingConfigValue::IPAllowWithoutAuth,
         1,
     );
-    let connection = PreludeNetworkingSocketsConnectionId::from_raw(2);
+    let connection_name = PreludeNetworkingSocketsConnectionName {
+        connection,
+        name: "player-1".to_owned(),
+    };
     let outbound = PreludeNetworkingSocketsOutboundMessage::new(
         connection,
         steamworks::networking_types::SendFlags::RELIABLE,
@@ -1001,7 +1015,7 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
-    accepts_prelude_message_exports(config, outbound, send_result);
+    accepts_prelude_message_exports(config, connection_name, outbound, send_result);
 }
 
 #[test]

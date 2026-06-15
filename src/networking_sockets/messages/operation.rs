@@ -8,7 +8,7 @@ use super::super::{
 };
 
 /// A successfully submitted Networking Sockets operation, read, or event.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum SteamworksNetworkingSocketsOperation {
     /// Authentication initialization was submitted.
     AuthenticationInitialized {
@@ -124,6 +124,13 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// User data value.
         user_data: i64,
     },
+    /// Connection debug name was set.
+    ConnectionNameSet {
+        /// Connection updated.
+        connection: SteamworksNetworkingSocketsConnectionId,
+        /// Debug name submitted to Steam.
+        name: String,
+    },
     /// A connection was closed and removed.
     ConnectionClosed {
         /// Connection removed.
@@ -143,4 +150,146 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Poll group removed.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
     },
+}
+
+impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AuthenticationInitialized { availability } => f
+                .debug_struct("AuthenticationInitialized")
+                .field("availability", availability)
+                .finish(),
+            Self::AuthenticationStatusRead { availability } => f
+                .debug_struct("AuthenticationStatusRead")
+                .field("availability", availability)
+                .finish(),
+            Self::ListenSocketCreated {
+                listen_socket,
+                endpoint,
+            } => f
+                .debug_struct("ListenSocketCreated")
+                .field("listen_socket", listen_socket)
+                .field("endpoint", endpoint)
+                .finish(),
+            Self::ConnectionCreated { connection, target } => f
+                .debug_struct("ConnectionCreated")
+                .field("connection", connection)
+                .field("target", target)
+                .finish(),
+            Self::PollGroupCreated { poll_group } => f
+                .debug_struct("PollGroupCreated")
+                .field("poll_group", poll_group)
+                .finish(),
+            Self::ListenSocketEventsPolled {
+                listen_socket,
+                events,
+            } => f
+                .debug_struct("ListenSocketEventsPolled")
+                .field("listen_socket", listen_socket)
+                .field("events", events)
+                .finish(),
+            Self::ConnectionEventsPolled {
+                connection,
+                events,
+                connection_removed,
+            } => f
+                .debug_struct("ConnectionEventsPolled")
+                .field("connection", connection)
+                .field("events", events)
+                .field("connection_removed", connection_removed)
+                .finish(),
+            Self::ConnectionInfoRead { info } => f
+                .debug_struct("ConnectionInfoRead")
+                .field("info", info)
+                .finish(),
+            Self::RealtimeConnectionStatusRead { status } => f
+                .debug_struct("RealtimeConnectionStatusRead")
+                .field("status", status)
+                .finish(),
+            Self::MessageSent {
+                connection,
+                message_number,
+                bytes,
+            } => f
+                .debug_struct("MessageSent")
+                .field("connection", connection)
+                .field("message_number", message_number)
+                .field("bytes", bytes)
+                .finish(),
+            Self::MessagesSent { messages } => f
+                .debug_struct("MessagesSent")
+                .field("messages", messages)
+                .finish(),
+            Self::MessagesReceived {
+                connection,
+                messages,
+            } => f
+                .debug_struct("MessagesReceived")
+                .field("connection", connection)
+                .field("messages", messages)
+                .finish(),
+            Self::PollGroupMessagesReceived {
+                poll_group,
+                messages,
+            } => f
+                .debug_struct("PollGroupMessagesReceived")
+                .field("poll_group", poll_group)
+                .field("messages", messages)
+                .finish(),
+            Self::MessagesFlushed { connection } => f
+                .debug_struct("MessagesFlushed")
+                .field("connection", connection)
+                .finish(),
+            Self::ConnectionPollGroupSet {
+                connection,
+                poll_group,
+            } => f
+                .debug_struct("ConnectionPollGroupSet")
+                .field("connection", connection)
+                .field("poll_group", poll_group)
+                .finish(),
+            Self::ConnectionPollGroupCleared { connection } => f
+                .debug_struct("ConnectionPollGroupCleared")
+                .field("connection", connection)
+                .finish(),
+            Self::ConnectionLanesConfigured { connection, lanes } => f
+                .debug_struct("ConnectionLanesConfigured")
+                .field("connection", connection)
+                .field("lanes", lanes)
+                .finish(),
+            Self::ConnectionUserDataSet {
+                connection,
+                user_data,
+            } => f
+                .debug_struct("ConnectionUserDataSet")
+                .field("connection", connection)
+                .field("user_data", user_data)
+                .finish(),
+            Self::ConnectionNameSet { connection, name } => f
+                .debug_struct("ConnectionNameSet")
+                .field("connection", connection)
+                .field("name_len", &name.len())
+                .finish(),
+            Self::ConnectionClosed {
+                connection,
+                close_succeeded,
+            } => f
+                .debug_struct("ConnectionClosed")
+                .field("connection", connection)
+                .field("close_succeeded", close_succeeded)
+                .finish(),
+            Self::ListenSocketClosed {
+                listen_socket,
+                closed_connections,
+            } => f
+                .debug_struct("ListenSocketClosed")
+                .field("listen_socket", listen_socket)
+                .field("closed_connections", closed_connections)
+                .finish(),
+            Self::PollGroupClosed { poll_group } => f
+                .debug_struct("PollGroupClosed")
+                .field("poll_group", poll_group)
+                .finish(),
+        }
+    }
 }

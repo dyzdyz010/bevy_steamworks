@@ -136,6 +136,13 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// User data value.
         user_data: i64,
     },
+    /// Set a connection debug name.
+    SetConnectionName {
+        /// Connection to update.
+        connection: SteamworksNetworkingSocketsConnectionId,
+        /// Debug name submitted to Steam.
+        name: String,
+    },
     /// Close and drop one connection.
     CloseConnection {
         /// Connection to close.
@@ -286,6 +293,11 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .debug_struct("SetConnectionUserData")
                 .field("connection", connection)
                 .field("user_data", user_data)
+                .finish(),
+            Self::SetConnectionName { connection, name } => f
+                .debug_struct("SetConnectionName")
+                .field("connection", connection)
+                .field("name_len", &name.len())
                 .finish(),
             Self::CloseConnection {
                 connection,
@@ -539,6 +551,17 @@ impl SteamworksNetworkingSocketsCommand {
         Self::SetConnectionUserData {
             connection,
             user_data,
+        }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::SetConnectionName`] command.
+    pub fn set_connection_name(
+        connection: SteamworksNetworkingSocketsConnectionId,
+        name: impl Into<String>,
+    ) -> Self {
+        Self::SetConnectionName {
+            connection,
+            name: name.into(),
         }
     }
 

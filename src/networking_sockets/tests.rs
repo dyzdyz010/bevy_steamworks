@@ -345,6 +345,13 @@ fn validation_rejects_invalid_inputs() {
         }),
         Err(SteamworksNetworkingSocketsError::InvalidString { field: "debug" })
     );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::set_connection_name(
+            connection_id(),
+            "bad\0name",
+        )),
+        Err(SteamworksNetworkingSocketsError::InvalidString { field: "name" })
+    );
 }
 
 #[test]
@@ -487,6 +494,13 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingSocketsCommand::set_connection_name(connection_id(), "player-1"),
+        SteamworksNetworkingSocketsCommand::SetConnectionName {
+            connection: connection_id(),
+            name: "player-1".to_owned(),
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingSocketsCommand::close_listen_socket(listen_socket_id()),
         SteamworksNetworkingSocketsCommand::CloseListenSocket {
             listen_socket: listen_socket_id(),
@@ -529,6 +543,31 @@ fn debug_redacts_config_entry_strings() {
     assert!(!entry_debug.contains("secret.stun.example"));
     assert!(command_debug.contains("data_len: 19"));
     assert!(!command_debug.contains("secret.stun.example"));
+}
+
+#[test]
+fn debug_redacts_connection_names() {
+    let command =
+        SteamworksNetworkingSocketsCommand::set_connection_name(connection_id(), "secret-player");
+    let operation = SteamworksNetworkingSocketsOperation::ConnectionNameSet {
+        connection: connection_id(),
+        name: "secret-player".to_owned(),
+    };
+    let snapshot = SteamworksNetworkingSocketsConnectionName {
+        connection: connection_id(),
+        name: "secret-player".to_owned(),
+    };
+    let result = SteamworksNetworkingSocketsResult::Ok(operation.clone());
+
+    for debug in [
+        format!("{command:?}"),
+        format!("{operation:?}"),
+        format!("{snapshot:?}"),
+        format!("{result:?}"),
+    ] {
+        assert!(debug.contains("name_len: 13"));
+        assert!(!debug.contains("secret-player"));
+    }
 }
 
 #[test]
@@ -775,6 +814,10 @@ fn state_records_operations_without_unbounded_message_history() {
             user_data: 123,
         },
     );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionNameSet {
+        connection: connection_id(),
+        name: "player-1".to_owned(),
+    });
     state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionClosed {
         connection: connection_id(),
         close_succeeded: false,
@@ -862,6 +905,13 @@ fn state_records_operations_without_unbounded_message_history() {
         Some(&SteamworksNetworkingSocketsConnectionUserData {
             connection: connection_id(),
             user_data: 123,
+        })
+    );
+    assert_eq!(
+        state.last_connection_name(),
+        Some(&SteamworksNetworkingSocketsConnectionName {
+            connection: connection_id(),
+            name: "player-1".to_owned(),
         })
     );
     assert_eq!(

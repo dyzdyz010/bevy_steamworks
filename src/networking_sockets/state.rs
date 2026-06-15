@@ -24,6 +24,7 @@ pub struct SteamworksNetworkingSocketsState {
     last_connection_poll_group_cleared: Option<SteamworksNetworkingSocketsConnectionId>,
     last_connection_lanes_configured: Option<SteamworksNetworkingSocketsLaneConfiguration>,
     last_connection_user_data: Option<SteamworksNetworkingSocketsConnectionUserData>,
+    last_connection_name: Option<SteamworksNetworkingSocketsConnectionName>,
     last_closed_connection: Option<SteamworksNetworkingSocketsConnectionClosed>,
     last_closed_listen_socket: Option<SteamworksNetworkingSocketsListenSocketClosed>,
     last_closed_poll_group: Option<SteamworksNetworkingSocketsPollGroupId>,
@@ -137,6 +138,11 @@ impl SteamworksNetworkingSocketsState {
         &self,
     ) -> Option<&SteamworksNetworkingSocketsConnectionUserData> {
         self.last_connection_user_data.as_ref()
+    }
+
+    /// Returns the most recent connection debug name submitted through this plugin.
+    pub fn last_connection_name(&self) -> Option<&SteamworksNetworkingSocketsConnectionName> {
+        self.last_connection_name.as_ref()
     }
 
     /// Returns the most recent connection closed through this plugin.
@@ -317,6 +323,12 @@ impl SteamworksNetworkingSocketsState {
                         connection: *connection,
                         user_data: *user_data,
                     });
+            }
+            SteamworksNetworkingSocketsOperation::ConnectionNameSet { connection, name } => {
+                self.last_connection_name = Some(SteamworksNetworkingSocketsConnectionName {
+                    connection: *connection,
+                    name: name.clone(),
+                });
             }
             SteamworksNetworkingSocketsOperation::ConnectionClosed {
                 connection,
