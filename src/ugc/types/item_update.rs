@@ -38,6 +38,26 @@ impl From<SteamworksUgcContentDescriptor> for steamworks::UGCContentDescriptorID
     }
 }
 
+impl From<steamworks::UGCContentDescriptorID> for SteamworksUgcContentDescriptor {
+    fn from(value: steamworks::UGCContentDescriptorID) -> Self {
+        match value {
+            steamworks::UGCContentDescriptorID::NudityOrSexualContent => {
+                Self::NudityOrSexualContent
+            }
+            steamworks::UGCContentDescriptorID::FrequentViolenceOrGore => {
+                Self::FrequentViolenceOrGore
+            }
+            steamworks::UGCContentDescriptorID::AdultOnlySexualContent => {
+                Self::AdultOnlySexualContent
+            }
+            steamworks::UGCContentDescriptorID::GratuitousSexualContent => {
+                Self::GratuitousSexualContent
+            }
+            steamworks::UGCContentDescriptorID::AnyMatureContent => Self::AnyMatureContent,
+        }
+    }
+}
+
 /// Options applied to one Workshop item update before submission.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SteamworksUgcItemUpdate {

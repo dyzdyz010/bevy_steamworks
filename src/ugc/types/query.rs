@@ -27,6 +27,8 @@ pub struct SteamworksUgcQueryOptions {
     pub return_metadata: bool,
     /// Whether Steam should return key/value tags.
     pub return_key_value_tags: bool,
+    /// Whether Steam should return additional previews.
+    pub return_additional_previews: bool,
     /// Whether Steam should return only IDs.
     pub return_only_ids: bool,
     /// Whether Steam should return only the total result count.
@@ -121,6 +123,15 @@ impl SteamworksUgcQueryOptions {
     /// Includes key/value tags.
     pub fn with_key_value_tags(mut self, include: bool) -> Self {
         self.return_key_value_tags = include;
+        self
+    }
+
+    /// Includes additional previews.
+    ///
+    /// The upstream `steamworks` crate currently exposes the request flag but not a safe
+    /// accessor for additional preview rows, so this only affects the Steam query request.
+    pub fn with_additional_previews(mut self, include: bool) -> Self {
+        self.return_additional_previews = include;
         self
     }
 

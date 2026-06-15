@@ -101,9 +101,12 @@ use bevy_steamworks::{
         SteamworksTimelineOperation as PreludeTimelineOperation,
         SteamworksTimelinePlugin as PreludeTimelinePlugin,
         SteamworksTimelineResult as PreludeTimelineResult,
-        SteamworksUgcCommand as PreludeUgcCommand, SteamworksUgcError as PreludeUgcError,
+        SteamworksUgcCommand as PreludeUgcCommand,
+        SteamworksUgcContentDescriptor as PreludeUgcContentDescriptor,
+        SteamworksUgcError as PreludeUgcError, SteamworksUgcItemDetails as PreludeUgcItemDetails,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
         SteamworksUgcQueryIds as PreludeUgcQueryIds,
+        SteamworksUgcQueryOptions as PreludeUgcQueryOptions,
         SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
@@ -153,8 +156,9 @@ use bevy_steamworks::{
     SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
-    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryTotal,
+    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+    SteamworksUgcError, SteamworksUgcItemDetails, SteamworksUgcOperation, SteamworksUgcPlugin,
+    SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryOptions, SteamworksUgcQueryTotal,
     SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError,
     SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
     SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
@@ -1467,6 +1471,72 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    fn root_item_detail(item: steamworks::PublishedFileId) -> SteamworksUgcItemDetails {
+        SteamworksUgcItemDetails {
+            published_file_id: item,
+            creator_app_id: Some(steamworks::AppId(480)),
+            consumer_app_id: Some(steamworks::AppId(480)),
+            title: "Title".to_owned(),
+            description: "Description".to_owned(),
+            owner: steamworks::SteamId::from_raw(1),
+            time_created: 1,
+            time_updated: 2,
+            time_added_to_user_list: 3,
+            visibility: steamworks::PublishedFileVisibility::Public,
+            banned: false,
+            accepted_for_use: true,
+            tags: vec!["tag".to_owned()],
+            tags_truncated: false,
+            file_name: "file.dat".to_owned(),
+            file_type: steamworks::FileType::Community,
+            file_size: 1024,
+            url: "https://example.invalid/item".to_owned(),
+            num_upvotes: 10,
+            num_downvotes: 1,
+            score: 0.9,
+            num_children: 0,
+            preview_url: Some("https://example.invalid/preview.png".to_owned()),
+            content_descriptors: vec![SteamworksUgcContentDescriptor::AnyMatureContent],
+            statistics: Vec::new(),
+            metadata: Some(b"metadata".to_vec()),
+            children: Some(Vec::new()),
+            key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
+        }
+    }
+
+    fn prelude_item_detail(item: steamworks::PublishedFileId) -> PreludeUgcItemDetails {
+        PreludeUgcItemDetails {
+            published_file_id: item,
+            creator_app_id: Some(steamworks::AppId(480)),
+            consumer_app_id: Some(steamworks::AppId(480)),
+            title: "Title".to_owned(),
+            description: "Description".to_owned(),
+            owner: steamworks::SteamId::from_raw(1),
+            time_created: 1,
+            time_updated: 2,
+            time_added_to_user_list: 3,
+            visibility: steamworks::PublishedFileVisibility::Public,
+            banned: false,
+            accepted_for_use: true,
+            tags: vec!["tag".to_owned()],
+            tags_truncated: false,
+            file_name: "file.dat".to_owned(),
+            file_type: steamworks::FileType::Community,
+            file_size: 1024,
+            url: "https://example.invalid/item".to_owned(),
+            num_upvotes: 10,
+            num_downvotes: 1,
+            score: 0.9,
+            num_children: 0,
+            preview_url: Some("https://example.invalid/preview.png".to_owned()),
+            content_descriptors: vec![PreludeUgcContentDescriptor::AnyMatureContent],
+            statistics: Vec::new(),
+            metadata: Some(b"metadata".to_vec()),
+            children: Some(Vec::new()),
+            key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
+        }
+    }
+
     let command = SteamworksUgcCommand::suspend_downloads(false);
     let operation = SteamworksUgcOperation::DownloadsSuspended { suspend: false };
     let error = SteamworksUgcError::ClientUnavailable;
@@ -1485,6 +1555,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
 
     let item = steamworks::PublishedFileId(42);
     let query = SteamworksUgcQuery::item(item);
+    let _query_options = SteamworksUgcQueryOptions::new().with_additional_previews(true);
+    let _item_detail = root_item_detail(item);
     accepts_root_exports(
         SteamworksUgcPlugin::new(),
         SteamworksUgcCommand::query_total(query.clone()),
@@ -1524,6 +1596,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
 
     accepts_prelude_exports(PreludeUgcPlugin::new(), command, operation, result, error);
 
+    let _prelude_query_options = PreludeUgcQueryOptions::new().with_additional_previews(true);
+    let _prelude_item_detail = prelude_item_detail(item);
     accepts_prelude_exports(
         PreludeUgcPlugin::new(),
         PreludeUgcCommand::query_total(query.clone()),

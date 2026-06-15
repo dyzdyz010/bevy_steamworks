@@ -73,6 +73,7 @@ pub(super) fn apply_query_options(
     query = query.set_return_children(options.return_children);
     query = query.set_return_metadata(options.return_metadata);
     query = query.set_return_key_value_tags(options.return_key_value_tags);
+    query = query.set_return_additional_previews(options.return_additional_previews);
     query = query.set_return_only_ids(options.return_only_ids);
     query = query.set_return_total_only(options.return_total_only);
 

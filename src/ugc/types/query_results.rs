@@ -1,3 +1,5 @@
+use super::SteamworksUgcContentDescriptor;
+
 /// Owned result set for a UGC query.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SteamworksUgcQueryResults {
@@ -74,6 +76,8 @@ pub struct SteamworksUgcItemDetails {
     pub num_children: u32,
     /// Preview URL, if Steam returned one.
     pub preview_url: Option<String>,
+    /// Mature-content descriptors returned by Steam.
+    pub content_descriptors: Vec<SteamworksUgcContentDescriptor>,
     /// Requested statistics.
     pub statistics: Vec<SteamworksUgcStatistic>,
     /// Developer metadata, if requested and present.

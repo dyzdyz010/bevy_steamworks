@@ -292,6 +292,17 @@ fn constructors_preserve_inputs() {
             .with_metadata(true)
             .with_key_value_tags(true),
     );
+    assert!(
+        SteamworksUgcQueryOptions::new()
+            .with_additional_previews(true)
+            .return_additional_previews
+    );
+    assert_eq!(
+        SteamworksUgcContentDescriptor::from(
+            steamworks::UGCContentDescriptorID::AdultOnlySexualContent
+        ),
+        SteamworksUgcContentDescriptor::AdultOnlySexualContent
+    );
 
     assert_eq!(
         SteamworksUgcCommand::query(query.clone()),

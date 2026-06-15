@@ -1,6 +1,6 @@
 use super::{
-    SteamworksUgcItemDetails, SteamworksUgcQueryOptions, SteamworksUgcQueryResults,
-    SteamworksUgcStatistic,
+    SteamworksUgcContentDescriptor, SteamworksUgcItemDetails, SteamworksUgcQueryOptions,
+    SteamworksUgcQueryResults, SteamworksUgcStatistic,
 };
 
 pub(super) fn snapshot_query_results(
@@ -53,6 +53,11 @@ fn snapshot_query_item(
         score: result.score,
         num_children: result.num_children,
         preview_url: results.preview_url(index),
+        content_descriptors: results
+            .content_descriptor(index)
+            .into_iter()
+            .map(SteamworksUgcContentDescriptor::from)
+            .collect(),
         statistics: options
             .statistics
             .iter()
