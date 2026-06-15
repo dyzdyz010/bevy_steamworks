@@ -16,6 +16,15 @@ pub(super) fn validate_command(command: &SteamworksUgcCommand) -> Result<(), Ste
         | SteamworksUgcCommand::GetItemUpdateProgress { .. }
         | SteamworksUgcCommand::ForgetItemUpdate { .. }
         | SteamworksUgcCommand::StopPlaytimeTrackingForAllItems => Ok(()),
+        SteamworksUgcCommand::InitWorkshopForGameServer {
+            workshop_depot,
+            folder,
+        } => {
+            if workshop_depot.raw() == 0 {
+                return Err(SteamworksUgcError::InvalidWorkshopDepot);
+            }
+            validate_steam_string("folder", folder)
+        }
         SteamworksUgcCommand::GetItemState { item }
         | SteamworksUgcCommand::GetItemDownloadInfo { item }
         | SteamworksUgcCommand::GetItemInstallInfo { item }

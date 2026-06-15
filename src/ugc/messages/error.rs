@@ -8,6 +8,9 @@ pub enum SteamworksUgcError {
     /// No [`crate::SteamworksClient`] resource exists.
     #[error("SteamworksClient resource is not available")]
     ClientUnavailable,
+    /// No [`crate::SteamworksServer`] resource exists.
+    #[error("SteamworksServer resource is not available")]
+    ServerUnavailable,
     /// A string passed to Steam contains an interior NUL byte.
     #[error("Steamworks UGC command field {field} contains an interior NUL byte")]
     InvalidString {
@@ -20,6 +23,9 @@ pub enum SteamworksUgcError {
     /// An item list was empty.
     #[error("Steamworks UGC item list must not be empty")]
     EmptyItemList,
+    /// A Workshop depot ID was zero.
+    #[error("Steamworks UGC Workshop depot id must be non-zero")]
+    InvalidWorkshopDepot,
     /// An item list exceeded the supported per-command cap.
     #[error("Steamworks UGC item list length {requested} exceeds max {max_supported}")]
     TooManyItems {

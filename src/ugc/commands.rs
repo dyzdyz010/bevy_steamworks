@@ -1,9 +1,10 @@
 use bevy_ecs::{
     message::{MessageReader, MessageWriter, Messages},
     prelude::{Res, ResMut},
+    system::SystemParam,
 };
 
-use crate::{SteamworksClient, SteamworksEvent};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksServer};
 
 use super::{
     async_results::SteamworksUgcAsyncResults, callbacks::process_ugc_steam_events,
@@ -15,45 +16,33 @@ use super::{
     SteamworksUgcOperation, SteamworksUgcResult, SteamworksUgcState,
 };
 
+#[derive(SystemParam)]
+pub(super) struct SteamworksUgcIo<'w, 's> {
+    client: Option<Res<'w, SteamworksClient>>,
+    server: Option<Res<'w, SteamworksServer>>,
+    async_results: Res<'w, SteamworksUgcAsyncResults>,
+    update_watches: Res<'w, SteamworksUgcUpdateWatches>,
+    commands: ResMut<'w, Messages<SteamworksUgcCommand>>,
+    steam_events: MessageReader<'w, 's, SteamworksEvent>,
+}
+
 pub(super) fn process_ugc_commands(
-    client: Option<Res<SteamworksClient>>,
-    async_results: Res<SteamworksUgcAsyncResults>,
-    update_watches: Res<SteamworksUgcUpdateWatches>,
     mut state: ResMut<SteamworksUgcState>,
-    mut commands: ResMut<Messages<SteamworksUgcCommand>>,
-    mut steam_events: MessageReader<SteamworksEvent>,
+    mut io: SteamworksUgcIo,
     mut results: MessageWriter<SteamworksUgcResult>,
 ) {
-    for result in async_results.drain() {
+    for result in io.async_results.drain() {
         record_ugc_result(&mut state, &result);
-        state.sync_active_item_updates(&update_watches);
+        state.sync_active_item_updates(&io.update_watches);
         results.write(result);
     }
 
-    process_ugc_steam_events(&mut state, &mut steam_events, &mut results);
+    process_ugc_steam_events(&mut state, &mut io.steam_events, &mut results);
 
-    let Some(client) = client else {
-        let error = SteamworksUgcError::ClientUnavailable;
-        for command in commands.drain() {
-            state.record_error(error.clone());
-            tracing::error!(
-                target: "bevy_steamworks",
-                command = ?command,
-                error = %error,
-                "Steamworks UGC command failed"
-            );
-            results.write(SteamworksUgcResult::Err {
-                command,
-                error: error.clone(),
-            });
-        }
-        return;
-    };
-
-    for command in commands.drain() {
+    for command in io.commands.drain() {
         if let Err(error) = validate_command(&command) {
             state.record_error(error.clone());
-            state.sync_active_item_updates(&update_watches);
+            state.sync_active_item_updates(&io.update_watches);
             tracing::error!(
                 target: "bevy_steamworks",
                 command = ?command,
@@ -66,15 +55,16 @@ pub(super) fn process_ugc_commands(
 
         let request_id = async_command_request_id(&command, &mut state);
         match handle_ugc_command(
-            &client,
-            &async_results,
-            &update_watches,
+            io.client.as_deref(),
+            io.server.as_deref(),
+            &io.async_results,
+            &io.update_watches,
             command.clone(),
             request_id,
         ) {
             Ok(operation) => {
                 state.record_operation(&operation);
-                state.sync_active_item_updates(&update_watches);
+                state.sync_active_item_updates(&io.update_watches);
                 tracing::debug!(
                     target: "bevy_steamworks",
                     operation = ?operation,
@@ -84,7 +74,7 @@ pub(super) fn process_ugc_commands(
             }
             Err(error) => {
                 state.record_error(error.clone());
-                state.sync_active_item_updates(&update_watches);
+                state.sync_active_item_updates(&io.update_watches);
                 tracing::error!(
                     target: "bevy_steamworks",
                     command = ?command,
@@ -131,6 +121,43 @@ fn async_command_request_id(
 }
 
 fn handle_ugc_command(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+    async_results: &SteamworksUgcAsyncResults,
+    update_watches: &SteamworksUgcUpdateWatches,
+    command: SteamworksUgcCommand,
+    request_id: Option<u64>,
+) -> Result<SteamworksUgcOperation, SteamworksUgcError> {
+    match command {
+        SteamworksUgcCommand::InitWorkshopForGameServer {
+            workshop_depot,
+            folder,
+        } => {
+            let server = server.ok_or(SteamworksUgcError::ServerUnavailable)?;
+            if !server
+                .ugc()
+                .init_for_game_server(workshop_depot.raw(), &folder)
+            {
+                return Err(SteamworksUgcError::operation_failed(
+                    "ugc.init_for_game_server",
+                ));
+            }
+            Ok(SteamworksUgcOperation::GameServerWorkshopInitialized {
+                workshop_depot,
+                folder,
+            })
+        }
+        command => handle_client_ugc_command(
+            client.ok_or(SteamworksUgcError::ClientUnavailable)?,
+            async_results,
+            update_watches,
+            command,
+            request_id,
+        ),
+    }
+}
+
+fn handle_client_ugc_command(
     client: &SteamworksClient,
     async_results: &SteamworksUgcAsyncResults,
     update_watches: &SteamworksUgcUpdateWatches,
@@ -520,6 +547,9 @@ fn handle_ugc_command(
                 });
             });
             Ok(SteamworksUgcOperation::PlaytimeTrackingForAllItemsStopRequested { request_id })
+        }
+        SteamworksUgcCommand::InitWorkshopForGameServer { .. } => {
+            unreachable!("server-only UGC command should be handled before client dispatch")
         }
     }
 }

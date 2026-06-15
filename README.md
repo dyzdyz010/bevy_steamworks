@@ -805,7 +805,7 @@ When both `BEVY_STEAMWORKS_REMOTE_STORAGE_WRITE` and `BEVY_STEAMWORKS_REMOTE_STO
 
 ## Workshop / UGC
 
-`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, query result totals or ID lists, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, submit item updates, read update progress, and start/stop playtime tracking.
+`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, query result totals or ID lists, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, submit item updates, read update progress, start/stop playtime tracking, and initialize Workshop storage for Steam Game Servers.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -856,7 +856,9 @@ fn main() {
 
 All async UGC commands emit an immediate `*Requested` or `*Submitted` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Full query results are copied into owned `SteamworksUgcQueryResults` snapshots, including preview URLs, requested statistics, key/value tags, metadata, children, and mature-content descriptors per item. `query_total` and `query_ids` provide lighter `SteamworksUgcQueryTotal` and `SteamworksUgcQueryIds` payloads for count-only or ID-only Workshop browsing. `query_total` and `query_ids` ignore `return_total_only` / `return_only_ids` query option flags because they use Steam's specialized total-only and ID-only paths. `query_ids` returns IDs for the submitted query page/result set; use pagination, often with `query_total`, when browsing all matches. `with_additional_previews(true)` forwards Steam's request flag, but owned snapshots do not expose additional preview rows until the upstream `steamworks` crate provides a safe accessor.
 
-String query and item update options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. Item update paths are canonicalized before submission, so paths that cannot be resolved become structured `SteamworksUgcError::InvalidPath` errors. Submitted item updates retain an internal progress watch handle until the Steam call result arrives; read it with `SteamworksUgcCommand::get_item_update_progress(request_id)`.
+String query, game-server Workshop initialization, and item update options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. Item update paths are canonicalized before submission, so paths that cannot be resolved become structured `SteamworksUgcError::InvalidPath` errors. Submitted item updates retain an internal progress watch handle until the Steam call result arrives; read it with `SteamworksUgcCommand::get_item_update_progress(request_id)`.
+
+`SteamworksUgcCommand::init_workshop_for_game_server(AppId(480), "workshop_server")` initializes Workshop storage through a `SteamworksServer` resource instead of a `SteamworksClient` resource, so dedicated server apps should add `SteamworksServerPlugin` and `SteamworksUgcPlugin` together before sending it.
 
 `DownloadItem` only confirms that Steam accepted the download request; final completion arrives later through both `SteamworksEvent::DownloadItemResult` and `SteamworksUgcOperation::DownloadItemResultReceived`.
 

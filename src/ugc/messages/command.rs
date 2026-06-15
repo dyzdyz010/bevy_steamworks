@@ -1,6 +1,6 @@
 use bevy_ecs::message::Message;
 
-use super::super::{SteamworksUgcItemUpdate, SteamworksUgcQuery};
+use super::super::{SteamworksUgcItemUpdate, SteamworksUgcQuery, SteamworksUgcWorkshopDepotId};
 
 /// A high-level command for Steam Workshop / UGC workflows.
 #[derive(Clone, Debug, Message, PartialEq)]
@@ -111,6 +111,16 @@ pub enum SteamworksUgcCommand {
     },
     /// Stop playtime tracking for all Workshop items.
     StopPlaytimeTrackingForAllItems,
+    /// Initialize Workshop content storage for a Steam Game Server.
+    ///
+    /// This command uses the [`crate::SteamworksServer`] resource instead of
+    /// the client [`crate::SteamworksClient`] resource.
+    InitWorkshopForGameServer {
+        /// Workshop depot to initialize.
+        workshop_depot: SteamworksUgcWorkshopDepotId,
+        /// Local folder for game-server Workshop content.
+        folder: String,
+    },
 }
 
 impl SteamworksUgcCommand {
@@ -224,5 +234,16 @@ impl SteamworksUgcCommand {
     /// Creates a [`SteamworksUgcCommand::StopPlaytimeTrackingForAllItems`] command.
     pub fn stop_playtime_tracking_for_all_items() -> Self {
         Self::StopPlaytimeTrackingForAllItems
+    }
+
+    /// Creates a [`SteamworksUgcCommand::InitWorkshopForGameServer`] command.
+    pub fn init_workshop_for_game_server(
+        workshop_depot: impl Into<SteamworksUgcWorkshopDepotId>,
+        folder: impl Into<String>,
+    ) -> Self {
+        Self::InitWorkshopForGameServer {
+            workshop_depot: workshop_depot.into(),
+            folder: folder.into(),
+        }
     }
 }

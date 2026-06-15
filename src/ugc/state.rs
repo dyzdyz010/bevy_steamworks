@@ -16,6 +16,7 @@ pub struct SteamworksUgcState {
     last_item_install_info: Option<SteamworksUgcItemInstallInfoResult>,
     last_item_update_progress: Option<SteamworksUgcItemUpdateProgress>,
     last_download_item_result: Option<SteamworksUgcDownloadItemResult>,
+    last_game_server_workshop_init: Option<SteamworksUgcGameServerWorkshopInit>,
     active_item_updates: usize,
     submitted_downloads: u64,
     successful_async_operations: u64,
@@ -72,6 +73,11 @@ impl SteamworksUgcState {
     /// Returns the most recent Workshop download completion callback snapshot.
     pub fn last_download_item_result(&self) -> Option<&SteamworksUgcDownloadItemResult> {
         self.last_download_item_result.as_ref()
+    }
+
+    /// Returns the most recent Steam Game Server Workshop initialization.
+    pub fn last_game_server_workshop_init(&self) -> Option<&SteamworksUgcGameServerWorkshopInit> {
+        self.last_game_server_workshop_init.as_ref()
     }
 
     /// Returns the number of item update progress handles currently owned by the plugin.
@@ -138,6 +144,15 @@ impl SteamworksUgcState {
             }
             SteamworksUgcOperation::DownloadItemResultReceived { result } => {
                 self.last_download_item_result = Some(result.clone());
+            }
+            SteamworksUgcOperation::GameServerWorkshopInitialized {
+                workshop_depot,
+                folder,
+            } => {
+                self.last_game_server_workshop_init = Some(SteamworksUgcGameServerWorkshopInit {
+                    workshop_depot: *workshop_depot,
+                    folder: folder.clone(),
+                });
             }
             SteamworksUgcOperation::ItemCreated { .. }
             | SteamworksUgcOperation::ItemUpdated { .. }

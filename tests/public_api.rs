@@ -103,11 +103,14 @@ use bevy_steamworks::{
         SteamworksTimelineResult as PreludeTimelineResult,
         SteamworksUgcCommand as PreludeUgcCommand,
         SteamworksUgcContentDescriptor as PreludeUgcContentDescriptor,
-        SteamworksUgcError as PreludeUgcError, SteamworksUgcItemDetails as PreludeUgcItemDetails,
+        SteamworksUgcError as PreludeUgcError,
+        SteamworksUgcGameServerWorkshopInit as PreludeUgcGameServerWorkshopInit,
+        SteamworksUgcItemDetails as PreludeUgcItemDetails,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
         SteamworksUgcQueryIds as PreludeUgcQueryIds,
         SteamworksUgcQueryOptions as PreludeUgcQueryOptions,
         SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
+        SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
         SteamworksUserPlugin as PreludeUserPlugin, SteamworksUserResult as PreludeUserResult,
@@ -157,11 +160,13 @@ use bevy_steamworks::{
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
     SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
-    SteamworksUgcError, SteamworksUgcItemDetails, SteamworksUgcOperation, SteamworksUgcPlugin,
-    SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryOptions, SteamworksUgcQueryTotal,
-    SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError,
-    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
-    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
+    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult,
+    SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -1628,8 +1633,29 @@ fn ugc_api_is_exported_from_root_and_prelude() {
 
     let item = steamworks::PublishedFileId(42);
     let query = SteamworksUgcQuery::item(item);
+    let workshop_depot = SteamworksUgcWorkshopDepotId::from(steamworks::AppId(480));
+    let _game_server_workshop_init = SteamworksUgcGameServerWorkshopInit {
+        workshop_depot,
+        folder: "workshop_server".to_owned(),
+    };
     let _query_options = SteamworksUgcQueryOptions::new().with_additional_previews(true);
     let _item_detail = root_item_detail(item);
+    accepts_root_exports(
+        SteamworksUgcPlugin::new(),
+        SteamworksUgcCommand::init_workshop_for_game_server(workshop_depot, "workshop_server"),
+        SteamworksUgcOperation::GameServerWorkshopInitialized {
+            workshop_depot,
+            folder: "workshop_server".to_owned(),
+        },
+        SteamworksUgcResult::Err {
+            command: SteamworksUgcCommand::init_workshop_for_game_server(
+                workshop_depot,
+                "workshop_server",
+            ),
+            error: SteamworksUgcError::ServerUnavailable,
+        },
+        SteamworksUgcError::InvalidWorkshopDepot,
+    );
     accepts_root_exports(
         SteamworksUgcPlugin::new(),
         SteamworksUgcCommand::query_total(query.clone()),
@@ -1671,6 +1697,27 @@ fn ugc_api_is_exported_from_root_and_prelude() {
 
     let _prelude_query_options = PreludeUgcQueryOptions::new().with_additional_previews(true);
     let _prelude_item_detail = prelude_item_detail(item);
+    let prelude_workshop_depot = PreludeUgcWorkshopDepotId::from(steamworks::AppId(480));
+    let _prelude_game_server_workshop_init = PreludeUgcGameServerWorkshopInit {
+        workshop_depot: prelude_workshop_depot,
+        folder: "workshop_server".to_owned(),
+    };
+    accepts_prelude_exports(
+        PreludeUgcPlugin::new(),
+        PreludeUgcCommand::init_workshop_for_game_server(prelude_workshop_depot, "workshop_server"),
+        PreludeUgcOperation::GameServerWorkshopInitialized {
+            workshop_depot: prelude_workshop_depot,
+            folder: "workshop_server".to_owned(),
+        },
+        PreludeUgcResult::Err {
+            command: PreludeUgcCommand::init_workshop_for_game_server(
+                prelude_workshop_depot,
+                "workshop_server",
+            ),
+            error: PreludeUgcError::ServerUnavailable,
+        },
+        PreludeUgcError::InvalidWorkshopDepot,
+    );
     accepts_prelude_exports(
         PreludeUgcPlugin::new(),
         PreludeUgcCommand::query_total(query.clone()),

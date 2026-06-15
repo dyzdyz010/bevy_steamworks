@@ -72,12 +72,65 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
+fn game_server_workshop_init_fails_when_server_is_unavailable() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksUgcPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksUgcCommand>>()
+        .write(SteamworksUgcCommand::init_workshop_for_game_server(
+            steamworks::AppId(480),
+            "workshop_server",
+        ));
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksUgcResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+    let command = SteamworksUgcCommand::init_workshop_for_game_server(
+        steamworks::AppId(480),
+        "workshop_server",
+    );
+
+    assert_eq!(
+        drained,
+        vec![SteamworksUgcResult::Err {
+            command,
+            error: SteamworksUgcError::ServerUnavailable,
+        }]
+    );
+
+    let state = app.world().resource::<SteamworksUgcState>();
+    assert_eq!(
+        state.last_error(),
+        Some(&SteamworksUgcError::ServerUnavailable)
+    );
+}
+
+#[test]
 fn validation_rejects_invalid_inputs() {
     assert_eq!(
         validate_command(&SteamworksUgcCommand::GetItemState {
             item: steamworks::PublishedFileId(0),
         }),
         Err(SteamworksUgcError::InvalidItemId)
+    );
+
+    assert_eq!(
+        validate_command(&SteamworksUgcCommand::init_workshop_for_game_server(
+            SteamworksUgcWorkshopDepotId::from_raw(0),
+            "workshop",
+        )),
+        Err(SteamworksUgcError::InvalidWorkshopDepot)
+    );
+    assert_eq!(
+        validate_command(&SteamworksUgcCommand::init_workshop_for_game_server(
+            steamworks::AppId(480),
+            "bad\0folder",
+        )),
+        Err(SteamworksUgcError::InvalidString { field: "folder" })
     );
 
     assert_eq!(
@@ -303,6 +356,11 @@ fn constructors_preserve_inputs() {
         ),
         SteamworksUgcContentDescriptor::AdultOnlySexualContent
     );
+    assert_eq!(SteamworksUgcWorkshopDepotId::from_raw(480).raw(), 480);
+    assert_eq!(
+        SteamworksUgcWorkshopDepotId::from(steamworks::AppId(480)),
+        SteamworksUgcWorkshopDepotId::from_raw(480)
+    );
 
     assert_eq!(
         SteamworksUgcCommand::query(query.clone()),
@@ -391,6 +449,13 @@ fn constructors_preserve_inputs() {
         SteamworksUgcCommand::stop_playtime_tracking_for_all_items(),
         SteamworksUgcCommand::StopPlaytimeTrackingForAllItems
     );
+    assert_eq!(
+        SteamworksUgcCommand::init_workshop_for_game_server(steamworks::AppId(480), "workshop"),
+        SteamworksUgcCommand::InitWorkshopForGameServer {
+            workshop_depot: SteamworksUgcWorkshopDepotId::from_raw(480),
+            folder: "workshop".to_owned(),
+        }
+    );
 }
 
 #[test]
@@ -465,6 +530,10 @@ fn state_records_operations_without_unbounded_query_history() {
         request_id: 3,
         item,
     });
+    state.record_operation(&SteamworksUgcOperation::GameServerWorkshopInitialized {
+        workshop_depot: SteamworksUgcWorkshopDepotId::from_raw(480),
+        folder: "workshop".to_owned(),
+    });
 
     assert!(state.subscribed_items().is_empty());
     assert_eq!(state.last_query(), Some(&second));
@@ -494,6 +563,13 @@ fn state_records_operations_without_unbounded_query_history() {
             status: steamworks::UpdateStatus::UploadingContent,
             processed_bytes: 10,
             total_bytes: 100,
+        })
+    );
+    assert_eq!(
+        state.last_game_server_workshop_init(),
+        Some(&SteamworksUgcGameServerWorkshopInit {
+            workshop_depot: SteamworksUgcWorkshopDepotId::from_raw(480),
+            folder: "workshop".to_owned(),
         })
     );
 }

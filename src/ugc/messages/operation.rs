@@ -2,7 +2,7 @@ use super::super::{
     SteamworksUgcDownloadItemResult, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcItemUpdate,
     SteamworksUgcItemUpdateProgress, SteamworksUgcQuery, SteamworksUgcQueryIds,
-    SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
+    SteamworksUgcQueryResults, SteamworksUgcQueryTotal, SteamworksUgcWorkshopDepotId,
 };
 
 /// A successfully submitted or completed UGC operation.
@@ -222,5 +222,12 @@ pub enum SteamworksUgcOperation {
     PlaytimeTrackingForAllItemsStopped {
         /// Plugin request ID.
         request_id: u64,
+    },
+    /// Steam Game Server Workshop content storage was initialized.
+    GameServerWorkshopInitialized {
+        /// Workshop depot submitted to Steam.
+        workshop_depot: SteamworksUgcWorkshopDepotId,
+        /// Local folder submitted to Steam.
+        folder: String,
     },
 }

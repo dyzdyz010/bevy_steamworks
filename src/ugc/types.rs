@@ -1,8 +1,10 @@
+mod game_server;
 mod item_info;
 mod item_update;
 mod query;
 mod query_results;
 
+pub use game_server::{SteamworksUgcGameServerWorkshopInit, SteamworksUgcWorkshopDepotId};
 pub use item_info::{
     SteamworksUgcDownloadItemResult, SteamworksUgcItemDownloadInfo,
     SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfo,
