@@ -1,10 +1,15 @@
 use std::sync::Mutex;
 
 use bevy_app::{App, First, Plugin};
-use bevy_ecs::{message::MessageWriter, schedule::IntoScheduleConfigs, system::Res};
-use steamworks::{AppId, SteamAPIInitError};
+use bevy_ecs::{
+    message::MessageWriter,
+    schedule::IntoScheduleConfigs,
+    system::{Res, ResMut},
+};
+use steamworks::{AppId, CallbackResult, SteamAPIInitError};
 
 use crate::{
+    utils::{SteamworksGamepadTextInputDismissed, SteamworksUtilsCallbackQueue},
     SteamworksCallbackRegistry, SteamworksClient, SteamworksEvent, SteamworksFailurePolicy,
     SteamworksInitMode, SteamworksPlugin, SteamworksSystem, SteamworksUnavailable,
 };
@@ -190,14 +195,27 @@ impl Plugin for SteamworksPlugin {
 
 fn run_steam_callbacks(
     client: Option<Res<SteamworksClient>>,
+    mut utils_callback_queue: Option<ResMut<SteamworksUtilsCallbackQueue>>,
     mut output: MessageWriter<SteamworksEvent>,
 ) {
     let Some(client) = client else {
         return;
     };
 
-    client.process_callbacks(|callback| {
-        output.write(SteamworksEvent::from(callback));
+    client.process_callbacks(|callback| match callback {
+        CallbackResult::GamepadTextInputDismissed(callback) => {
+            if let Some(queue) = utils_callback_queue.as_deref_mut() {
+                let submitted_text = client.utils().get_entered_gamepad_text_input(&callback);
+                queue.push_gamepad_text_input_dismissed(SteamworksGamepadTextInputDismissed {
+                    submitted_text_len: callback.submitted_text_len,
+                    submitted_text,
+                });
+            }
+            output.write(SteamworksEvent::GamepadTextInputDismissed(callback));
+        }
+        callback => {
+            output.write(SteamworksEvent::from(callback));
+        }
     });
 }
 

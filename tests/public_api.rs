@@ -8,12 +8,23 @@ use bevy_steamworks::{
         SteamworksClientPlugins as PreludeClientPlugins,
         SteamworksCommandError as PreludeCommandError, SteamworksEvent as PreludeEvent,
         SteamworksFailurePolicy as PreludeFailurePolicy,
+        SteamworksFloatingGamepadTextInputDismissed as PreludeFloatingGamepadTextInputDismissed,
+        SteamworksFloatingGamepadTextInputMode as PreludeFloatingGamepadTextInputMode,
+        SteamworksFloatingGamepadTextInputRequest as PreludeFloatingGamepadTextInputRequest,
+        SteamworksFloatingGamepadTextInputShown as PreludeFloatingGamepadTextInputShown,
         SteamworksFriendsCommand as PreludeFriendsCommand,
         SteamworksFriendsError as PreludeFriendsError,
         SteamworksFriendsOperation as PreludeFriendsOperation,
         SteamworksFriendsPlugin as PreludeFriendsPlugin,
-        SteamworksFriendsResult as PreludeFriendsResult, SteamworksInitMode as PreludeInitMode,
-        SteamworksInputCommand as PreludeInputCommand, SteamworksInputError as PreludeInputError,
+        SteamworksFriendsResult as PreludeFriendsResult,
+        SteamworksGamepadTextInputDismissed as PreludeGamepadTextInputDismissed,
+        SteamworksGamepadTextInputLineMode as PreludeGamepadTextInputLineMode,
+        SteamworksGamepadTextInputMode as PreludeGamepadTextInputMode,
+        SteamworksGamepadTextInputRequest as PreludeGamepadTextInputRequest,
+        SteamworksGamepadTextInputShown as PreludeGamepadTextInputShown,
+        SteamworksGamepadTextInputSubmitted as PreludeGamepadTextInputSubmitted,
+        SteamworksInitMode as PreludeInitMode, SteamworksInputCommand as PreludeInputCommand,
+        SteamworksInputError as PreludeInputError,
         SteamworksInputOperation as PreludeInputOperation,
         SteamworksInputPlugin as PreludeInputPlugin, SteamworksInputResult as PreludeInputResult,
         SteamworksLobbyListFilter as PreludeLobbyListFilter,
@@ -100,8 +111,13 @@ use bevy_steamworks::{
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
     SteamworksAppsPlugin, SteamworksAppsResult, SteamworksCallbackRegistry, SteamworksClient,
     SteamworksClientPlugins, SteamworksCommandError, SteamworksEvent, SteamworksFailurePolicy,
+    SteamworksFloatingGamepadTextInputDismissed, SteamworksFloatingGamepadTextInputMode,
+    SteamworksFloatingGamepadTextInputRequest, SteamworksFloatingGamepadTextInputShown,
     SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
-    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksInitMode, SteamworksInputCommand,
+    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksGamepadTextInputDismissed,
+    SteamworksGamepadTextInputLineMode, SteamworksGamepadTextInputMode,
+    SteamworksGamepadTextInputRequest, SteamworksGamepadTextInputShown,
+    SteamworksGamepadTextInputSubmitted, SteamworksInitMode, SteamworksInputCommand,
     SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
     SteamworksLobbyListFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
     SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
@@ -1429,6 +1445,37 @@ fn utils_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    let gamepad_request = SteamworksGamepadTextInputRequest::new("Name", 32)
+        .with_input_mode(SteamworksGamepadTextInputMode::Normal)
+        .with_line_mode(SteamworksGamepadTextInputLineMode::SingleLine)
+        .with_existing_text("Player");
+    let floating_request = SteamworksFloatingGamepadTextInputRequest::new(
+        SteamworksFloatingGamepadTextInputMode::SingleLine,
+        1,
+        2,
+        300,
+        40,
+    );
+    let _root_gamepad_dismissed = SteamworksGamepadTextInputDismissed {
+        submitted_text_len: Some(4),
+        submitted_text: Some("Name".to_owned()),
+    };
+    let _root_floating_dismissed = SteamworksFloatingGamepadTextInputDismissed;
+    let _root_floating_modes = [
+        SteamworksFloatingGamepadTextInputMode::SingleLine,
+        SteamworksFloatingGamepadTextInputMode::MultipleLines,
+        SteamworksFloatingGamepadTextInputMode::Email,
+        SteamworksFloatingGamepadTextInputMode::Numeric,
+    ];
+    let _root_gamepad_modes = [
+        SteamworksGamepadTextInputMode::Normal,
+        SteamworksGamepadTextInputMode::Password,
+    ];
+    let _root_line_modes = [
+        SteamworksGamepadTextInputLineMode::SingleLine,
+        SteamworksGamepadTextInputLineMode::MultipleLines,
+    ];
+
     let command = SteamworksUtilsCommand::set_overlay_notification_position(
         SteamworksNotificationPosition::TopLeft,
     );
@@ -1449,6 +1496,76 @@ fn utils_api_is_exported_from_root_and_prelude() {
         error,
     );
 
+    accepts_root_exports(
+        SteamworksUtilsPlugin::new(),
+        SteamworksUtilsCommand::show_gamepad_text_input(gamepad_request.clone()),
+        SteamworksUtilsOperation::GamepadTextInputShown {
+            shown: SteamworksGamepadTextInputShown {
+                request: gamepad_request,
+                shown: true,
+            },
+        },
+        SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputSubmitted {
+            submitted: SteamworksGamepadTextInputSubmitted {
+                text: "Name".to_owned(),
+                submitted_text_len: 4,
+            },
+        }),
+        SteamworksUtilsError::InvalidString {
+            field: "description",
+        },
+    );
+    accepts_root_exports(
+        SteamworksUtilsPlugin::new(),
+        SteamworksUtilsCommand::show_floating_gamepad_text_input(floating_request.clone()),
+        SteamworksUtilsOperation::FloatingGamepadTextInputShown {
+            shown: SteamworksFloatingGamepadTextInputShown {
+                request: floating_request,
+                shown: true,
+            },
+        },
+        SteamworksUtilsResult::Ok(
+            SteamworksUtilsOperation::FloatingGamepadTextInputDismissed {
+                dismissed: SteamworksFloatingGamepadTextInputDismissed,
+            },
+        ),
+        SteamworksUtilsError::InvalidFloatingTextInputBounds {
+            width: 0,
+            height: 1,
+        },
+    );
+
+    let gamepad_request = PreludeGamepadTextInputRequest::new("Name", 32)
+        .with_input_mode(PreludeGamepadTextInputMode::Normal)
+        .with_line_mode(PreludeGamepadTextInputLineMode::SingleLine)
+        .with_existing_text("Player");
+    let floating_request = PreludeFloatingGamepadTextInputRequest::new(
+        PreludeFloatingGamepadTextInputMode::SingleLine,
+        1,
+        2,
+        300,
+        40,
+    );
+    let _prelude_gamepad_dismissed = PreludeGamepadTextInputDismissed {
+        submitted_text_len: Some(4),
+        submitted_text: Some("Name".to_owned()),
+    };
+    let _prelude_floating_dismissed = PreludeFloatingGamepadTextInputDismissed;
+    let _prelude_floating_modes = [
+        PreludeFloatingGamepadTextInputMode::SingleLine,
+        PreludeFloatingGamepadTextInputMode::MultipleLines,
+        PreludeFloatingGamepadTextInputMode::Email,
+        PreludeFloatingGamepadTextInputMode::Numeric,
+    ];
+    let _prelude_gamepad_modes = [
+        PreludeGamepadTextInputMode::Normal,
+        PreludeGamepadTextInputMode::Password,
+    ];
+    let _prelude_line_modes = [
+        PreludeGamepadTextInputLineMode::SingleLine,
+        PreludeGamepadTextInputLineMode::MultipleLines,
+    ];
+
     let command = PreludeUtilsCommand::set_overlay_notification_position(
         PreludeNotificationPosition::TopLeft,
     );
@@ -1462,6 +1579,42 @@ fn utils_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeUtilsPlugin::new(), command, operation, result, error);
+    accepts_prelude_exports(
+        PreludeUtilsPlugin::new(),
+        PreludeUtilsCommand::show_gamepad_text_input(gamepad_request.clone()),
+        PreludeUtilsOperation::GamepadTextInputShown {
+            shown: PreludeGamepadTextInputShown {
+                request: gamepad_request,
+                shown: true,
+            },
+        },
+        PreludeUtilsResult::Ok(PreludeUtilsOperation::GamepadTextInputSubmitted {
+            submitted: PreludeGamepadTextInputSubmitted {
+                text: "Name".to_owned(),
+                submitted_text_len: 4,
+            },
+        }),
+        PreludeUtilsError::InvalidString {
+            field: "description",
+        },
+    );
+    accepts_prelude_exports(
+        PreludeUtilsPlugin::new(),
+        PreludeUtilsCommand::show_floating_gamepad_text_input(floating_request.clone()),
+        PreludeUtilsOperation::FloatingGamepadTextInputShown {
+            shown: PreludeFloatingGamepadTextInputShown {
+                request: floating_request,
+                shown: true,
+            },
+        },
+        PreludeUtilsResult::Ok(PreludeUtilsOperation::FloatingGamepadTextInputDismissed {
+            dismissed: PreludeFloatingGamepadTextInputDismissed,
+        }),
+        PreludeUtilsError::InvalidFloatingTextInputBounds {
+            width: 0,
+            height: 1,
+        },
+    );
 }
 
 #[test]

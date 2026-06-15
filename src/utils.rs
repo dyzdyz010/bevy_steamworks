@@ -13,6 +13,7 @@ mod state;
 mod tests;
 mod types;
 
+pub(crate) use callbacks::SteamworksUtilsCallbackQueue;
 pub use messages::*;
 pub use state::SteamworksUtilsState;
 pub use types::*;

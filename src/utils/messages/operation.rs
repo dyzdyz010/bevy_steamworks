@@ -1,6 +1,7 @@
 use super::super::{
-    SteamworksFloatingGamepadTextInputDismissed, SteamworksGamepadTextInputDismissed,
-    SteamworksNotificationPosition, SteamworksUtilsInfo,
+    SteamworksFloatingGamepadTextInputDismissed, SteamworksFloatingGamepadTextInputShown,
+    SteamworksGamepadTextInputDismissed, SteamworksGamepadTextInputShown,
+    SteamworksGamepadTextInputSubmitted, SteamworksNotificationPosition, SteamworksUtilsInfo,
 };
 
 /// A successfully submitted Steam utility operation or synchronous read.
@@ -50,6 +51,21 @@ pub enum SteamworksUtilsOperation {
     OverlayNotificationPositionSet {
         /// Position submitted to Steam.
         position: SteamworksNotificationPosition,
+    },
+    /// Steam accepted or rejected a Big Picture gamepad text input request.
+    GamepadTextInputShown {
+        /// Show result.
+        shown: SteamworksGamepadTextInputShown,
+    },
+    /// Steam accepted or rejected a floating gamepad text input request.
+    FloatingGamepadTextInputShown {
+        /// Show result.
+        shown: SteamworksFloatingGamepadTextInputShown,
+    },
+    /// Submitted text was captured during the Steam callback.
+    GamepadTextInputSubmitted {
+        /// Submitted text snapshot.
+        submitted: SteamworksGamepadTextInputSubmitted,
     },
     /// A gamepad text input dismissal callback was observed.
     GamepadTextInputDismissed {

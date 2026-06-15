@@ -15,6 +15,9 @@ pub struct SteamworksUtilsState {
     steam_in_big_picture_mode: Option<bool>,
     steam_running_on_steam_deck: Option<bool>,
     overlay_notification_position: Option<SteamworksNotificationPosition>,
+    last_gamepad_text_input_shown: Option<SteamworksGamepadTextInputShown>,
+    last_floating_gamepad_text_input_shown: Option<SteamworksFloatingGamepadTextInputShown>,
+    last_gamepad_text_input_submitted: Option<SteamworksGamepadTextInputSubmitted>,
     last_gamepad_text_input_dismissed: Option<SteamworksGamepadTextInputDismissed>,
     last_floating_gamepad_text_input_dismissed: Option<SteamworksFloatingGamepadTextInputDismissed>,
 }
@@ -70,6 +73,25 @@ impl SteamworksUtilsState {
         self.overlay_notification_position
     }
 
+    /// Returns the most recent Big Picture gamepad text input show result.
+    pub fn last_gamepad_text_input_shown(&self) -> Option<&SteamworksGamepadTextInputShown> {
+        self.last_gamepad_text_input_shown.as_ref()
+    }
+
+    /// Returns the most recent floating gamepad text input show result.
+    pub fn last_floating_gamepad_text_input_shown(
+        &self,
+    ) -> Option<&SteamworksFloatingGamepadTextInputShown> {
+        self.last_floating_gamepad_text_input_shown.as_ref()
+    }
+
+    /// Returns the most recent submitted gamepad text captured during callback timing.
+    pub fn last_gamepad_text_input_submitted(
+        &self,
+    ) -> Option<&SteamworksGamepadTextInputSubmitted> {
+        self.last_gamepad_text_input_submitted.as_ref()
+    }
+
     /// Returns the most recent gamepad text input dismissal callback snapshot.
     pub fn last_gamepad_text_input_dismissed(
         &self,
@@ -123,6 +145,15 @@ impl SteamworksUtilsState {
             }
             SteamworksUtilsOperation::OverlayNotificationPositionSet { position } => {
                 self.overlay_notification_position = Some(*position);
+            }
+            SteamworksUtilsOperation::GamepadTextInputShown { shown } => {
+                self.last_gamepad_text_input_shown = Some(shown.clone());
+            }
+            SteamworksUtilsOperation::FloatingGamepadTextInputShown { shown } => {
+                self.last_floating_gamepad_text_input_shown = Some(shown.clone());
+            }
+            SteamworksUtilsOperation::GamepadTextInputSubmitted { submitted } => {
+                self.last_gamepad_text_input_submitted = Some(submitted.clone());
             }
             SteamworksUtilsOperation::GamepadTextInputDismissed { dismissed } => {
                 self.last_gamepad_text_input_dismissed = Some(dismissed.clone());

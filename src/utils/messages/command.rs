@@ -1,6 +1,9 @@
 use bevy_ecs::message::Message;
 
-use super::super::SteamworksNotificationPosition;
+use super::super::{
+    SteamworksFloatingGamepadTextInputRequest, SteamworksGamepadTextInputRequest,
+    SteamworksNotificationPosition,
+};
 
 /// A high-level command for Steam utility queries and overlay helpers.
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
@@ -26,11 +29,33 @@ pub enum SteamworksUtilsCommand {
         /// Popup position to submit to Steam.
         position: SteamworksNotificationPosition,
     },
+    /// Show Steam's Big Picture gamepad text input dialog.
+    ShowGamepadTextInput {
+        /// Text input request.
+        request: SteamworksGamepadTextInputRequest,
+    },
+    /// Show Steam's floating gamepad text input overlay.
+    ShowFloatingGamepadTextInput {
+        /// Text input request.
+        request: SteamworksFloatingGamepadTextInputRequest,
+    },
 }
 
 impl SteamworksUtilsCommand {
     /// Creates a [`crate::SteamworksUtilsCommand::SetOverlayNotificationPosition`] command.
     pub fn set_overlay_notification_position(position: SteamworksNotificationPosition) -> Self {
         Self::SetOverlayNotificationPosition { position }
+    }
+
+    /// Creates a [`crate::SteamworksUtilsCommand::ShowGamepadTextInput`] command.
+    pub fn show_gamepad_text_input(request: SteamworksGamepadTextInputRequest) -> Self {
+        Self::ShowGamepadTextInput { request }
+    }
+
+    /// Creates a [`crate::SteamworksUtilsCommand::ShowFloatingGamepadTextInput`] command.
+    pub fn show_floating_gamepad_text_input(
+        request: SteamworksFloatingGamepadTextInputRequest,
+    ) -> Self {
+        Self::ShowFloatingGamepadTextInput { request }
     }
 }

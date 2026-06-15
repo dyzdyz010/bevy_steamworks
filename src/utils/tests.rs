@@ -19,6 +19,9 @@ fn utils_plugin_registers_resources_and_messages() {
     assert!(app
         .world()
         .contains_resource::<Messages<SteamworksUtilsResult>>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksUtilsCallbackQueue>());
 }
 
 #[test]
@@ -99,9 +102,11 @@ fn text_input_callbacks_are_bridged_without_client() {
     let drained = results.drain().collect::<Vec<_>>();
     let submitted = SteamworksGamepadTextInputDismissed {
         submitted_text_len: Some(12),
+        submitted_text: None,
     };
     let cancelled = SteamworksGamepadTextInputDismissed {
         submitted_text_len: None,
+        submitted_text: None,
     };
     let floating = SteamworksFloatingGamepadTextInputDismissed;
 
@@ -129,6 +134,91 @@ fn text_input_callbacks_are_bridged_without_client() {
         Some(&floating)
     );
     assert_eq!(state.last_error(), None);
+}
+
+#[test]
+fn queued_text_input_callback_captures_submitted_text_before_dismissal() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksUtilsPlugin::new());
+
+    let dismissed = SteamworksGamepadTextInputDismissed {
+        submitted_text_len: Some(4),
+        submitted_text: Some("Name".to_owned()),
+    };
+    app.world_mut()
+        .resource_mut::<SteamworksUtilsCallbackQueue>()
+        .push_gamepad_text_input_dismissed(dismissed.clone());
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksUtilsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+    let submitted = SteamworksGamepadTextInputSubmitted {
+        text: "Name".to_owned(),
+        submitted_text_len: 4,
+    };
+
+    assert_eq!(
+        drained,
+        vec![
+            SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputSubmitted {
+                submitted: submitted.clone(),
+            }),
+            SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputDismissed {
+                dismissed: dismissed.clone(),
+            }),
+        ]
+    );
+
+    let state = app.world().resource::<SteamworksUtilsState>();
+    assert_eq!(state.last_gamepad_text_input_submitted(), Some(&submitted));
+    assert_eq!(state.last_gamepad_text_input_dismissed(), Some(&dismissed));
+}
+
+#[test]
+fn queued_text_input_callback_suppresses_duplicate_raw_event_bridge() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksUtilsPlugin::new());
+
+    let dismissed = SteamworksGamepadTextInputDismissed {
+        submitted_text_len: Some(4),
+        submitted_text: Some("Name".to_owned()),
+    };
+    app.world_mut()
+        .resource_mut::<SteamworksUtilsCallbackQueue>()
+        .push_gamepad_text_input_dismissed(dismissed.clone());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksEvent>>()
+        .write(SteamworksEvent::GamepadTextInputDismissed(
+            steamworks::GamepadTextInputDismissed {
+                submitted_text_len: Some(4),
+            },
+        ));
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksUtilsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(drained.len(), 2);
+    assert!(matches!(
+        &drained[0],
+        SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputSubmitted {
+            submitted
+        }) if submitted.text == "Name"
+    ));
+    assert_eq!(
+        drained[1],
+        SteamworksUtilsResult::Ok(SteamworksUtilsOperation::GamepadTextInputDismissed {
+            dismissed,
+        })
+    );
 }
 
 #[test]
@@ -173,6 +263,46 @@ fn state_records_utility_operations() {
     state.record_operation(&SteamworksUtilsOperation::OverlayNotificationPositionSet {
         position: SteamworksNotificationPosition::BottomRight,
     });
+    let gamepad_shown = SteamworksGamepadTextInputShown {
+        request: SteamworksGamepadTextInputRequest::new("Name", 32),
+        shown: true,
+    };
+    let floating_shown = SteamworksFloatingGamepadTextInputShown {
+        request: SteamworksFloatingGamepadTextInputRequest::new(
+            SteamworksFloatingGamepadTextInputMode::SingleLine,
+            1,
+            2,
+            300,
+            40,
+        ),
+        shown: true,
+    };
+    let submitted = SteamworksGamepadTextInputSubmitted {
+        text: "Name".to_owned(),
+        submitted_text_len: 4,
+    };
+    let dismissed = SteamworksGamepadTextInputDismissed {
+        submitted_text_len: Some(4),
+        submitted_text: Some("Name".to_owned()),
+    };
+    let floating_dismissed = SteamworksFloatingGamepadTextInputDismissed;
+    state.record_operation(&SteamworksUtilsOperation::GamepadTextInputShown {
+        shown: gamepad_shown.clone(),
+    });
+    state.record_operation(&SteamworksUtilsOperation::FloatingGamepadTextInputShown {
+        shown: floating_shown.clone(),
+    });
+    state.record_operation(&SteamworksUtilsOperation::GamepadTextInputSubmitted {
+        submitted: submitted.clone(),
+    });
+    state.record_operation(&SteamworksUtilsOperation::GamepadTextInputDismissed {
+        dismissed: dismissed.clone(),
+    });
+    state.record_operation(
+        &SteamworksUtilsOperation::FloatingGamepadTextInputDismissed {
+            dismissed: floating_dismissed,
+        },
+    );
 
     assert_eq!(state.current_info(), Some(&info));
     assert_eq!(state.app_id(), Some(steamworks::AppId(481)));
@@ -186,4 +316,27 @@ fn state_records_utility_operations() {
         state.overlay_notification_position(),
         Some(SteamworksNotificationPosition::BottomRight)
     );
+    assert_eq!(state.last_gamepad_text_input_shown(), Some(&gamepad_shown));
+    assert_eq!(
+        state.last_floating_gamepad_text_input_shown(),
+        Some(&floating_shown)
+    );
+    assert_eq!(state.last_gamepad_text_input_submitted(), Some(&submitted));
+    assert_eq!(state.last_gamepad_text_input_dismissed(), Some(&dismissed));
+    assert_eq!(
+        state.last_floating_gamepad_text_input_dismissed(),
+        Some(&floating_dismissed)
+    );
+}
+
+#[test]
+fn gamepad_text_input_request_debug_hides_existing_text() {
+    let request =
+        SteamworksGamepadTextInputRequest::new("Name", 32).with_existing_text("secret-value");
+
+    let debug = format!("{request:?}");
+
+    assert!(debug.contains("existing_text_len: Some(12)"));
+    assert!(!debug.contains("secret-value"));
+    assert!(!debug.contains("existing_text:"));
 }

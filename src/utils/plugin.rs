@@ -4,8 +4,8 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 use crate::{SteamworksEvent, SteamworksSystem};
 
 use super::{
-    commands::process_utils_commands, SteamworksUtilsCommand, SteamworksUtilsPlugin,
-    SteamworksUtilsResult, SteamworksUtilsState,
+    callbacks::SteamworksUtilsCallbackQueue, commands::process_utils_commands,
+    SteamworksUtilsCommand, SteamworksUtilsPlugin, SteamworksUtilsResult, SteamworksUtilsState,
 };
 
 impl SteamworksUtilsPlugin {
@@ -18,6 +18,7 @@ impl SteamworksUtilsPlugin {
 impl Plugin for SteamworksUtilsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SteamworksUtilsState>()
+            .init_resource::<SteamworksUtilsCallbackQueue>()
             .add_message::<SteamworksEvent>()
             .add_message::<SteamworksUtilsCommand>()
             .add_message::<SteamworksUtilsResult>()

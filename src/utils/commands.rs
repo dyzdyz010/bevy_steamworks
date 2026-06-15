@@ -6,23 +6,36 @@ use bevy_ecs::{
 use crate::{SteamworksClient, SteamworksEvent};
 
 use super::{
-    callbacks::process_utils_steam_events,
+    callbacks::{
+        process_utils_callback_queue, process_utils_steam_events, SteamworksUtilsCallbackQueue,
+    },
     messages::{
         SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
         SteamworksUtilsResult,
     },
     state::SteamworksUtilsState,
-    types::SteamworksUtilsInfo,
+    types::{
+        SteamworksFloatingGamepadTextInputShown, SteamworksGamepadTextInputShown,
+        SteamworksUtilsInfo,
+    },
 };
 
 pub(super) fn process_utils_commands(
     client: Option<Res<SteamworksClient>>,
     mut state: ResMut<SteamworksUtilsState>,
+    mut callback_queue: ResMut<SteamworksUtilsCallbackQueue>,
     mut commands: ResMut<Messages<SteamworksUtilsCommand>>,
     mut steam_events: MessageReader<SteamworksEvent>,
     mut results: MessageWriter<SteamworksUtilsResult>,
 ) {
-    process_utils_steam_events(&mut state, &mut steam_events, &mut results);
+    let skipped_gamepad_text_input_dismissals =
+        process_utils_callback_queue(&mut state, &mut callback_queue, &mut results);
+    process_utils_steam_events(
+        &mut state,
+        &mut steam_events,
+        &mut results,
+        skipped_gamepad_text_input_dismissals,
+    );
 
     let Some(client) = client else {
         let error = SteamworksUtilsError::ClientUnavailable;
@@ -109,6 +122,38 @@ fn handle_utils_command(
                 position: *position,
             }
         }
+        SteamworksUtilsCommand::ShowGamepadTextInput { request } => {
+            let shown = utils.show_gamepad_text_input(
+                request.input_mode.to_steam(),
+                request.line_mode.to_steam(),
+                &request.description,
+                request.max_characters,
+                request.existing_text.as_deref(),
+                |_| {},
+            );
+            SteamworksUtilsOperation::GamepadTextInputShown {
+                shown: SteamworksGamepadTextInputShown {
+                    request: request.clone(),
+                    shown,
+                },
+            }
+        }
+        SteamworksUtilsCommand::ShowFloatingGamepadTextInput { request } => {
+            let shown = utils.show_floating_gamepad_text_input(
+                request.input_mode.to_steam(),
+                request.x,
+                request.y,
+                request.width,
+                request.height,
+                || {},
+            );
+            SteamworksUtilsOperation::FloatingGamepadTextInputShown {
+                shown: SteamworksFloatingGamepadTextInputShown {
+                    request: request.clone(),
+                    shown,
+                },
+            }
+        }
     })
 }
 
@@ -125,13 +170,41 @@ fn snapshot_utils_info(client: &SteamworksClient) -> SteamworksUtilsInfo {
     }
 }
 
-fn validate_command(_command: &SteamworksUtilsCommand) -> Result<(), SteamworksUtilsError> {
-    Ok(())
+fn validate_command(command: &SteamworksUtilsCommand) -> Result<(), SteamworksUtilsError> {
+    match command {
+        SteamworksUtilsCommand::ShowGamepadTextInput { request } => {
+            validate_c_string("description", &request.description)?;
+            if let Some(existing_text) = request.existing_text.as_ref() {
+                validate_c_string("existing_text", existing_text)?;
+            }
+            Ok(())
+        }
+        SteamworksUtilsCommand::ShowFloatingGamepadTextInput { request }
+            if request.width <= 0 || request.height <= 0 =>
+        {
+            Err(SteamworksUtilsError::InvalidFloatingTextInputBounds {
+                width: request.width,
+                height: request.height,
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_c_string(field: &'static str, value: &str) -> Result<(), SteamworksUtilsError> {
+    if value.as_bytes().contains(&0) {
+        Err(SteamworksUtilsError::invalid_string(field))
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::SteamworksNotificationPosition;
+    use super::super::{
+        SteamworksFloatingGamepadTextInputMode, SteamworksFloatingGamepadTextInputRequest,
+        SteamworksGamepadTextInputRequest, SteamworksNotificationPosition,
+    };
     use super::*;
 
     #[test]
@@ -145,6 +218,59 @@ mod tests {
                 SteamworksNotificationPosition::BottomRight
             )),
             Ok(())
+        );
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::show_gamepad_text_input(
+                SteamworksGamepadTextInputRequest::new("Name", 32).with_existing_text("Existing")
+            )),
+            Ok(())
+        );
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::show_floating_gamepad_text_input(
+                SteamworksFloatingGamepadTextInputRequest::new(
+                    SteamworksFloatingGamepadTextInputMode::SingleLine,
+                    1,
+                    2,
+                    300,
+                    40,
+                )
+            )),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn validation_rejects_text_input_values_that_would_panic_upstream() {
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::show_gamepad_text_input(
+                SteamworksGamepadTextInputRequest::new("bad\0description", 32)
+            )),
+            Err(SteamworksUtilsError::InvalidString {
+                field: "description",
+            })
+        );
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::show_gamepad_text_input(
+                SteamworksGamepadTextInputRequest::new("Name", 32).with_existing_text("bad\0text")
+            )),
+            Err(SteamworksUtilsError::InvalidString {
+                field: "existing_text",
+            })
+        );
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::show_floating_gamepad_text_input(
+                SteamworksFloatingGamepadTextInputRequest::new(
+                    SteamworksFloatingGamepadTextInputMode::SingleLine,
+                    1,
+                    2,
+                    0,
+                    40,
+                )
+            )),
+            Err(SteamworksUtilsError::InvalidFloatingTextInputBounds {
+                width: 0,
+                height: 40,
+            })
         );
     }
 }
