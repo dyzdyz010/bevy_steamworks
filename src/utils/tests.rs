@@ -70,6 +70,34 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
+fn client_only_commands_still_fail_without_client_even_when_read_commands_can_use_server() {
+    let mut app = App::new();
+    let command = SteamworksUtilsCommand::set_overlay_notification_position(
+        SteamworksNotificationPosition::BottomRight,
+    );
+
+    app.add_plugins(SteamworksUtilsPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksUtilsCommand>>()
+        .write(command.clone());
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksUtilsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksUtilsResult::Err {
+            command,
+            error: SteamworksUtilsError::ClientUnavailable,
+        }]
+    );
+}
+
+#[test]
 fn constructors_preserve_inputs() {
     let gamepad_request = SteamworksGamepadTextInputRequest::new("Name", 32);
     let floating_request = SteamworksFloatingGamepadTextInputRequest::new(

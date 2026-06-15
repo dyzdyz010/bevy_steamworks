@@ -3,7 +3,7 @@ use bevy_ecs::{
     prelude::{Res, ResMut},
 };
 
-use crate::{SteamworksClient, SteamworksEvent};
+use crate::{SteamworksClient, SteamworksEvent, SteamworksServer};
 
 use super::{
     callbacks::{
@@ -22,6 +22,7 @@ use super::{
 
 pub(super) fn process_utils_commands(
     client: Option<Res<SteamworksClient>>,
+    server: Option<Res<SteamworksServer>>,
     mut state: ResMut<SteamworksUtilsState>,
     mut callback_queue: ResMut<SteamworksUtilsCallbackQueue>,
     mut commands: ResMut<Messages<SteamworksUtilsCommand>>,
@@ -37,26 +38,8 @@ pub(super) fn process_utils_commands(
         skipped_gamepad_text_input_dismissals,
     );
 
-    let Some(client) = client else {
-        let error = SteamworksUtilsError::ClientUnavailable;
-        for command in commands.drain() {
-            state.record_error(error.clone());
-            tracing::error!(
-                target: "bevy_steamworks",
-                command = ?command,
-                error = %error,
-                "Steamworks utils command failed"
-            );
-            results.write(SteamworksUtilsResult::Err {
-                command,
-                error: error.clone(),
-            });
-        }
-        return;
-    };
-
     for command in commands.drain() {
-        match handle_utils_command(&client, &command) {
+        match handle_utils_command(client.as_deref(), server.as_deref(), &command) {
             Ok(operation) => {
                 state.record_operation(&operation);
                 tracing::debug!(
@@ -81,48 +64,50 @@ pub(super) fn process_utils_commands(
 }
 
 fn handle_utils_command(
-    client: &SteamworksClient,
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
     command: &SteamworksUtilsCommand,
 ) -> Result<SteamworksUtilsOperation, SteamworksUtilsError> {
     validate_command(command)?;
 
-    let utils = client.utils();
     Ok(match command {
         SteamworksUtilsCommand::GetCurrentInfo => SteamworksUtilsOperation::CurrentInfoRead {
-            info: snapshot_utils_info(client),
+            info: snapshot_utils_info(&read_utils(client, server)?),
         },
         SteamworksUtilsCommand::GetAppId => SteamworksUtilsOperation::AppIdRead {
-            app_id: utils.app_id(),
+            app_id: read_utils(client, server)?.app_id(),
         },
         SteamworksUtilsCommand::GetIpCountry => SteamworksUtilsOperation::IpCountryRead {
-            country: utils.ip_country(),
+            country: read_utils(client, server)?.ip_country(),
         },
         SteamworksUtilsCommand::IsOverlayEnabled => SteamworksUtilsOperation::OverlayEnabledRead {
-            enabled: utils.is_overlay_enabled(),
+            enabled: read_utils(client, server)?.is_overlay_enabled(),
         },
         SteamworksUtilsCommand::GetUiLanguage => SteamworksUtilsOperation::UiLanguageRead {
-            language: utils.ui_language(),
+            language: read_utils(client, server)?.ui_language(),
         },
         SteamworksUtilsCommand::GetServerRealTime => SteamworksUtilsOperation::ServerRealTimeRead {
-            unix_epoch_seconds: utils.get_server_real_time(),
+            unix_epoch_seconds: read_utils(client, server)?.get_server_real_time(),
         },
         SteamworksUtilsCommand::IsSteamInBigPictureMode => {
             SteamworksUtilsOperation::SteamInBigPictureModeRead {
-                enabled: utils.is_steam_in_big_picture_mode(),
+                enabled: read_utils(client, server)?.is_steam_in_big_picture_mode(),
             }
         }
         SteamworksUtilsCommand::IsSteamRunningOnSteamDeck => {
             SteamworksUtilsOperation::SteamRunningOnSteamDeckRead {
-                enabled: utils.is_steam_running_on_steam_deck(),
+                enabled: read_utils(client, server)?.is_steam_running_on_steam_deck(),
             }
         }
         SteamworksUtilsCommand::SetOverlayNotificationPosition { position } => {
+            let utils = client_utils(client)?;
             utils.set_overlay_notification_position(position.to_steam());
             SteamworksUtilsOperation::OverlayNotificationPositionSet {
                 position: *position,
             }
         }
         SteamworksUtilsCommand::ShowGamepadTextInput { request } => {
+            let utils = client_utils(client)?;
             let shown = utils.show_gamepad_text_input(
                 request.input_mode.to_steam(),
                 request.line_mode.to_steam(),
@@ -139,6 +124,7 @@ fn handle_utils_command(
             }
         }
         SteamworksUtilsCommand::ShowFloatingGamepadTextInput { request } => {
+            let utils = client_utils(client)?;
             let shown = utils.show_floating_gamepad_text_input(
                 request.input_mode.to_steam(),
                 request.x,
@@ -157,8 +143,28 @@ fn handle_utils_command(
     })
 }
 
-fn snapshot_utils_info(client: &SteamworksClient) -> SteamworksUtilsInfo {
-    let utils = client.utils();
+fn read_utils(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+) -> Result<steamworks::Utils, SteamworksUtilsError> {
+    if let Some(client) = client {
+        Ok(client.utils())
+    } else if let Some(server) = server {
+        Ok(server.utils())
+    } else {
+        Err(SteamworksUtilsError::ClientUnavailable)
+    }
+}
+
+fn client_utils(
+    client: Option<&SteamworksClient>,
+) -> Result<steamworks::Utils, SteamworksUtilsError> {
+    client
+        .map(|client| client.utils())
+        .ok_or(SteamworksUtilsError::ClientUnavailable)
+}
+
+fn snapshot_utils_info(utils: &steamworks::Utils) -> SteamworksUtilsInfo {
     SteamworksUtilsInfo {
         app_id: utils.app_id(),
         ip_country: utils.ip_country(),
