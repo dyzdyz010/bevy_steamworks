@@ -435,8 +435,8 @@ cargo run --example utils
 # use bevy_steamworks::prelude::*;
 fn request_input(mut input: MessageWriter<SteamworksInputCommand>) {
     input.write(SteamworksInputCommand::init(false));
-    input.write(SteamworksInputCommand::RunFrame);
-    input.write(SteamworksInputCommand::ListControllers);
+    input.write(SteamworksInputCommand::run_frame());
+    input.write(SteamworksInputCommand::list_controllers());
     input.write(SteamworksInputCommand::get_action_set_handle("gameplay"));
     input.write(SteamworksInputCommand::get_digital_action_handle("jump"));
 }
@@ -462,7 +462,7 @@ The plugin uses stable wrapper types such as `SteamworksInputHandle`, `Steamwork
 
 `SteamworksInputState` caches known controller snapshots, named action set/digital/analog handles, the latest action set activation, digital/analog action data, digital/analog origin snapshots, motion data, binding panel controller, and successful `RunFrame` count. Systems can query the cached state with accessors such as `controller`, `action_set_handle`, `digital_action_handle`, `analog_action_handle`, `last_digital_action_origins`, and `last_analog_action_origins`. `Init`, `Shutdown`, and `SetActionManifestFilePath` clear stale action data so reads from a previous manifest are not silently reused.
 
-Steam Input is synchronized by `SteamAPI_RunCallbacks` when initialized with `SteamworksInputCommand::init(false)`, which matches the default callback pump in `SteamworksSystem::RunCallbacks`. Input commands run after `RunCallbacks`; if you initialize and read input in the same frame, send `SteamworksInputCommand::RunFrame` between `Init` and the read commands, or wait until a later frame. If you initialize with `init(true)`, explicitly send `RunFrame` before reads each frame.
+Steam Input is synchronized by `SteamAPI_RunCallbacks` when initialized with `SteamworksInputCommand::init(false)`, which matches the default callback pump in `SteamworksSystem::RunCallbacks`. Input commands run after `RunCallbacks`; if you initialize and read input in the same frame, send `SteamworksInputCommand::run_frame()` between `SteamworksInputCommand::init(...)` and the read commands, or wait until a later frame. If you initialize with `init(true)`, explicitly send `run_frame()` before reads each frame.
 
 Run the Steam Input example with:
 

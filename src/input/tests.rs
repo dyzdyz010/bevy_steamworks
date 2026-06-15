@@ -72,6 +72,52 @@ fn constructors_preserve_inputs() {
 
     assert_eq!(controller.raw(), 1);
     assert_eq!(
+        SteamworksInputCommand::init(true),
+        SteamworksInputCommand::Init {
+            explicitly_call_run_frame: true,
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::run_frame(),
+        SteamworksInputCommand::RunFrame
+    );
+    assert_eq!(
+        SteamworksInputCommand::shutdown(),
+        SteamworksInputCommand::Shutdown
+    );
+    assert_eq!(
+        SteamworksInputCommand::list_controllers(),
+        SteamworksInputCommand::ListControllers
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_controller_info(controller),
+        SteamworksInputCommand::GetControllerInfo { controller }
+    );
+    assert_eq!(
+        SteamworksInputCommand::set_action_manifest_file_path("input_manifest.vdf"),
+        SteamworksInputCommand::SetActionManifestFilePath {
+            path: "input_manifest.vdf".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_action_set_handle("gameplay"),
+        SteamworksInputCommand::GetActionSetHandle {
+            name: "gameplay".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_digital_action_handle("jump"),
+        SteamworksInputCommand::GetDigitalActionHandle {
+            name: "jump".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_analog_action_handle("move"),
+        SteamworksInputCommand::GetAnalogActionHandle {
+            name: "move".to_owned(),
+        }
+    );
+    assert_eq!(
         SteamworksInputCommand::activate_action_set(controller, action_set),
         SteamworksInputCommand::ActivateActionSet {
             controller,
@@ -91,6 +137,30 @@ fn constructors_preserve_inputs() {
             controller,
             action: analog_action,
         }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_digital_action_origins(controller, action_set, digital_action),
+        SteamworksInputCommand::GetDigitalActionOrigins {
+            controller,
+            action_set,
+            action: digital_action,
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_analog_action_origins(controller, action_set, analog_action),
+        SteamworksInputCommand::GetAnalogActionOrigins {
+            controller,
+            action_set,
+            action: analog_action,
+        }
+    );
+    assert_eq!(
+        SteamworksInputCommand::get_motion_data(controller),
+        SteamworksInputCommand::GetMotionData { controller }
+    );
+    assert_eq!(
+        SteamworksInputCommand::show_binding_panel(controller),
+        SteamworksInputCommand::ShowBindingPanel { controller }
     );
 }
 

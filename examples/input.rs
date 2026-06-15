@@ -22,8 +22,8 @@ fn request_input(
     }
 
     commands.write(SteamworksInputCommand::init(false));
-    commands.write(SteamworksInputCommand::RunFrame);
-    commands.write(SteamworksInputCommand::ListControllers);
+    commands.write(SteamworksInputCommand::run_frame());
+    commands.write(SteamworksInputCommand::list_controllers());
 
     if let Ok(path) = std::env::var("BEVY_STEAMWORKS_INPUT_MANIFEST") {
         commands.write(SteamworksInputCommand::set_action_manifest_file_path(path));

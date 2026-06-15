@@ -628,6 +628,13 @@ fn input_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    accepts_root_exports(
+        SteamworksInputPlugin::new(),
+        SteamworksInputCommand::run_frame(),
+        SteamworksInputOperation::FrameRun,
+        SteamworksInputResult::Ok(SteamworksInputOperation::Shutdown),
+        SteamworksInputError::ClientUnavailable,
+    );
 
     let command = PreludeInputCommand::init(false);
     let operation = PreludeInputOperation::Initialized {
@@ -640,6 +647,15 @@ fn input_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeInputPlugin::new(), command, operation, result, error);
+    accepts_prelude_exports(
+        PreludeInputPlugin::new(),
+        PreludeInputCommand::list_controllers(),
+        PreludeInputOperation::ControllersListed {
+            controllers: Vec::new(),
+        },
+        PreludeInputResult::Ok(PreludeInputOperation::FrameRun),
+        PreludeInputError::ClientUnavailable,
+    );
 }
 
 #[test]
