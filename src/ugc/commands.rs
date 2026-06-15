@@ -116,6 +116,8 @@ fn async_command_request_id(
     matches!(
         command,
         SteamworksUgcCommand::Query { .. }
+            | SteamworksUgcCommand::QueryTotal { .. }
+            | SteamworksUgcCommand::QueryIds { .. }
             | SteamworksUgcCommand::CreateItem { .. }
             | SteamworksUgcCommand::SubmitItemUpdate { .. }
             | SteamworksUgcCommand::SubscribeItem { .. }
@@ -227,6 +229,68 @@ fn handle_ugc_command(
                 });
             });
             Ok(SteamworksUgcOperation::QueryRequested { request_id, query })
+        }
+        SteamworksUgcCommand::QueryTotal { query } => {
+            let request_id = request_id.expect("async UGC total query command missing request id");
+            let options = query_options_without_payload_shape_flags(&query);
+            let query_handle = create_query(&ugc, &query)?;
+            let query_handle = apply_query_options(query_handle, &options)?;
+            let async_results = async_results.clone();
+            let command = SteamworksUgcCommand::QueryTotal {
+                query: query.clone(),
+            };
+            let callback_query = query.clone();
+            query_handle.fetch_total(move |result| {
+                async_results.push(match result {
+                    Ok(total_results) => {
+                        SteamworksUgcResult::Ok(SteamworksUgcOperation::QueryTotalCompleted {
+                            request_id,
+                            query: callback_query.clone(),
+                            total: super::SteamworksUgcQueryTotal { total_results },
+                        })
+                    }
+                    Err(source) => SteamworksUgcResult::Err {
+                        command: command.clone(),
+                        error: SteamworksUgcError::steam_error(
+                            "ugc.query.fetch_total",
+                            Some(request_id),
+                            source,
+                        ),
+                    },
+                });
+            });
+            Ok(SteamworksUgcOperation::QueryTotalRequested { request_id, query })
+        }
+        SteamworksUgcCommand::QueryIds { query } => {
+            let request_id = request_id.expect("async UGC ID query command missing request id");
+            let options = query_options_without_payload_shape_flags(&query);
+            let query_handle = create_query(&ugc, &query)?;
+            let query_handle = apply_query_options(query_handle, &options)?;
+            let async_results = async_results.clone();
+            let command = SteamworksUgcCommand::QueryIds {
+                query: query.clone(),
+            };
+            let callback_query = query.clone();
+            query_handle.fetch_ids(move |result| {
+                async_results.push(match result {
+                    Ok(items) => {
+                        SteamworksUgcResult::Ok(SteamworksUgcOperation::QueryIdsCompleted {
+                            request_id,
+                            query: callback_query.clone(),
+                            ids: super::SteamworksUgcQueryIds { items },
+                        })
+                    }
+                    Err(source) => SteamworksUgcResult::Err {
+                        command: command.clone(),
+                        error: SteamworksUgcError::steam_error(
+                            "ugc.query.fetch_ids",
+                            Some(request_id),
+                            source,
+                        ),
+                    },
+                });
+            });
+            Ok(SteamworksUgcOperation::QueryIdsRequested { request_id, query })
         }
         SteamworksUgcCommand::CreateItem { app_id, file_type } => {
             let request_id = request_id.expect("async UGC create command missing request id");
@@ -460,6 +524,15 @@ fn handle_ugc_command(
     }
 }
 
+fn query_options_without_payload_shape_flags(
+    query: &super::SteamworksUgcQuery,
+) -> super::SteamworksUgcQueryOptions {
+    let mut options = query.options().clone();
+    options.return_only_ids = false;
+    options.return_total_only = false;
+    options
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::{SteamworksUgcItemUpdate, SteamworksUgcQuery};
@@ -468,11 +541,23 @@ mod tests {
     #[test]
     fn async_commands_get_unique_request_ids() {
         let mut state = SteamworksUgcState::default();
-        let query =
-            SteamworksUgcCommand::query(SteamworksUgcQuery::item(steamworks::PublishedFileId(1)));
+        let query = SteamworksUgcQuery::item(steamworks::PublishedFileId(1));
 
-        assert_eq!(async_command_request_id(&query, &mut state), Some(0));
-        assert_eq!(async_command_request_id(&query, &mut state), Some(1));
+        assert_eq!(
+            async_command_request_id(&SteamworksUgcCommand::query(query.clone()), &mut state),
+            Some(0)
+        );
+        assert_eq!(
+            async_command_request_id(
+                &SteamworksUgcCommand::query_total(query.clone()),
+                &mut state
+            ),
+            Some(1)
+        );
+        assert_eq!(
+            async_command_request_id(&SteamworksUgcCommand::query_ids(query), &mut state),
+            Some(2)
+        );
         assert_eq!(
             async_command_request_id(
                 &SteamworksUgcCommand::download_item(steamworks::PublishedFileId(1), false),
@@ -485,7 +570,7 @@ mod tests {
                 &SteamworksUgcCommand::subscribe_item(steamworks::PublishedFileId(1)),
                 &mut state,
             ),
-            Some(2)
+            Some(3)
         );
         assert_eq!(
             async_command_request_id(
@@ -496,7 +581,7 @@ mod tests {
                 ),
                 &mut state,
             ),
-            Some(3)
+            Some(4)
         );
     }
 
@@ -525,5 +610,19 @@ mod tests {
                 steamworks::SteamError::IOFailure,
             ))
         );
+    }
+
+    #[test]
+    fn specialized_query_commands_ignore_payload_shape_option_flags() {
+        let query = SteamworksUgcQuery::item(steamworks::PublishedFileId(1)).with_options(
+            super::super::SteamworksUgcQueryOptions::new()
+                .with_return_only_ids(true)
+                .with_return_total_only(true),
+        );
+
+        let options = query_options_without_payload_shape_flags(&query);
+
+        assert!(!options.return_only_ids);
+        assert!(!options.return_total_only);
     }
 }

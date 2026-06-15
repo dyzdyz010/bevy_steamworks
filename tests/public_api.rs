@@ -103,11 +103,12 @@ use bevy_steamworks::{
         SteamworksTimelineResult as PreludeTimelineResult,
         SteamworksUgcCommand as PreludeUgcCommand, SteamworksUgcError as PreludeUgcError,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
-        SteamworksUgcResult as PreludeUgcResult, SteamworksUnavailable as PreludeUnavailable,
-        SteamworksUserCommand as PreludeUserCommand, SteamworksUserError as PreludeUserError,
-        SteamworksUserOperation as PreludeUserOperation, SteamworksUserPlugin as PreludeUserPlugin,
-        SteamworksUserResult as PreludeUserResult, SteamworksUtilsCommand as PreludeUtilsCommand,
-        SteamworksUtilsError as PreludeUtilsError,
+        SteamworksUgcQueryIds as PreludeUgcQueryIds,
+        SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
+        SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
+        SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
+        SteamworksUserPlugin as PreludeUserPlugin, SteamworksUserResult as PreludeUserResult,
+        SteamworksUtilsCommand as PreludeUtilsCommand, SteamworksUtilsError as PreludeUtilsError,
         SteamworksUtilsOperation as PreludeUtilsOperation,
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
@@ -153,10 +154,10 @@ use bevy_steamworks::{
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
     SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcError, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
-    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
-    SteamworksUtilsResult,
+    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryTotal,
+    SteamworksUgcResult, SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError,
+    SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand,
+    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -1482,6 +1483,37 @@ fn ugc_api_is_exported_from_root_and_prelude() {
         error,
     );
 
+    let item = steamworks::PublishedFileId(42);
+    let query = SteamworksUgcQuery::item(item);
+    accepts_root_exports(
+        SteamworksUgcPlugin::new(),
+        SteamworksUgcCommand::query_total(query.clone()),
+        SteamworksUgcOperation::QueryTotalRequested {
+            request_id: 0,
+            query: query.clone(),
+        },
+        SteamworksUgcResult::Ok(SteamworksUgcOperation::QueryTotalCompleted {
+            request_id: 1,
+            query: query.clone(),
+            total: SteamworksUgcQueryTotal { total_results: 1 },
+        }),
+        SteamworksUgcError::ClientUnavailable,
+    );
+    accepts_root_exports(
+        SteamworksUgcPlugin::new(),
+        SteamworksUgcCommand::query_ids(query.clone()),
+        SteamworksUgcOperation::QueryIdsRequested {
+            request_id: 2,
+            query: query.clone(),
+        },
+        SteamworksUgcResult::Ok(SteamworksUgcOperation::QueryIdsCompleted {
+            request_id: 3,
+            query: query.clone(),
+            ids: SteamworksUgcQueryIds { items: vec![item] },
+        }),
+        SteamworksUgcError::ClientUnavailable,
+    );
+
     let command = PreludeUgcCommand::suspend_downloads(false);
     let operation = PreludeUgcOperation::DownloadsSuspended { suspend: false };
     let error = PreludeUgcError::ClientUnavailable;
@@ -1491,6 +1523,35 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     };
 
     accepts_prelude_exports(PreludeUgcPlugin::new(), command, operation, result, error);
+
+    accepts_prelude_exports(
+        PreludeUgcPlugin::new(),
+        PreludeUgcCommand::query_total(query.clone()),
+        PreludeUgcOperation::QueryTotalRequested {
+            request_id: 0,
+            query: query.clone(),
+        },
+        PreludeUgcResult::Ok(PreludeUgcOperation::QueryTotalCompleted {
+            request_id: 1,
+            query: query.clone(),
+            total: PreludeUgcQueryTotal { total_results: 1 },
+        }),
+        PreludeUgcError::ClientUnavailable,
+    );
+    accepts_prelude_exports(
+        PreludeUgcPlugin::new(),
+        PreludeUgcCommand::query_ids(query.clone()),
+        PreludeUgcOperation::QueryIdsRequested {
+            request_id: 2,
+            query: query.clone(),
+        },
+        PreludeUgcResult::Ok(PreludeUgcOperation::QueryIdsCompleted {
+            request_id: 3,
+            query,
+            ids: PreludeUgcQueryIds { items: vec![item] },
+        }),
+        PreludeUgcError::ClientUnavailable,
+    );
 }
 
 #[test]

@@ -9,6 +9,8 @@ pub struct SteamworksUgcState {
     last_error: Option<SteamworksUgcError>,
     subscribed_items: Vec<steamworks::PublishedFileId>,
     last_query: Option<SteamworksUgcQueryResults>,
+    last_query_total: Option<SteamworksUgcQueryTotal>,
+    last_query_ids: Option<SteamworksUgcQueryIds>,
     last_item_state: Option<SteamworksUgcItemStateInfo>,
     last_item_download_info: Option<SteamworksUgcItemDownloadInfoResult>,
     last_item_install_info: Option<SteamworksUgcItemInstallInfoResult>,
@@ -35,6 +37,16 @@ impl SteamworksUgcState {
     /// Returns the most recent UGC query result set.
     pub fn last_query(&self) -> Option<&SteamworksUgcQueryResults> {
         self.last_query.as_ref()
+    }
+
+    /// Returns the most recent UGC total-only query result.
+    pub fn last_query_total(&self) -> Option<&SteamworksUgcQueryTotal> {
+        self.last_query_total.as_ref()
+    }
+
+    /// Returns the most recent UGC ID-only query result.
+    pub fn last_query_ids(&self) -> Option<&SteamworksUgcQueryIds> {
+        self.last_query_ids.as_ref()
     }
 
     /// Returns the most recent item state snapshot.
@@ -101,6 +113,14 @@ impl SteamworksUgcState {
                 self.last_query = Some(results.clone());
                 self.record_successful_async_operation();
             }
+            SteamworksUgcOperation::QueryTotalCompleted { total, .. } => {
+                self.last_query_total = Some(total.clone());
+                self.record_successful_async_operation();
+            }
+            SteamworksUgcOperation::QueryIdsCompleted { ids, .. } => {
+                self.last_query_ids = Some(ids.clone());
+                self.record_successful_async_operation();
+            }
             SteamworksUgcOperation::ItemStateRead { info } => {
                 self.last_item_state = Some(info.clone());
             }
@@ -139,6 +159,8 @@ impl SteamworksUgcState {
             }
             SteamworksUgcOperation::DownloadsSuspended { .. }
             | SteamworksUgcOperation::QueryRequested { .. }
+            | SteamworksUgcOperation::QueryTotalRequested { .. }
+            | SteamworksUgcOperation::QueryIdsRequested { .. }
             | SteamworksUgcOperation::ItemCreateRequested { .. }
             | SteamworksUgcOperation::ItemUpdateSubmitted { .. }
             | SteamworksUgcOperation::ItemUpdateForgotten { .. }

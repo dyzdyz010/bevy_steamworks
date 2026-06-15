@@ -42,6 +42,22 @@ pub enum SteamworksUgcCommand {
         /// Query to run.
         query: SteamworksUgcQuery,
     },
+    /// Run a UGC query that only returns the total matching result count.
+    ///
+    /// The query's payload-shape flags (`return_only_ids` and `return_total_only`) are ignored
+    /// because this command uses Steam's total-only query path.
+    QueryTotal {
+        /// Query to run.
+        query: SteamworksUgcQuery,
+    },
+    /// Run a UGC query that only returns item IDs for the submitted query page/result set.
+    ///
+    /// The query's payload-shape flags (`return_only_ids` and `return_total_only`) are ignored
+    /// because this command uses Steam's ID-only query path.
+    QueryIds {
+        /// Query to run.
+        query: SteamworksUgcQuery,
+    },
     /// Create a Workshop item.
     CreateItem {
         /// App ID that owns the item.
@@ -128,6 +144,16 @@ impl SteamworksUgcCommand {
     /// Creates a [`SteamworksUgcCommand::Query`] command.
     pub fn query(query: SteamworksUgcQuery) -> Self {
         Self::Query { query }
+    }
+
+    /// Creates a [`SteamworksUgcCommand::QueryTotal`] command.
+    pub fn query_total(query: SteamworksUgcQuery) -> Self {
+        Self::QueryTotal { query }
+    }
+
+    /// Creates a [`SteamworksUgcCommand::QueryIds`] command.
+    pub fn query_ids(query: SteamworksUgcQuery) -> Self {
+        Self::QueryIds { query }
     }
 
     /// Creates a [`SteamworksUgcCommand::CreateItem`] command.

@@ -27,7 +27,9 @@ pub(super) fn validate_command(command: &SteamworksUgcCommand) -> Result<(), Ste
             validate_item(*item)?;
             validate_item_update(update)
         }
-        SteamworksUgcCommand::Query { query } => validate_query(query),
+        SteamworksUgcCommand::Query { query }
+        | SteamworksUgcCommand::QueryTotal { query }
+        | SteamworksUgcCommand::QueryIds { query } => validate_query(query),
         SteamworksUgcCommand::StartPlaytimeTracking { items }
         | SteamworksUgcCommand::StopPlaytimeTracking { items } => validate_items(items),
     }

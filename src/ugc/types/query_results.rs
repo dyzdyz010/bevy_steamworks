@@ -11,6 +11,20 @@ pub struct SteamworksUgcQueryResults {
     pub items: Vec<SteamworksUgcItemDetails>,
 }
 
+/// Owned result count returned by a total-only UGC query.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUgcQueryTotal {
+    /// Total matching result count across all pages.
+    pub total_results: u32,
+}
+
+/// Owned item IDs returned by an ID-only UGC query for the submitted page/result set.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksUgcQueryIds {
+    /// Matching Workshop item IDs returned by Steam.
+    pub items: Vec<steamworks::PublishedFileId>,
+}
+
 /// Owned UGC item details copied from one query result row.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SteamworksUgcItemDetails {

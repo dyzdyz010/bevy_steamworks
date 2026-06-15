@@ -1,7 +1,8 @@
 use super::super::{
     SteamworksUgcDownloadItemResult, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcItemUpdate,
-    SteamworksUgcItemUpdateProgress, SteamworksUgcQuery, SteamworksUgcQueryResults,
+    SteamworksUgcItemUpdateProgress, SteamworksUgcQuery, SteamworksUgcQueryIds,
+    SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
 };
 
 /// A successfully submitted or completed UGC operation.
@@ -61,6 +62,38 @@ pub enum SteamworksUgcOperation {
         query: SteamworksUgcQuery,
         /// Owned query results.
         results: SteamworksUgcQueryResults,
+    },
+    /// A total-only query was submitted.
+    QueryTotalRequested {
+        /// Plugin request ID.
+        request_id: u64,
+        /// Query submitted.
+        query: SteamworksUgcQuery,
+    },
+    /// A total-only query completed.
+    QueryTotalCompleted {
+        /// Plugin request ID.
+        request_id: u64,
+        /// Query submitted.
+        query: SteamworksUgcQuery,
+        /// Total result count.
+        total: SteamworksUgcQueryTotal,
+    },
+    /// An ID-only query was submitted.
+    QueryIdsRequested {
+        /// Plugin request ID.
+        request_id: u64,
+        /// Query submitted.
+        query: SteamworksUgcQuery,
+    },
+    /// An ID-only query completed.
+    QueryIdsCompleted {
+        /// Plugin request ID.
+        request_id: u64,
+        /// Query submitted.
+        query: SteamworksUgcQuery,
+        /// Returned item IDs.
+        ids: SteamworksUgcQueryIds,
     },
     /// Item creation was submitted.
     ItemCreateRequested {

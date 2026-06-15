@@ -295,7 +295,19 @@ fn constructors_preserve_inputs() {
 
     assert_eq!(
         SteamworksUgcCommand::query(query.clone()),
-        SteamworksUgcCommand::Query { query }
+        SteamworksUgcCommand::Query {
+            query: query.clone()
+        }
+    );
+    assert_eq!(
+        SteamworksUgcCommand::query_total(query.clone()),
+        SteamworksUgcCommand::QueryTotal {
+            query: query.clone()
+        }
+    );
+    assert_eq!(
+        SteamworksUgcCommand::query_ids(query.clone()),
+        SteamworksUgcCommand::QueryIds { query }
     );
     assert_eq!(
         SteamworksUgcCommand::download_item(item, true),
@@ -401,6 +413,16 @@ fn state_records_operations_without_unbounded_query_history() {
         query: SteamworksUgcQuery::item(item),
         results: second.clone(),
     });
+    state.record_operation(&SteamworksUgcOperation::QueryTotalCompleted {
+        request_id: 2,
+        query: SteamworksUgcQuery::item(item),
+        total: SteamworksUgcQueryTotal { total_results: 42 },
+    });
+    state.record_operation(&SteamworksUgcOperation::QueryIdsCompleted {
+        request_id: 3,
+        query: SteamworksUgcQuery::item(item),
+        ids: SteamworksUgcQueryIds { items: vec![item] },
+    });
     state.record_operation(&SteamworksUgcOperation::ItemStateRead {
         info: SteamworksUgcItemStateInfo {
             item,
@@ -436,6 +458,14 @@ fn state_records_operations_without_unbounded_query_history() {
     assert!(state.subscribed_items().is_empty());
     assert_eq!(state.last_query(), Some(&second));
     assert_eq!(
+        state.last_query_total(),
+        Some(&SteamworksUgcQueryTotal { total_results: 42 })
+    );
+    assert_eq!(
+        state.last_query_ids(),
+        Some(&SteamworksUgcQueryIds { items: vec![item] })
+    );
+    assert_eq!(
         state.last_item_state(),
         Some(&SteamworksUgcItemStateInfo {
             item,
@@ -443,9 +473,9 @@ fn state_records_operations_without_unbounded_query_history() {
         })
     );
     assert_eq!(state.submitted_downloads(), 1);
-    assert_eq!(state.successful_async_operations(), 5);
+    assert_eq!(state.successful_async_operations(), 7);
     assert_eq!(state.failed_async_operations(), 0);
-    assert_eq!(state.completed_async_operations(), 5);
+    assert_eq!(state.completed_async_operations(), 7);
     assert_eq!(
         state.last_item_update_progress(),
         Some(&SteamworksUgcItemUpdateProgress {

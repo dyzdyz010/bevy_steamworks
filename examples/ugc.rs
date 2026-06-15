@@ -64,19 +64,24 @@ fn request_ugc(
     }
 
     if let Ok(search_text) = std::env::var("BEVY_STEAMWORKS_UGC_SEARCH") {
-        commands.write(SteamworksUgcCommand::query(
-            SteamworksUgcQuery::all(
-                UGCQueryType::RankedByTextSearch,
-                UGCType::Items,
-                AppIDs::ConsumerAppId(AppId(480)),
-                1,
-            )
-            .with_options(
-                SteamworksUgcQueryOptions::new()
-                    .with_search_text(search_text)
-                    .with_long_description(false),
-            ),
-        ));
+        let query = SteamworksUgcQuery::all(
+            UGCQueryType::RankedByTextSearch,
+            UGCType::Items,
+            AppIDs::ConsumerAppId(AppId(480)),
+            1,
+        )
+        .with_options(
+            SteamworksUgcQueryOptions::new()
+                .with_search_text(search_text)
+                .with_long_description(false),
+        );
+        commands.write(SteamworksUgcCommand::query(query.clone()));
+        if std::env::var("BEVY_STEAMWORKS_UGC_SEARCH_TOTAL").as_deref() == Ok("1") {
+            commands.write(SteamworksUgcCommand::query_total(query.clone()));
+        }
+        if std::env::var("BEVY_STEAMWORKS_UGC_SEARCH_IDS").as_deref() == Ok("1") {
+            commands.write(SteamworksUgcCommand::query_ids(query));
+        }
     }
 }
 

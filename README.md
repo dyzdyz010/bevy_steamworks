@@ -805,7 +805,7 @@ When both `BEVY_STEAMWORKS_REMOTE_STORAGE_WRITE` and `BEVY_STEAMWORKS_REMOTE_STO
 
 ## Workshop / UGC
 
-`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, submit item updates, read update progress, and start/stop playtime tracking.
+`SteamworksUgcPlugin` adds command/result messages for common Steam Workshop workflows: query item details, search Workshop pages, query result totals or ID lists, list subscriptions, read item state/download/install info, submit downloads, subscribe/unsubscribe/delete items, create a new Workshop item, submit item updates, read update progress, and start/stop playtime tracking.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -817,9 +817,15 @@ fn request_ugc(mut ugc: MessageWriter<SteamworksUgcCommand>) {
             SteamworksUgcQueryOptions::new()
                 .with_metadata(true)
                 .with_key_value_tags(true)
-            .with_statistic(UGCStatisticType::Subscriptions),
+                .with_statistic(UGCStatisticType::Subscriptions),
         ),
     ));
+    ugc.write(SteamworksUgcCommand::query_ids(SteamworksUgcQuery::all(
+        UGCQueryType::RankedByVote,
+        UGCType::Items,
+        AppIDs::ConsumerAppId(AppId(480)),
+        1,
+    )));
     ugc.write(SteamworksUgcCommand::submit_item_update(
         AppId(480),
         PublishedFileId(123456),
@@ -848,7 +854,7 @@ fn main() {
 }
 ```
 
-All async UGC commands emit an immediate `*Requested` or `*Submitted` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Query results are copied into owned `SteamworksUgcQueryResults` snapshots, so callers do not need to hold upstream query handles or lifetimes.
+All async UGC commands emit an immediate `*Requested` or `*Submitted` operation with a plugin-assigned `request_id`, then emit the completion or async error after `SteamworksSystem::RunCallbacks` pumps Steam call results. Full query results are copied into owned `SteamworksUgcQueryResults` snapshots, while `query_total` and `query_ids` provide lighter `SteamworksUgcQueryTotal` and `SteamworksUgcQueryIds` payloads for count-only or ID-only Workshop browsing. `query_total` and `query_ids` ignore `return_total_only` / `return_only_ids` query option flags because they use Steam's specialized total-only and ID-only paths. `query_ids` returns IDs for the submitted query page/result set; use pagination, often with `query_total`, when browsing all matches.
 
 String query and item update options are validated before calling upstream `steamworks`, so interior NUL bytes become `SteamworksUgcError::InvalidString` instead of panicking in a C string conversion. Item update paths are canonicalized before submission, so paths that cannot be resolved become structured `SteamworksUgcError::InvalidPath` errors. Submitted item updates retain an internal progress watch handle until the Steam call result arrives; read it with `SteamworksUgcCommand::get_item_update_progress(request_id)`.
 
@@ -861,6 +867,8 @@ cargo run --example ugc
 $env:BEVY_STEAMWORKS_UGC_ITEM = "123456"
 cargo run --example ugc
 $env:BEVY_STEAMWORKS_UGC_SEARCH = "levels"
+$env:BEVY_STEAMWORKS_UGC_SEARCH_TOTAL = "1"
+$env:BEVY_STEAMWORKS_UGC_SEARCH_IDS = "1"
 cargo run --example ugc
 $env:BEVY_STEAMWORKS_UGC_DOWNLOAD = "1"
 cargo run --example ugc
