@@ -158,7 +158,7 @@ fn commands_fail_when_server_is_unavailable() {
     app.add_plugins(SteamworksServerPlugin::manual().log_and_continue());
     app.world_mut()
         .resource_mut::<Messages<SteamworksServerCommand>>()
-        .write(SteamworksServerCommand::GetSteamId);
+        .write(SteamworksServerCommand::get_steam_id());
 
     app.update();
 
@@ -331,6 +331,10 @@ fn constructors_preserve_inputs() {
     let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 27015);
 
     assert_eq!(
+        SteamworksServerCommand::get_steam_id(),
+        SteamworksServerCommand::GetSteamId
+    );
+    assert_eq!(
         SteamworksServerCommand::get_authentication_session_ticket(user),
         SteamworksServerCommand::GetAuthenticationSessionTicket { steam_id: user }
     );
@@ -372,6 +376,10 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksServerCommand::log_on_anonymous(),
+        SteamworksServerCommand::LogOnAnonymous
+    );
+    assert_eq!(
         SteamworksServerCommand::log_on("secret-token"),
         SteamworksServerCommand::LogOn {
             token: SteamworksServerLoginToken::new("secret-token"),
@@ -380,6 +388,10 @@ fn constructors_preserve_inputs() {
     assert_eq!(
         format!("{:?}", SteamworksServerCommand::log_on("secret-token")),
         "LogOn { token: SteamworksServerLoginToken(<redacted>) }"
+    );
+    assert_eq!(
+        SteamworksServerCommand::clear_all_key_values(),
+        SteamworksServerCommand::ClearAllKeyValues
     );
     assert_eq!(
         SteamworksServerCommand::drain_outgoing_packets(),
@@ -507,7 +519,7 @@ fn validation_rejects_pre_logon_only_commands_after_logon() {
         Ok(())
     );
     assert_eq!(
-        validate_server_command_for_state(&SteamworksServerCommand::LogOnAnonymous, &state),
+        validate_server_command_for_state(&SteamworksServerCommand::log_on_anonymous(), &state),
         Err(SteamworksServerError::LogonAlreadySubmitted)
     );
     assert_eq!(

@@ -440,7 +440,7 @@ fn result_helper_api_is_exported_from_root_and_prelude() {
         PreludeAppsError::ClientUnavailable,
     ));
 
-    let command = SteamworksServerCommand::GetSteamId;
+    let command = SteamworksServerCommand::get_steam_id();
     let error = SteamworksServerError::ServerUnavailable;
     let err = SteamworksServerResult::Err {
         command: command.clone(),
@@ -531,7 +531,7 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksServerCommand::GetSteamId;
+    let command = SteamworksServerCommand::get_steam_id();
     let operation = SteamworksServerOperation::AnonymousLogonSubmitted;
     let error = SteamworksServerError::ServerUnavailable;
     let result = SteamworksServerResult::Err {
@@ -577,7 +577,7 @@ fn game_server_api_is_exported_from_root_and_prelude() {
 
     accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
-    let command = PreludeServerCommand::GetSteamId;
+    let command = PreludeServerCommand::get_steam_id();
     let operation = PreludeServerOperation::AnonymousLogonSubmitted;
     let error = PreludeServerError::ServerUnavailable;
     let result = PreludeServerResult::Err {

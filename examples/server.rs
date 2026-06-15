@@ -27,7 +27,7 @@ fn log_server_state(
         ));
         commands.write(SteamworksServerCommand::set_max_players(16));
         commands.write(SteamworksServerCommand::set_bot_player_count(0));
-        commands.write(SteamworksServerCommand::LogOnAnonymous);
+        commands.write(SteamworksServerCommand::log_on_anonymous());
         commands.write(SteamworksServerCommand::set_advertise_server_active(true));
     }
 }

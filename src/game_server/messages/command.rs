@@ -209,6 +209,11 @@ impl fmt::Debug for SteamworksServerCommand {
 }
 
 impl SteamworksServerCommand {
+    /// Creates a [`SteamworksServerCommand::GetSteamId`] command.
+    pub fn get_steam_id() -> Self {
+        Self::GetSteamId
+    }
+
     /// Creates a [`SteamworksServerCommand::GetAuthenticationSessionTicket`] command.
     pub fn get_authentication_session_ticket(steam_id: steamworks::SteamId) -> Self {
         Self::GetAuthenticationSessionTicket { steam_id }
@@ -267,6 +272,11 @@ impl SteamworksServerCommand {
         Self::SetDedicatedServer { dedicated }
     }
 
+    /// Creates a [`SteamworksServerCommand::LogOnAnonymous`] command.
+    pub fn log_on_anonymous() -> Self {
+        Self::LogOnAnonymous
+    }
+
     /// Creates a [`SteamworksServerCommand::LogOn`] command.
     pub fn log_on(token: impl Into<SteamworksServerLoginToken>) -> Self {
         Self::LogOn {
@@ -316,6 +326,11 @@ impl SteamworksServerCommand {
             key: key.into(),
             value: value.into(),
         }
+    }
+
+    /// Creates a [`SteamworksServerCommand::ClearAllKeyValues`] command.
+    pub fn clear_all_key_values() -> Self {
+        Self::ClearAllKeyValues
     }
 
     /// Creates a [`SteamworksServerCommand::SetPasswordProtected`] command.
