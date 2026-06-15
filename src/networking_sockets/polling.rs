@@ -62,6 +62,9 @@ pub(super) fn poll_listen_socket_events(
             steamworks::networking_types::ListenSocketEvent::Connected(event) => {
                 let remote = event.remote();
                 let user_data = event.user_data();
+                let owner = handles.listen_socket_owner(listen_socket).ok_or(
+                    SteamworksNetworkingSocketsError::ListenSocketNotFound { id: listen_socket },
+                )?;
                 let connection = handles.insert_connection(
                     event.take_connection(),
                     SteamworksNetworkingSocketsConnectionMetadata::listen_socket(
@@ -69,6 +72,7 @@ pub(super) fn poll_listen_socket_events(
                         remote.clone(),
                         user_data,
                     ),
+                    owner,
                 );
                 events.push(SteamworksListenSocketEventInfo::Connected {
                     listen_socket,

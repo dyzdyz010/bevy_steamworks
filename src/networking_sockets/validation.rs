@@ -23,6 +23,10 @@ pub(super) fn validate_command(
             validate_virtual_port(*local_virtual_port)?;
             validate_config_entries(options)
         }
+        SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket {
+            options,
+            ..
+        } => validate_config_entries(options),
         SteamworksNetworkingSocketsCommand::ConnectByIpAddress { options, .. } => {
             validate_config_entries(options)
         }

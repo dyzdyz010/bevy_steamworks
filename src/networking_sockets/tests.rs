@@ -6,7 +6,7 @@ use std::{
 use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
-use super::handles::SteamworksNetworkingSocketsHandles;
+use super::handles::{SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsHandles};
 use super::*;
 
 #[test]
@@ -94,6 +94,39 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksNetworkingSocketsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn hosted_dedicated_server_listen_socket_requires_server() {
+    let mut app = App::new();
+    let command =
+        SteamworksNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket(27015);
+
+    app.add_plugins(SteamworksNetworkingSocketsPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsCommand>>()
+        .write(command.clone());
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingSocketsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksNetworkingSocketsResult::Err {
+            command,
+            error: SteamworksNetworkingSocketsError::ServerUnavailable,
+        }]
+    );
+
+    let state = app.world().resource::<SteamworksNetworkingSocketsState>();
+    assert_eq!(
+        state.last_error(),
+        Some(&SteamworksNetworkingSocketsError::ServerUnavailable)
     );
 }
 
@@ -292,6 +325,18 @@ fn validation_rejects_invalid_inputs() {
     );
     assert_eq!(
         validate_command(
+            &SteamworksNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket_with_options(
+                27015,
+                vec![no_auth_config(); STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES + 1],
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::TooManyConfigEntries {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
+        })
+    );
+    assert_eq!(
+        validate_command(
             &SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
                 localhost(),
                 vec![SteamworksNetworkingSocketsConfigEntry::int32(
@@ -400,6 +445,23 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket(27015),
+        SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket {
+            local_virtual_port: 27015,
+            options: Vec::new(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket_with_options(
+            27015,
+            vec![no_auth_config()],
+        ),
+        SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket {
+            local_virtual_port: 27015,
+            options: vec![no_auth_config()],
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingSocketsCommand::connect_by_ip_address_with_options(
             address,
             vec![no_auth_config()],
@@ -424,6 +486,10 @@ fn constructors_preserve_inputs() {
     assert_eq!(
         SteamworksNetworkingSocketsCommand::create_poll_group(),
         SteamworksNetworkingSocketsCommand::CreatePollGroup
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::create_server_poll_group(),
+        SteamworksNetworkingSocketsCommand::CreateServerPollGroup
     );
     assert_eq!(
         SteamworksNetworkingSocketsCommand::get_realtime_connection_status(connection_id(), 4),
@@ -948,6 +1014,99 @@ fn handle_storage_starts_ids_at_one() {
     assert_eq!(storage.next_listen_socket_id, 1);
     assert_eq!(storage.next_connection_id, 1);
     assert_eq!(storage.next_poll_group_id, 1);
+}
+
+#[test]
+fn handle_storage_tracks_and_clears_handle_owners() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+
+    storage.listen_socket_owners.insert(
+        listen_socket_id(),
+        SteamworksNetworkingSocketsHandleOwner::Server,
+    );
+    storage.connection_owners.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsHandleOwner::Server,
+    );
+    storage.poll_group_owners.insert(
+        poll_group_id(),
+        SteamworksNetworkingSocketsHandleOwner::Server,
+    );
+    storage.connection_metadata.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsConnectionMetadata::listen_socket(
+            listen_socket_id(),
+            steamworks::networking_types::NetworkingIdentity::new_ip(localhost()),
+            0,
+        ),
+    );
+
+    assert_eq!(
+        storage.listen_socket_owner(listen_socket_id()),
+        Some(SteamworksNetworkingSocketsHandleOwner::Server)
+    );
+    assert_eq!(
+        storage.connection_owner(connection_id()),
+        Some(SteamworksNetworkingSocketsHandleOwner::Server)
+    );
+    assert_eq!(
+        storage.poll_group_owner(poll_group_id()),
+        Some(SteamworksNetworkingSocketsHandleOwner::Server)
+    );
+
+    assert!(storage.remove_connection(&connection_id()).is_none());
+    assert_eq!(storage.connection_owner(connection_id()), None);
+    assert!(!storage.connection_metadata.contains_key(&connection_id()));
+}
+
+#[test]
+fn server_owned_connections_are_rejected_by_batch_send_before_client_lookup() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+    storage.connection_owners.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsHandleOwner::Server,
+    );
+    let command = SteamworksNetworkingSocketsCommand::send_messages(vec![
+        SteamworksNetworkingSocketsOutboundMessage::new(
+            connection_id(),
+            steamworks::networking_types::SendFlags::RELIABLE,
+            [1, 2, 3],
+        ),
+    ]);
+
+    assert_eq!(
+        super::commands::handle_networking_sockets_command(None, None, &mut storage, &command),
+        Err(
+            SteamworksNetworkingSocketsError::ServerConnectionBatchSendUnsupported {
+                connection: connection_id(),
+            }
+        )
+    );
+}
+
+#[test]
+fn poll_group_assignment_rejects_mismatched_handle_owners() {
+    let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
+    storage.connection_owners.insert(
+        connection_id(),
+        SteamworksNetworkingSocketsHandleOwner::Server,
+    );
+    storage.poll_group_owners.insert(
+        poll_group_id(),
+        SteamworksNetworkingSocketsHandleOwner::Client,
+    );
+    let command = SteamworksNetworkingSocketsCommand::set_connection_poll_group(
+        connection_id(),
+        poll_group_id(),
+    );
+
+    assert_eq!(
+        super::commands::handle_networking_sockets_command(None, None, &mut storage, &command),
+        Err(SteamworksNetworkingSocketsError::HandleOwnerMismatch {
+            connection: connection_id(),
+            poll_group: poll_group_id(),
+        })
+    );
 }
 
 #[test]

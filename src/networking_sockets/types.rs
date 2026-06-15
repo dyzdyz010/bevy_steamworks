@@ -569,6 +569,11 @@ pub enum SteamworksNetworkingSocketsListenEndpoint {
         /// Local virtual port.
         local_virtual_port: i32,
     },
+    /// Hosted dedicated-server virtual port.
+    HostedDedicatedServer {
+        /// Local virtual port.
+        local_virtual_port: u32,
+    },
 }
 
 /// Connection target created by a command.

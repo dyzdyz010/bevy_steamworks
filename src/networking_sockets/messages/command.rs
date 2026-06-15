@@ -29,6 +29,13 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Initial Steam Networking Sockets config entries.
         options: Vec<SteamworksNetworkingSocketsConfigEntry>,
     },
+    /// Create a hosted dedicated-server listen socket.
+    CreateHostedDedicatedServerListenSocket {
+        /// Local virtual port.
+        local_virtual_port: u32,
+        /// Initial Steam Networking Sockets config entries.
+        options: Vec<SteamworksNetworkingSocketsConfigEntry>,
+    },
     /// Connect to an IP endpoint.
     ConnectByIpAddress {
         /// Remote socket address.
@@ -47,6 +54,8 @@ pub enum SteamworksNetworkingSocketsCommand {
     },
     /// Create a poll group for receiving messages from many connections.
     CreatePollGroup,
+    /// Create a server-owned poll group for receiving messages from many server connections.
+    CreateServerPollGroup,
     /// Poll events from one listen socket.
     PollListenSocketEvents {
         /// Listen socket to poll.
@@ -187,6 +196,14 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("local_virtual_port", local_virtual_port)
                 .field("options", options)
                 .finish(),
+            Self::CreateHostedDedicatedServerListenSocket {
+                local_virtual_port,
+                options,
+            } => f
+                .debug_struct("CreateHostedDedicatedServerListenSocket")
+                .field("local_virtual_port", local_virtual_port)
+                .field("options", options)
+                .finish(),
             Self::ConnectByIpAddress { address, options } => f
                 .debug_struct("ConnectByIpAddress")
                 .field("address", address)
@@ -203,6 +220,7 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("options", options)
                 .finish(),
             Self::CreatePollGroup => f.write_str("CreatePollGroup"),
+            Self::CreateServerPollGroup => f.write_str("CreateServerPollGroup"),
             Self::PollListenSocketEvents {
                 listen_socket,
                 max_events,
@@ -366,6 +384,26 @@ impl SteamworksNetworkingSocketsCommand {
         }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket`] command.
+    ///
+    /// This command requires a [`crate::SteamworksServer`] resource.
+    pub fn create_hosted_dedicated_server_listen_socket(local_virtual_port: u32) -> Self {
+        Self::create_hosted_dedicated_server_listen_socket_with_options(local_virtual_port, [])
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket`] command with config.
+    ///
+    /// This command requires a [`crate::SteamworksServer`] resource.
+    pub fn create_hosted_dedicated_server_listen_socket_with_options(
+        local_virtual_port: u32,
+        options: impl Into<Vec<SteamworksNetworkingSocketsConfigEntry>>,
+    ) -> Self {
+        Self::CreateHostedDedicatedServerListenSocket {
+            local_virtual_port,
+            options: options.into(),
+        }
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::ConnectByIpAddress`] command.
     pub fn connect_by_ip_address(address: SocketAddr) -> Self {
         Self::connect_by_ip_address_with_options(address, [])
@@ -424,6 +462,13 @@ impl SteamworksNetworkingSocketsCommand {
     /// Creates a [`SteamworksNetworkingSocketsCommand::CreatePollGroup`] command.
     pub fn create_poll_group() -> Self {
         Self::CreatePollGroup
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CreateServerPollGroup`] command.
+    ///
+    /// This command requires a [`crate::SteamworksServer`] resource.
+    pub fn create_server_poll_group() -> Self {
+        Self::CreateServerPollGroup
     }
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::PollListenSocketEvents`] command.

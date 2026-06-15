@@ -53,6 +53,7 @@ use bevy_steamworks::{
         SteamworksNetworkingSocketsConnectionId as PreludeNetworkingSocketsConnectionId,
         SteamworksNetworkingSocketsConnectionName as PreludeNetworkingSocketsConnectionName,
         SteamworksNetworkingSocketsError as PreludeNetworkingSocketsError,
+        SteamworksNetworkingSocketsListenEndpoint as PreludeNetworkingSocketsListenEndpoint,
         SteamworksNetworkingSocketsMessageSendResult as PreludeNetworkingSocketsMessageSendResult,
         SteamworksNetworkingSocketsOperation as PreludeNetworkingSocketsOperation,
         SteamworksNetworkingSocketsOutboundMessage as PreludeNetworkingSocketsOutboundMessage,
@@ -141,33 +142,34 @@ use bevy_steamworks::{
     SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
     SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
-    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
-    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksPlugin, SteamworksPlugins,
-    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
-    SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
-    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
-    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
-    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
-    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
-    SteamworksServerOperation, SteamworksServerPlugin, SteamworksServerResult,
-    SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
-    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem,
-    SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineGameMode,
-    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
-    SteamworksUgcCommand, SteamworksUgcContentDescriptor, SteamworksUgcError,
-    SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryOptions,
-    SteamworksUgcQueryTotal, SteamworksUgcResult, SteamworksUgcWorkshopDepotId,
-    SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation,
-    SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError,
-    SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
+    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
+    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksServerError, SteamworksServerInitMode, SteamworksServerListFilters,
+    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
+    SteamworksServerPlugin, SteamworksServerResult, SteamworksServerUnavailable,
+    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+    SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
+    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult,
+    SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -906,12 +908,16 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
     }
 
     let connection = SteamworksNetworkingSocketsConnectionId::from_raw(2);
-    let command = SteamworksNetworkingSocketsCommand::set_connection_name(connection, "player-1");
-    let operation = SteamworksNetworkingSocketsOperation::ConnectionNameSet {
-        connection,
-        name: "player-1".to_owned(),
+    let command =
+        SteamworksNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket(27015);
+    let server_poll_group_command = SteamworksNetworkingSocketsCommand::create_server_poll_group();
+    let operation = SteamworksNetworkingSocketsOperation::ListenSocketCreated {
+        listen_socket: bevy_steamworks::SteamworksListenSocketId::from_raw(1),
+        endpoint: SteamworksNetworkingSocketsListenEndpoint::HostedDedicatedServer {
+            local_virtual_port: 27015,
+        },
     };
-    let error = SteamworksNetworkingSocketsError::ClientUnavailable;
+    let error = SteamworksNetworkingSocketsError::ServerUnavailable;
     let result = SteamworksNetworkingSocketsResult::Err {
         command: command.clone(),
         error: error.clone(),
@@ -948,6 +954,21 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         error,
     );
     accepts_root_message_exports(config, connection_name, outbound, send_result);
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        server_poll_group_command,
+        SteamworksNetworkingSocketsOperation::PollGroupCreated {
+            poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        },
+        SteamworksNetworkingSocketsResult::Err {
+            command: SteamworksNetworkingSocketsCommand::create_server_poll_group(),
+            error: SteamworksNetworkingSocketsError::ServerUnavailable,
+        },
+        SteamworksNetworkingSocketsError::HandleOwnerMismatch {
+            connection,
+            poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        },
+    );
     assert_eq!(
         bevy_steamworks::STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
         bevy_steamworks::prelude::STEAMWORKS_NETWORKING_SOCKETS_MAX_CONFIG_ENTRIES,
@@ -974,12 +995,16 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
     );
 
     let connection = PreludeNetworkingSocketsConnectionId::from_raw(2);
-    let command = PreludeNetworkingSocketsCommand::set_connection_name(connection, "player-1");
-    let operation = PreludeNetworkingSocketsOperation::ConnectionNameSet {
-        connection,
-        name: "player-1".to_owned(),
+    let command =
+        PreludeNetworkingSocketsCommand::create_hosted_dedicated_server_listen_socket(27015);
+    let server_poll_group_command = PreludeNetworkingSocketsCommand::create_server_poll_group();
+    let operation = PreludeNetworkingSocketsOperation::ListenSocketCreated {
+        listen_socket: bevy_steamworks::prelude::SteamworksListenSocketId::from_raw(1),
+        endpoint: PreludeNetworkingSocketsListenEndpoint::HostedDedicatedServer {
+            local_virtual_port: 27015,
+        },
     };
-    let error = PreludeNetworkingSocketsError::ClientUnavailable;
+    let error = PreludeNetworkingSocketsError::ServerUnavailable;
     let result = PreludeNetworkingSocketsResult::Err {
         command: command.clone(),
         error: error.clone(),
@@ -1016,6 +1041,25 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         error,
     );
     accepts_prelude_message_exports(config, connection_name, outbound, send_result);
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        server_poll_group_command,
+        PreludeNetworkingSocketsOperation::PollGroupCreated {
+            poll_group: bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(
+                1,
+            ),
+        },
+        PreludeNetworkingSocketsResult::Err {
+            command: PreludeNetworkingSocketsCommand::create_server_poll_group(),
+            error: PreludeNetworkingSocketsError::ServerUnavailable,
+        },
+        PreludeNetworkingSocketsError::HandleOwnerMismatch {
+            connection,
+            poll_group: bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(
+                1,
+            ),
+        },
+    );
 }
 
 #[test]

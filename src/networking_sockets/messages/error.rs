@@ -15,6 +15,9 @@ pub enum SteamworksNetworkingSocketsError {
     /// client-only.
     #[error("Steamworks Networking Sockets resource is not available")]
     ClientUnavailable,
+    /// No [`crate::SteamworksServer`] resource exists for a server-only command.
+    #[error("Steamworks Game Server Networking Sockets resource is not available")]
+    ServerUnavailable,
     /// A listen socket ID is not owned by this plugin.
     #[error("Steam Networking Sockets listen socket {id:?} was not found")]
     ListenSocketNotFound {
@@ -32,6 +35,24 @@ pub enum SteamworksNetworkingSocketsError {
     PollGroupNotFound {
         /// Missing poll group ID.
         id: SteamworksNetworkingSocketsPollGroupId,
+    },
+    /// A connection and poll group were created from different Steam Networking Sockets interfaces.
+    #[error(
+        "Steam Networking Sockets connection {connection:?} cannot be assigned to poll group {poll_group:?} because they are owned by different interfaces"
+    )]
+    HandleOwnerMismatch {
+        /// Connection with the incompatible owner.
+        connection: SteamworksNetworkingSocketsConnectionId,
+        /// Poll group with the incompatible owner.
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    },
+    /// A server-owned connection was submitted to the client-only batch send command.
+    #[error(
+        "Steam Networking Sockets connection {connection:?} is server-owned; SendMessages requires client-owned connections"
+    )]
+    ServerConnectionBatchSendUnsupported {
+        /// Server-owned connection that cannot be sent through `SendMessages`.
+        connection: SteamworksNetworkingSocketsConnectionId,
     },
     /// A max-events value was zero.
     #[error("Steam Networking Sockets max_events must be greater than zero")]

@@ -18,18 +18,30 @@ pub(super) struct SteamworksNetworkingSocketsHandleStorage {
     pub(super) next_poll_group_id: u64,
     pub(super) listen_sockets:
         HashMap<SteamworksListenSocketId, steamworks::networking_sockets::ListenSocket>,
+    pub(super) listen_socket_owners:
+        HashMap<SteamworksListenSocketId, SteamworksNetworkingSocketsHandleOwner>,
     pub(super) connections: HashMap<
         SteamworksNetworkingSocketsConnectionId,
         steamworks::networking_sockets::NetConnection,
     >,
+    pub(super) connection_owners:
+        HashMap<SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsHandleOwner>,
     pub(super) poll_groups: HashMap<
         SteamworksNetworkingSocketsPollGroupId,
         steamworks::networking_sockets::NetPollGroup,
     >,
+    pub(super) poll_group_owners:
+        HashMap<SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsHandleOwner>,
     pub(super) connection_metadata: HashMap<
         SteamworksNetworkingSocketsConnectionId,
         SteamworksNetworkingSocketsConnectionMetadata,
     >,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SteamworksNetworkingSocketsHandleOwner {
+    Client,
+    Server,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,8 +83,11 @@ impl Default for SteamworksNetworkingSocketsHandleStorage {
             next_connection_id: 1,
             next_poll_group_id: 1,
             listen_sockets: HashMap::default(),
+            listen_socket_owners: HashMap::default(),
             connections: HashMap::default(),
+            connection_owners: HashMap::default(),
             poll_groups: HashMap::default(),
+            poll_group_owners: HashMap::default(),
             connection_metadata: HashMap::default(),
         }
     }
@@ -82,10 +97,12 @@ impl SteamworksNetworkingSocketsHandleStorage {
     pub(super) fn insert_listen_socket(
         &mut self,
         socket: steamworks::networking_sockets::ListenSocket,
+        owner: SteamworksNetworkingSocketsHandleOwner,
     ) -> SteamworksListenSocketId {
         let id = SteamworksListenSocketId::from_raw(self.next_listen_socket_id);
         self.next_listen_socket_id = self.next_listen_socket_id.saturating_add(1).max(1);
         self.listen_sockets.insert(id, socket);
+        self.listen_socket_owners.insert(id, owner);
         id
     }
 
@@ -93,10 +110,12 @@ impl SteamworksNetworkingSocketsHandleStorage {
         &mut self,
         connection: steamworks::networking_sockets::NetConnection,
         metadata: SteamworksNetworkingSocketsConnectionMetadata,
+        owner: SteamworksNetworkingSocketsHandleOwner,
     ) -> SteamworksNetworkingSocketsConnectionId {
         let id = SteamworksNetworkingSocketsConnectionId::from_raw(self.next_connection_id);
         self.next_connection_id = self.next_connection_id.saturating_add(1).max(1);
         self.connections.insert(id, connection);
+        self.connection_owners.insert(id, owner);
         self.connection_metadata.insert(id, metadata);
         id
     }
@@ -104,11 +123,34 @@ impl SteamworksNetworkingSocketsHandleStorage {
     pub(super) fn insert_poll_group(
         &mut self,
         poll_group: steamworks::networking_sockets::NetPollGroup,
+        owner: SteamworksNetworkingSocketsHandleOwner,
     ) -> SteamworksNetworkingSocketsPollGroupId {
         let id = SteamworksNetworkingSocketsPollGroupId::from_raw(self.next_poll_group_id);
         self.next_poll_group_id = self.next_poll_group_id.saturating_add(1).max(1);
         self.poll_groups.insert(id, poll_group);
+        self.poll_group_owners.insert(id, owner);
         id
+    }
+
+    pub(super) fn listen_socket_owner(
+        &self,
+        listen_socket: SteamworksListenSocketId,
+    ) -> Option<SteamworksNetworkingSocketsHandleOwner> {
+        self.listen_socket_owners.get(&listen_socket).copied()
+    }
+
+    pub(super) fn connection_owner(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<SteamworksNetworkingSocketsHandleOwner> {
+        self.connection_owners.get(&connection).copied()
+    }
+
+    pub(super) fn poll_group_owner(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> Option<SteamworksNetworkingSocketsHandleOwner> {
+        self.poll_group_owners.get(&poll_group).copied()
     }
 
     pub(super) fn remove_connection(
@@ -116,7 +158,16 @@ impl SteamworksNetworkingSocketsHandleStorage {
         connection: &SteamworksNetworkingSocketsConnectionId,
     ) -> Option<steamworks::networking_sockets::NetConnection> {
         self.connection_metadata.remove(connection);
+        self.connection_owners.remove(connection);
         self.connections.remove(connection)
+    }
+
+    pub(super) fn remove_listen_socket(
+        &mut self,
+        listen_socket: &SteamworksListenSocketId,
+    ) -> Option<steamworks::networking_sockets::ListenSocket> {
+        self.listen_socket_owners.remove(listen_socket);
+        self.listen_sockets.remove(listen_socket)
     }
 
     pub(super) fn remove_poll_group(
@@ -124,6 +175,7 @@ impl SteamworksNetworkingSocketsHandleStorage {
         poll_group: &SteamworksNetworkingSocketsPollGroupId,
     ) -> Option<steamworks::networking_sockets::NetPollGroup> {
         let removed = self.poll_groups.remove(poll_group)?;
+        self.poll_group_owners.remove(poll_group);
         self.clear_poll_group_metadata(*poll_group);
         Some(removed)
     }

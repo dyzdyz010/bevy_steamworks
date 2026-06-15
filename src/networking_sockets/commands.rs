@@ -7,8 +7,8 @@ use crate::{SteamworksClient, SteamworksServer};
 
 use super::{
     handles::{
-        SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleStorage,
-        SteamworksNetworkingSocketsHandles,
+        SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleOwner,
+        SteamworksNetworkingSocketsHandleStorage, SteamworksNetworkingSocketsHandles,
     },
     polling::{poll_connection_events, poll_listen_socket_events},
     snapshots::{
@@ -17,10 +17,11 @@ use super::{
     },
     validation::validate_command,
     SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConfigEntry,
-    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
-    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingSocketsState,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionTarget,
+    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingSocketsState,
 };
 
 pub(super) fn process_networking_sockets_commands(
@@ -82,7 +83,7 @@ pub(super) fn process_networking_sockets_commands(
     }
 }
 
-fn handle_networking_sockets_command(
+pub(super) fn handle_networking_sockets_command(
     client: Option<&SteamworksClient>,
     server: Option<&SteamworksServer>,
     handles: &mut SteamworksNetworkingSocketsHandleStorage,
@@ -90,22 +91,15 @@ fn handle_networking_sockets_command(
 ) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
     validate_command(command)?;
 
-    if matches!(
-        command,
-        SteamworksNetworkingSocketsCommand::SendMessages { .. }
-    ) && client.is_none()
-    {
-        return Err(SteamworksNetworkingSocketsError::ClientUnavailable);
-    }
-
-    let sockets = networking_sockets(client, server)?;
     Ok(match command {
         SteamworksNetworkingSocketsCommand::InitAuthentication => {
+            let (sockets, _) = networking_sockets(client, server)?;
             SteamworksNetworkingSocketsOperation::AuthenticationInitialized {
                 availability: sockets.init_authentication(),
             }
         }
         SteamworksNetworkingSocketsCommand::GetAuthenticationStatus => {
+            let (sockets, _) = networking_sockets(client, server)?;
             SteamworksNetworkingSocketsOperation::AuthenticationStatusRead {
                 availability: sockets.get_authentication_status(),
             }
@@ -114,6 +108,7 @@ fn handle_networking_sockets_command(
             local_address,
             options,
         } => {
+            let (sockets, owner) = networking_sockets(client, server)?;
             let options = steam_config_entries(options);
             let socket = sockets
                 .create_listen_socket_ip(*local_address, options)
@@ -122,7 +117,7 @@ fn handle_networking_sockets_command(
                         "networking_sockets.create_listen_socket_ip",
                     )
                 })?;
-            let listen_socket = handles.insert_listen_socket(socket);
+            let listen_socket = handles.insert_listen_socket(socket, owner);
             SteamworksNetworkingSocketsOperation::ListenSocketCreated {
                 listen_socket,
                 endpoint: SteamworksNetworkingSocketsListenEndpoint::Ip(*local_address),
@@ -132,6 +127,7 @@ fn handle_networking_sockets_command(
             local_virtual_port,
             options,
         } => {
+            let (sockets, owner) = networking_sockets(client, server)?;
             let options = steam_config_entries(options);
             let socket = sockets
                 .create_listen_socket_p2p(*local_virtual_port, options)
@@ -140,7 +136,7 @@ fn handle_networking_sockets_command(
                         "networking_sockets.create_listen_socket_p2p",
                     )
                 })?;
-            let listen_socket = handles.insert_listen_socket(socket);
+            let listen_socket = handles.insert_listen_socket(socket, owner);
             SteamworksNetworkingSocketsOperation::ListenSocketCreated {
                 listen_socket,
                 endpoint: SteamworksNetworkingSocketsListenEndpoint::P2p {
@@ -148,7 +144,29 @@ fn handle_networking_sockets_command(
                 },
             }
         }
+        SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket {
+            local_virtual_port,
+            options,
+        } => {
+            let (sockets, owner) = server_networking_sockets(server)?;
+            let options = steam_config_entries(options);
+            let socket = sockets
+                .create_hosted_dedicated_server_listen_socket(*local_virtual_port, options)
+                .map_err(|_| {
+                    SteamworksNetworkingSocketsError::invalid_handle(
+                        "networking_sockets.create_hosted_dedicated_server_listen_socket",
+                    )
+                })?;
+            let listen_socket = handles.insert_listen_socket(socket, owner);
+            SteamworksNetworkingSocketsOperation::ListenSocketCreated {
+                listen_socket,
+                endpoint: SteamworksNetworkingSocketsListenEndpoint::HostedDedicatedServer {
+                    local_virtual_port: *local_virtual_port,
+                },
+            }
+        }
         SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address, options } => {
+            let (sockets, owner) = networking_sockets(client, server)?;
             let options = steam_config_entries(options);
             let connection = sockets
                 .connect_by_ip_address(*address, options)
@@ -160,6 +178,7 @@ fn handle_networking_sockets_command(
             let connection = handles.insert_connection(
                 connection,
                 SteamworksNetworkingSocketsConnectionMetadata::independent(),
+                owner,
             );
             SteamworksNetworkingSocketsOperation::ConnectionCreated {
                 connection,
@@ -171,6 +190,7 @@ fn handle_networking_sockets_command(
             remote_virtual_port,
             options,
         } => {
+            let (sockets, owner) = networking_sockets(client, server)?;
             let options = steam_config_entries(options);
             let connection = sockets
                 .connect_p2p(identity.clone(), *remote_virtual_port, options)
@@ -182,6 +202,7 @@ fn handle_networking_sockets_command(
             let connection = handles.insert_connection(
                 connection,
                 SteamworksNetworkingSocketsConnectionMetadata::independent(),
+                owner,
             );
             SteamworksNetworkingSocketsOperation::ConnectionCreated {
                 connection,
@@ -192,7 +213,13 @@ fn handle_networking_sockets_command(
             }
         }
         SteamworksNetworkingSocketsCommand::CreatePollGroup => {
-            let poll_group = handles.insert_poll_group(sockets.create_poll_group());
+            let (sockets, owner) = networking_sockets(client, server)?;
+            let poll_group = handles.insert_poll_group(sockets.create_poll_group(), owner);
+            SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group }
+        }
+        SteamworksNetworkingSocketsCommand::CreateServerPollGroup => {
+            let (sockets, owner) = server_networking_sockets(server)?;
+            let poll_group = handles.insert_poll_group(sockets.create_poll_group(), owner);
             SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group }
         }
         SteamworksNetworkingSocketsCommand::PollListenSocketEvents {
@@ -217,6 +244,8 @@ fn handle_networking_sockets_command(
             }
         }
         SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus { connection, lanes } => {
+            let owner = connection_owner(handles, *connection)?;
+            let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
             let connection_ref = handles
                 .connections
                 .get(connection)
@@ -258,8 +287,25 @@ fn handle_networking_sockets_command(
             }
         }
         SteamworksNetworkingSocketsCommand::SendMessages { messages } => {
-            let client = client.expect("SendMessages requires SteamworksClient");
             let mut outbound = Vec::with_capacity(messages.len());
+            for message in messages {
+                if handles.connection_owner(message.connection)
+                    == Some(SteamworksNetworkingSocketsHandleOwner::Server)
+                {
+                    return Err(
+                        SteamworksNetworkingSocketsError::ServerConnectionBatchSendUnsupported {
+                            connection: message.connection,
+                        },
+                    );
+                }
+            }
+
+            let client = client.ok_or(SteamworksNetworkingSocketsError::ClientUnavailable)?;
+            let (sockets, _) = networking_sockets_for_owner(
+                Some(client),
+                server,
+                SteamworksNetworkingSocketsHandleOwner::Client,
+            )?;
             for message in messages {
                 let connection_ref = handles.connections.get(&message.connection).ok_or(
                     SteamworksNetworkingSocketsError::ConnectionNotFound {
@@ -355,6 +401,14 @@ fn handle_networking_sockets_command(
             connection,
             poll_group,
         } => {
+            let connection_owner = connection_owner(handles, *connection)?;
+            let poll_group_owner = poll_group_owner(handles, *poll_group)?;
+            if connection_owner != poll_group_owner {
+                return Err(SteamworksNetworkingSocketsError::HandleOwnerMismatch {
+                    connection: *connection,
+                    poll_group: *poll_group,
+                });
+            }
             let connection_ref = handles
                 .connections
                 .get(connection)
@@ -388,6 +442,8 @@ fn handle_networking_sockets_command(
             lane_priorities,
             lane_weights,
         } => {
+            let owner = connection_owner(handles, *connection)?;
+            let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
             let connection_ref = handles
                 .connections
                 .get(connection)
@@ -465,7 +521,7 @@ fn handle_networking_sockets_command(
                 });
             }
             let closed_connections = handles.remove_connections_for_listen_socket(*listen_socket);
-            handles.listen_sockets.remove(listen_socket);
+            handles.remove_listen_socket(listen_socket);
             SteamworksNetworkingSocketsOperation::ListenSocketClosed {
                 listen_socket: *listen_socket,
                 closed_connections,
@@ -494,14 +550,87 @@ fn steam_config_entries(
 fn networking_sockets(
     client: Option<&SteamworksClient>,
     server: Option<&SteamworksServer>,
-) -> Result<steamworks::networking_sockets::NetworkingSockets, SteamworksNetworkingSocketsError> {
+) -> Result<
+    (
+        steamworks::networking_sockets::NetworkingSockets,
+        SteamworksNetworkingSocketsHandleOwner,
+    ),
+    SteamworksNetworkingSocketsError,
+> {
     if let Some(client) = client {
-        Ok(client.networking_sockets())
+        Ok((
+            client.networking_sockets(),
+            SteamworksNetworkingSocketsHandleOwner::Client,
+        ))
     } else if let Some(server) = server {
-        Ok(server.networking_sockets())
+        Ok((
+            server.networking_sockets(),
+            SteamworksNetworkingSocketsHandleOwner::Server,
+        ))
     } else {
         Err(SteamworksNetworkingSocketsError::ClientUnavailable)
     }
+}
+
+fn server_networking_sockets(
+    server: Option<&SteamworksServer>,
+) -> Result<
+    (
+        steamworks::networking_sockets::NetworkingSockets,
+        SteamworksNetworkingSocketsHandleOwner,
+    ),
+    SteamworksNetworkingSocketsError,
+> {
+    if let Some(server) = server {
+        Ok((
+            server.networking_sockets(),
+            SteamworksNetworkingSocketsHandleOwner::Server,
+        ))
+    } else {
+        Err(SteamworksNetworkingSocketsError::ServerUnavailable)
+    }
+}
+
+fn networking_sockets_for_owner(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+    owner: SteamworksNetworkingSocketsHandleOwner,
+) -> Result<
+    (
+        steamworks::networking_sockets::NetworkingSockets,
+        SteamworksNetworkingSocketsHandleOwner,
+    ),
+    SteamworksNetworkingSocketsError,
+> {
+    match owner {
+        SteamworksNetworkingSocketsHandleOwner::Client => client
+            .map(|client| {
+                (
+                    client.networking_sockets(),
+                    SteamworksNetworkingSocketsHandleOwner::Client,
+                )
+            })
+            .ok_or(SteamworksNetworkingSocketsError::ClientUnavailable),
+        SteamworksNetworkingSocketsHandleOwner::Server => server_networking_sockets(server),
+    }
+}
+
+fn connection_owner(
+    handles: &SteamworksNetworkingSocketsHandleStorage,
+    connection: SteamworksNetworkingSocketsConnectionId,
+) -> Result<SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsError> {
+    handles
+        .connection_owner(connection)
+        .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: connection })
+}
+
+fn poll_group_owner(
+    handles: &SteamworksNetworkingSocketsHandleStorage,
+    poll_group: super::SteamworksNetworkingSocketsPollGroupId,
+) -> Result<SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsError> {
+    handles
+        .poll_group_owner(poll_group)
+        .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: poll_group })
 }
 
 fn allocate_outbound_message(
