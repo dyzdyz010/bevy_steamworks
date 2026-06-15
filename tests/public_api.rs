@@ -472,7 +472,7 @@ fn friends_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksFriendsCommand::GetPersonaName;
+    let command = SteamworksFriendsCommand::get_persona_name();
     let operation = SteamworksFriendsOperation::PersonaNameRead {
         name: String::new(),
     };
@@ -490,7 +490,7 @@ fn friends_api_is_exported_from_root_and_prelude() {
         error,
     );
 
-    let command = PreludeFriendsCommand::GetPersonaName;
+    let command = PreludeFriendsCommand::get_persona_name();
     let operation = PreludeFriendsOperation::PersonaNameRead {
         name: String::new(),
     };
@@ -1503,7 +1503,7 @@ fn stats_api_is_exported_from_root_and_prelude() {
         bevy_steamworks::prelude::STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
     );
 
-    let command = SteamworksStatsCommand::RequestCurrentUserStats;
+    let command = SteamworksStatsCommand::request_current_user_stats();
     let operation = SteamworksStatsOperation::GlobalAchievementPercentagesRequested;
     let error = SteamworksStatsError::ClientUnavailable;
     let result = SteamworksStatsResult::Err {
@@ -1513,7 +1513,7 @@ fn stats_api_is_exported_from_root_and_prelude() {
 
     accepts_root_exports(root_plugin, command, operation, result, error);
 
-    let command = PreludeStatsCommand::RequestCurrentUserStats;
+    let command = PreludeStatsCommand::request_current_user_stats();
     let operation = PreludeStatsOperation::GlobalAchievementPercentagesRequested;
     let error = PreludeStatsError::ClientUnavailable;
     let result = PreludeStatsResult::Err {

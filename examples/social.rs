@@ -21,7 +21,7 @@ fn request_social_data(
         return;
     }
 
-    commands.write(SteamworksFriendsCommand::GetPersonaName);
+    commands.write(SteamworksFriendsCommand::get_persona_name());
     commands.write(SteamworksFriendsCommand::list_friends(
         FriendFlags::IMMEDIATE,
     ));

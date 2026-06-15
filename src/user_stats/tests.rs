@@ -376,6 +376,10 @@ fn state_records_local_stats_and_named_achievements() {
 #[test]
 fn achievement_commands_preserve_inputs() {
     assert_eq!(
+        SteamworksStatsCommand::request_current_user_stats(),
+        SteamworksStatsCommand::RequestCurrentUserStats
+    );
+    assert_eq!(
         SteamworksStatsCommand::list_achievement_names(),
         SteamworksStatsCommand::ListAchievementNames {
             offset: 0,
@@ -414,6 +418,10 @@ fn achievement_commands_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksStatsCommand::request_global_achievement_percentages(),
+        SteamworksStatsCommand::RequestGlobalAchievementPercentages
+    );
+    assert_eq!(
         SteamworksStatsCommand::list_achievement_global_percentages(),
         SteamworksStatsCommand::ListAchievementGlobalPercentages {
             offset: 0,
@@ -426,6 +434,10 @@ fn achievement_commands_preserve_inputs() {
             offset: 6,
             limit: 9,
         }
+    );
+    assert_eq!(
+        SteamworksStatsCommand::store_stats(),
+        SteamworksStatsCommand::StoreStats
     );
 }
 

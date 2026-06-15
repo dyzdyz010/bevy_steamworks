@@ -30,8 +30,8 @@ fn request_stats(
         return;
     }
 
-    commands.write(SteamworksStatsCommand::RequestCurrentUserStats);
-    commands.write(SteamworksStatsCommand::RequestGlobalAchievementPercentages);
+    commands.write(SteamworksStatsCommand::request_current_user_stats());
+    commands.write(SteamworksStatsCommand::request_global_achievement_percentages());
 
     if std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_I64").is_ok()
         || std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_F64").is_ok()

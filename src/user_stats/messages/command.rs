@@ -198,6 +198,11 @@ pub enum SteamworksStatsCommand {
 }
 
 impl SteamworksStatsCommand {
+    /// Creates a [`SteamworksStatsCommand::RequestCurrentUserStats`] command.
+    pub fn request_current_user_stats() -> Self {
+        Self::RequestCurrentUserStats
+    }
+
     /// Creates a [`SteamworksStatsCommand::RequestUserStats`] command.
     pub fn request_user_stats(steam_id: steamworks::SteamId) -> Self {
         Self::RequestUserStats { steam_id }
@@ -300,6 +305,11 @@ impl SteamworksStatsCommand {
         }
     }
 
+    /// Creates a [`SteamworksStatsCommand::RequestGlobalAchievementPercentages`] command.
+    pub fn request_global_achievement_percentages() -> Self {
+        Self::RequestGlobalAchievementPercentages
+    }
+
     /// Creates a [`SteamworksStatsCommand::GetAchievementAchievedPercent`] command.
     pub fn get_achievement_achieved_percent(name: impl Into<String>) -> Self {
         Self::GetAchievementAchievedPercent { name: name.into() }
@@ -347,6 +357,11 @@ impl SteamworksStatsCommand {
             name: name.into(),
             max_days,
         }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::StoreStats`] command.
+    pub fn store_stats() -> Self {
+        Self::StoreStats
     }
 
     /// Creates a [`SteamworksStatsCommand::ResetAllStats`] command.

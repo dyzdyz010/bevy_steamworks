@@ -198,7 +198,7 @@ cargo run --example server
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_social(mut friends: MessageWriter<SteamworksFriendsCommand>) {
-    friends.write(SteamworksFriendsCommand::GetPersonaName);
+    friends.write(SteamworksFriendsCommand::get_persona_name());
     friends.write(SteamworksFriendsCommand::list_friends(FriendFlags::IMMEDIATE));
     friends.write(SteamworksFriendsCommand::set_rich_presence("status", "In Match"));
 }

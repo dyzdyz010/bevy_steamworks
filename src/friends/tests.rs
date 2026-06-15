@@ -42,7 +42,7 @@ fn commands_fail_when_client_is_unavailable() {
     app.add_plugins(SteamworksFriendsPlugin::new());
     app.world_mut()
         .resource_mut::<Messages<SteamworksFriendsCommand>>()
-        .write(SteamworksFriendsCommand::GetPersonaName);
+        .write(SteamworksFriendsCommand::get_persona_name());
 
     app.update();
 
@@ -63,6 +63,127 @@ fn commands_fail_when_client_is_unavailable() {
     assert_eq!(
         state.last_error(),
         Some(&SteamworksFriendsError::ClientUnavailable)
+    );
+}
+
+#[test]
+fn constructors_preserve_inputs() {
+    let friend = steamworks::SteamId::from_raw(2);
+    let lobby = steamworks::LobbyId::from_raw(3);
+    let app_id = steamworks::AppId(480);
+    let flags = steamworks::FriendFlags::IMMEDIATE;
+
+    assert_eq!(
+        SteamworksFriendsCommand::get_persona_name(),
+        SteamworksFriendsCommand::GetPersonaName
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::list_friends(flags),
+        SteamworksFriendsCommand::ListFriends { flags }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::list_coplay_friends(),
+        SteamworksFriendsCommand::ListCoplayFriends
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::get_friend(friend),
+        SteamworksFriendsCommand::GetFriend { steam_id: friend }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::request_user_information(friend, true),
+        SteamworksFriendsCommand::RequestUserInformation {
+            steam_id: friend,
+            name_only: true,
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::set_rich_presence("status", "In Match"),
+        SteamworksFriendsCommand::SetRichPresence {
+            key: "status".to_owned(),
+            value: Some("In Match".to_owned()),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::clear_rich_presence_key("status"),
+        SteamworksFriendsCommand::SetRichPresence {
+            key: "status".to_owned(),
+            value: None,
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::clear_rich_presence(),
+        SteamworksFriendsCommand::ClearRichPresence
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::get_friend_rich_presence(friend, "connect"),
+        SteamworksFriendsCommand::GetFriendRichPresence {
+            steam_id: friend,
+            key: "connect".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay("Friends"),
+        SteamworksFriendsCommand::ActivateGameOverlay {
+            dialog: "Friends".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_to_web_page("https://steamcommunity.com"),
+        SteamworksFriendsCommand::ActivateGameOverlayToWebPage {
+            url: "https://steamcommunity.com".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_to_store(
+            app_id,
+            SteamworksOverlayToStoreAction::AddToCart,
+        ),
+        SteamworksFriendsCommand::ActivateGameOverlayToStore {
+            app_id,
+            action: SteamworksOverlayToStoreAction::AddToCart,
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_to_user("steamid", friend),
+        SteamworksFriendsCommand::ActivateGameOverlayToUser {
+            dialog: "steamid".to_owned(),
+            steam_id: friend,
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_invite_dialog(lobby),
+        SteamworksFriendsCommand::ActivateInviteDialog { lobby }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_invite_dialog_connect_string("join=abc"),
+        SteamworksFriendsCommand::ActivateInviteDialogConnectString {
+            connect: "join=abc".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::invite_user_to_game(friend, "join=abc"),
+        SteamworksFriendsCommand::InviteUserToGame {
+            steam_id: friend,
+            connect: "join=abc".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::set_played_with(friend),
+        SteamworksFriendsCommand::SetPlayedWith { steam_id: friend }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::has_friend(friend, flags),
+        SteamworksFriendsCommand::HasFriend {
+            steam_id: friend,
+            flags,
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::get_friend_avatar(friend, SteamworksAvatarSize::Medium),
+        SteamworksFriendsCommand::GetFriendAvatar {
+            steam_id: friend,
+            size: SteamworksAvatarSize::Medium,
+        }
     );
 }
 

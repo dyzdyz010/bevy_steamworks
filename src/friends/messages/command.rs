@@ -105,9 +105,19 @@ pub enum SteamworksFriendsCommand {
 }
 
 impl SteamworksFriendsCommand {
+    /// Creates a [`SteamworksFriendsCommand::GetPersonaName`] command.
+    pub fn get_persona_name() -> Self {
+        Self::GetPersonaName
+    }
+
     /// Creates a [`SteamworksFriendsCommand::ListFriends`] command.
     pub fn list_friends(flags: steamworks::FriendFlags) -> Self {
         Self::ListFriends { flags }
+    }
+
+    /// Creates a [`SteamworksFriendsCommand::ListCoplayFriends`] command.
+    pub fn list_coplay_friends() -> Self {
+        Self::ListCoplayFriends
     }
 
     /// Creates a [`SteamworksFriendsCommand::GetFriend`] command.
@@ -137,6 +147,11 @@ impl SteamworksFriendsCommand {
             key: key.into(),
             value: None,
         }
+    }
+
+    /// Creates a [`SteamworksFriendsCommand::ClearRichPresence`] command.
+    pub fn clear_rich_presence() -> Self {
+        Self::ClearRichPresence
     }
 
     /// Creates a [`SteamworksFriendsCommand::GetFriendRichPresence`] command.
