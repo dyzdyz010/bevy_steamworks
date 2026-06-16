@@ -5,11 +5,16 @@ use bevy_ecs::{
 
 use crate::{SteamworksClient, SteamworksEvent};
 
+mod chat_commands;
+mod data_commands;
+mod lifecycle_commands;
+mod member_commands;
+mod server_commands;
+
 use super::{
     async_results::SteamworksMatchmakingAsyncResults, callbacks::process_matchmaking_steam_events,
-    filters::apply_lobby_list_filter, validation::validate_command, SteamworksLobbyGameServer,
-    SteamworksMatchmakingCommand, SteamworksMatchmakingError, SteamworksMatchmakingOperation,
-    SteamworksMatchmakingResult, SteamworksMatchmakingState,
+    validation::validate_command, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
+    SteamworksMatchmakingOperation, SteamworksMatchmakingResult, SteamworksMatchmakingState,
 };
 
 pub(super) fn process_matchmaking_commands(
@@ -99,228 +104,96 @@ fn handle_matchmaking_command(
     let matchmaking = client.matchmaking();
     match command {
         SteamworksMatchmakingCommand::RequestLobbyList { filter } => {
-            let request_id = request_id.expect("async matchmaking command missing request id");
-            apply_lobby_list_filter(&matchmaking, &filter)?;
-            let async_results = async_results.clone();
-            let command = SteamworksMatchmakingCommand::RequestLobbyList {
-                filter: filter.clone(),
-            };
-            let request_filter = filter.clone();
-            matchmaking.request_lobby_list(move |result| {
-                async_results.push(match result {
-                    Ok(lobbies) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyListReceived {
-                            request_id,
-                            filter: request_filter.clone(),
-                            lobbies,
-                        },
-                    ),
-                    Err(source) => SteamworksMatchmakingResult::Err {
-                        command,
-                        error: SteamworksMatchmakingError::steam_error(
-                            "matchmaking.request_lobby_list",
-                            source,
-                        ),
-                    },
-                });
-            });
-            Ok(SteamworksMatchmakingOperation::LobbyListRequested { request_id, filter })
+            lifecycle_commands::request_lobby_list(
+                &matchmaking,
+                async_results,
+                request_id.expect("async matchmaking command missing request id"),
+                filter,
+            )
         }
         SteamworksMatchmakingCommand::CreateLobby {
             lobby_type,
             max_members,
-        } => {
-            let request_id = request_id.expect("async matchmaking command missing request id");
-            let async_results = async_results.clone();
-            let command = SteamworksMatchmakingCommand::CreateLobby {
-                lobby_type,
-                max_members,
-            };
-            matchmaking.create_lobby(lobby_type, max_members, move |result| {
-                async_results.push(match result {
-                    Ok(lobby) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyCreated {
-                            request_id,
-                            lobby_type,
-                            max_members,
-                            lobby,
-                        },
-                    ),
-                    Err(source) => SteamworksMatchmakingResult::Err {
-                        command,
-                        error: SteamworksMatchmakingError::steam_error(
-                            "matchmaking.create_lobby",
-                            source,
-                        ),
-                    },
-                });
-            });
-            Ok(SteamworksMatchmakingOperation::LobbyCreateRequested {
-                request_id,
-                lobby_type,
-                max_members,
-            })
-        }
-        SteamworksMatchmakingCommand::JoinLobby { lobby } => {
-            let request_id = request_id.expect("async matchmaking command missing request id");
-            let async_results = async_results.clone();
-            let command = SteamworksMatchmakingCommand::JoinLobby { lobby };
-            let requested_lobby = lobby;
-            matchmaking.join_lobby(lobby, move |result| {
-                async_results.push(match result {
-                    Ok(lobby) => SteamworksMatchmakingResult::Ok(
-                        SteamworksMatchmakingOperation::LobbyJoined {
-                            request_id,
-                            requested_lobby,
-                            lobby,
-                        },
-                    ),
-                    Err(()) => SteamworksMatchmakingResult::Err {
-                        command,
-                        error: SteamworksMatchmakingError::operation_failed(
-                            "matchmaking.join_lobby",
-                        ),
-                    },
-                });
-            });
-            Ok(SteamworksMatchmakingOperation::LobbyJoinRequested { request_id, lobby })
-        }
+        } => Ok(lifecycle_commands::create_lobby(
+            &matchmaking,
+            async_results,
+            request_id.expect("async matchmaking command missing request id"),
+            lobby_type,
+            max_members,
+        )),
+        SteamworksMatchmakingCommand::JoinLobby { lobby } => Ok(lifecycle_commands::join_lobby(
+            &matchmaking,
+            async_results,
+            request_id.expect("async matchmaking command missing request id"),
+            lobby,
+        )),
         SteamworksMatchmakingCommand::LeaveLobby { lobby } => {
-            matchmaking.leave_lobby(lobby);
-            Ok(SteamworksMatchmakingOperation::LobbyLeft { lobby })
+            Ok(lifecycle_commands::leave_lobby(&matchmaking, lobby))
         }
         SteamworksMatchmakingCommand::GetLobbyDataCount { lobby } => {
-            Ok(SteamworksMatchmakingOperation::LobbyDataCountRead {
-                lobby,
-                count: matchmaking.lobby_data_count(lobby),
-            })
+            Ok(data_commands::read_lobby_data_count(&matchmaking, lobby))
         }
         SteamworksMatchmakingCommand::GetLobbyData { lobby, key } => {
-            Ok(SteamworksMatchmakingOperation::LobbyDataRead {
-                lobby,
-                value: matchmaking.lobby_data(lobby, &key),
-                key,
-            })
+            Ok(data_commands::read_lobby_data(&matchmaking, lobby, key))
         }
-        SteamworksMatchmakingCommand::GetLobbyDataByIndex { lobby, index } => {
-            Ok(SteamworksMatchmakingOperation::LobbyDataByIndexRead {
-                lobby,
-                index,
-                entry: matchmaking.lobby_data_by_index(lobby, index),
-            })
-        }
+        SteamworksMatchmakingCommand::GetLobbyDataByIndex { lobby, index } => Ok(
+            data_commands::read_lobby_data_by_index(&matchmaking, lobby, index),
+        ),
         SteamworksMatchmakingCommand::GetAllLobbyData { lobby } => {
-            let entries = (0..matchmaking.lobby_data_count(lobby))
-                .filter_map(|index| matchmaking.lobby_data_by_index(lobby, index))
-                .collect();
-            Ok(SteamworksMatchmakingOperation::AllLobbyDataRead { lobby, entries })
+            Ok(data_commands::read_all_lobby_data(&matchmaking, lobby))
         }
         SteamworksMatchmakingCommand::SetLobbyData { lobby, key, value } => {
-            if matchmaking.set_lobby_data(lobby, &key, &value) {
-                Ok(SteamworksMatchmakingOperation::LobbyDataSet { lobby, key })
-            } else {
-                Err(SteamworksMatchmakingError::operation_failed(
-                    "matchmaking.set_lobby_data",
-                ))
-            }
+            data_commands::set_lobby_data(&matchmaking, lobby, key, value)
         }
         SteamworksMatchmakingCommand::DeleteLobbyData { lobby, key } => {
-            if matchmaking.delete_lobby_data(lobby, &key) {
-                Ok(SteamworksMatchmakingOperation::LobbyDataDeleted { lobby, key })
-            } else {
-                Err(SteamworksMatchmakingError::operation_failed(
-                    "matchmaking.delete_lobby_data",
-                ))
-            }
+            data_commands::delete_lobby_data(&matchmaking, lobby, key)
         }
-        SteamworksMatchmakingCommand::SetLobbyMemberData { lobby, key, value } => {
-            matchmaking.set_lobby_member_data(lobby, &key, &value);
-            Ok(SteamworksMatchmakingOperation::LobbyMemberDataSet { lobby, key })
-        }
-        SteamworksMatchmakingCommand::GetLobbyMemberData { lobby, user, key } => {
-            Ok(SteamworksMatchmakingOperation::LobbyMemberDataRead {
-                lobby,
-                user,
-                value: matchmaking.get_lobby_member_data(lobby, user, &key),
-                key,
-            })
-        }
-        SteamworksMatchmakingCommand::GetLobbyMemberLimit { lobby } => {
-            Ok(SteamworksMatchmakingOperation::LobbyMemberLimitRead {
-                lobby,
-                limit: matchmaking.lobby_member_limit(lobby),
-            })
-        }
+        SteamworksMatchmakingCommand::SetLobbyMemberData { lobby, key, value } => Ok(
+            member_commands::set_lobby_member_data(&matchmaking, lobby, key, value),
+        ),
+        SteamworksMatchmakingCommand::GetLobbyMemberData { lobby, user, key } => Ok(
+            member_commands::read_lobby_member_data(&matchmaking, lobby, user, key),
+        ),
+        SteamworksMatchmakingCommand::GetLobbyMemberLimit { lobby } => Ok(
+            member_commands::read_lobby_member_limit(&matchmaking, lobby),
+        ),
         SteamworksMatchmakingCommand::GetLobbyOwner { lobby } => {
-            Ok(SteamworksMatchmakingOperation::LobbyOwnerRead {
-                lobby,
-                owner: matchmaking.lobby_owner(lobby),
-            })
+            Ok(member_commands::read_lobby_owner(&matchmaking, lobby))
         }
-        SteamworksMatchmakingCommand::GetLobbyMemberCount { lobby } => {
-            Ok(SteamworksMatchmakingOperation::LobbyMemberCountRead {
-                lobby,
-                count: matchmaking.lobby_member_count(lobby),
-            })
-        }
+        SteamworksMatchmakingCommand::GetLobbyMemberCount { lobby } => Ok(
+            member_commands::read_lobby_member_count(&matchmaking, lobby),
+        ),
         SteamworksMatchmakingCommand::ListLobbyMembers { lobby } => {
-            Ok(SteamworksMatchmakingOperation::LobbyMembersListed {
-                lobby,
-                members: matchmaking.lobby_members(lobby),
-            })
+            Ok(member_commands::list_lobby_members(&matchmaking, lobby))
         }
         SteamworksMatchmakingCommand::SetLobbyJoinable { lobby, joinable } => {
-            if matchmaking.set_lobby_joinable(lobby, joinable) {
-                Ok(SteamworksMatchmakingOperation::LobbyJoinableSet { lobby, joinable })
-            } else {
-                Err(SteamworksMatchmakingError::operation_failed(
-                    "matchmaking.set_lobby_joinable",
-                ))
-            }
+            chat_commands::set_lobby_joinable(&matchmaking, lobby, joinable)
         }
-        SteamworksMatchmakingCommand::SendLobbyChatMessage { lobby, data } => matchmaking
-            .send_lobby_chat_message(lobby, &data)
-            .map(|()| SteamworksMatchmakingOperation::LobbyChatMessageSent {
-                lobby,
-                len: data.len(),
-            })
-            .map_err(|source| {
-                SteamworksMatchmakingError::steam_error(
-                    "matchmaking.send_lobby_chat_message",
-                    source,
-                )
-            }),
+        SteamworksMatchmakingCommand::SendLobbyChatMessage { lobby, data } => {
+            chat_commands::send_lobby_chat_message(&matchmaking, lobby, data)
+        }
         SteamworksMatchmakingCommand::GetLobbyChatEntry {
             lobby,
             chat_id,
             max_bytes,
-        } => {
-            let mut buffer = vec![0; max_bytes];
-            let data = matchmaking
-                .get_lobby_chat_entry(lobby, chat_id, &mut buffer)
-                .to_vec();
-            Ok(SteamworksMatchmakingOperation::LobbyChatEntryRead {
-                lobby,
-                chat_id,
-                data,
-            })
-        }
+        } => Ok(chat_commands::read_lobby_chat_entry(
+            &matchmaking,
+            lobby,
+            chat_id,
+            max_bytes,
+        )),
         SteamworksMatchmakingCommand::SetLobbyGameServer {
             lobby,
             address,
             steam_id,
-        } => {
-            matchmaking.set_lobby_game_server(lobby, address, steam_id);
-            Ok(SteamworksMatchmakingOperation::LobbyGameServerSet {
-                lobby,
-                server: SteamworksLobbyGameServer { address, steam_id },
-            })
-        }
+        } => Ok(server_commands::set_lobby_game_server(
+            &matchmaking,
+            lobby,
+            address,
+            steam_id,
+        )),
         SteamworksMatchmakingCommand::GetLobbyGameServer { lobby } => {
-            let server = matchmaking
-                .get_lobby_game_server(lobby)
-                .map(|(address, steam_id)| SteamworksLobbyGameServer { address, steam_id });
-            Ok(SteamworksMatchmakingOperation::LobbyGameServerRead { lobby, server })
+            Ok(server_commands::read_lobby_game_server(&matchmaking, lobby))
         }
     }
 }
