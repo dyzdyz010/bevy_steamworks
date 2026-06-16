@@ -243,6 +243,20 @@ pub(super) fn handle_networking_sockets_command(
                 info: snapshot_connection_info(*connection, info),
             }
         }
+        SteamworksNetworkingSocketsCommand::GetConnectionUserData { connection } => {
+            let connection_ref = handles
+                .connections
+                .get(connection)
+                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
+            let user_data = connection_user_data_from_info_result(
+                connection_ref.info().map(|info| info.user_data()),
+            )?;
+            handles.update_connection_user_data(*connection, user_data);
+            SteamworksNetworkingSocketsOperation::ConnectionUserDataRead {
+                connection: *connection,
+                user_data,
+            }
+        }
         SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus { connection, lanes } => {
             let owner = connection_owner(handles, *connection)?;
             let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
@@ -631,6 +645,12 @@ fn poll_group_owner(
     handles
         .poll_group_owner(poll_group)
         .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: poll_group })
+}
+
+pub(super) fn connection_user_data_from_info_result(
+    result: Result<i64, steamworks::networking_sockets::InvalidHandle>,
+) -> Result<i64, SteamworksNetworkingSocketsError> {
+    result.map_err(|_| SteamworksNetworkingSocketsError::invalid_handle("net_connection.info"))
 }
 
 fn allocate_outbound_message(

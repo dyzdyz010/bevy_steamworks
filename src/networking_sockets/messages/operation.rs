@@ -60,6 +60,13 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Connection info snapshot.
         info: SteamworksNetworkingSocketsConnectionInfo,
     },
+    /// Connection user data was read.
+    ConnectionUserDataRead {
+        /// Connection inspected.
+        connection: SteamworksNetworkingSocketsConnectionId,
+        /// User data value.
+        user_data: i64,
+    },
     /// Realtime connection status was read.
     RealtimeConnectionStatusRead {
         /// Realtime status snapshot.
@@ -201,6 +208,14 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
             Self::ConnectionInfoRead { info } => f
                 .debug_struct("ConnectionInfoRead")
                 .field("info", info)
+                .finish(),
+            Self::ConnectionUserDataRead {
+                connection,
+                user_data,
+            } => f
+                .debug_struct("ConnectionUserDataRead")
+                .field("connection", connection)
+                .field("user_data", user_data)
                 .finish(),
             Self::RealtimeConnectionStatusRead { status } => f
                 .debug_struct("RealtimeConnectionStatusRead")

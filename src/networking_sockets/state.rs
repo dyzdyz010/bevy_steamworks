@@ -133,7 +133,7 @@ impl SteamworksNetworkingSocketsState {
         self.last_connection_lanes_configured.as_ref()
     }
 
-    /// Returns the most recent connection user data set through this plugin.
+    /// Returns the most recent connection user data read or set through this plugin.
     pub fn last_connection_user_data(
         &self,
     ) -> Option<&SteamworksNetworkingSocketsConnectionUserData> {
@@ -314,7 +314,11 @@ impl SteamworksNetworkingSocketsState {
                         lanes: *lanes,
                     });
             }
-            SteamworksNetworkingSocketsOperation::ConnectionUserDataSet {
+            SteamworksNetworkingSocketsOperation::ConnectionUserDataRead {
+                connection,
+                user_data,
+            }
+            | SteamworksNetworkingSocketsOperation::ConnectionUserDataSet {
                 connection,
                 user_data,
             } => {

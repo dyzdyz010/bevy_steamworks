@@ -77,6 +77,11 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Connection to inspect.
         connection: SteamworksNetworkingSocketsConnectionId,
     },
+    /// Read connection user data.
+    GetConnectionUserData {
+        /// Connection to inspect.
+        connection: SteamworksNetworkingSocketsConnectionId,
+    },
     /// Read realtime connection status.
     GetRealtimeConnectionStatus {
         /// Connection to inspect.
@@ -241,6 +246,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .finish(),
             Self::GetConnectionInfo { connection } => f
                 .debug_struct("GetConnectionInfo")
+                .field("connection", connection)
+                .finish(),
+            Self::GetConnectionUserData { connection } => f
+                .debug_struct("GetConnectionUserData")
                 .field("connection", connection)
                 .finish(),
             Self::GetRealtimeConnectionStatus { connection, lanes } => f
@@ -498,6 +507,11 @@ impl SteamworksNetworkingSocketsCommand {
     /// Creates a [`SteamworksNetworkingSocketsCommand::GetConnectionInfo`] command.
     pub fn get_connection_info(connection: SteamworksNetworkingSocketsConnectionId) -> Self {
         Self::GetConnectionInfo { connection }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::GetConnectionUserData`] command.
+    pub fn get_connection_user_data(connection: SteamworksNetworkingSocketsConnectionId) -> Self {
+        Self::GetConnectionUserData { connection }
     }
 
     /// Creates a [`SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus`] command.

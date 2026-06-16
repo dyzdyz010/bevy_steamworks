@@ -492,6 +492,18 @@ fn constructors_preserve_inputs() {
         SteamworksNetworkingSocketsCommand::CreateServerPollGroup
     );
     assert_eq!(
+        SteamworksNetworkingSocketsCommand::get_connection_info(connection_id()),
+        SteamworksNetworkingSocketsCommand::GetConnectionInfo {
+            connection: connection_id(),
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::get_connection_user_data(connection_id()),
+        SteamworksNetworkingSocketsCommand::GetConnectionUserData {
+            connection: connection_id(),
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingSocketsCommand::get_realtime_connection_status(connection_id(), 4),
         SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus {
             connection: connection_id(),
@@ -786,6 +798,12 @@ fn state_records_operations_without_unbounded_message_history() {
         info: info.clone(),
     });
     state.record_operation(
+        &SteamworksNetworkingSocketsOperation::ConnectionUserDataRead {
+            connection: connection_id(),
+            user_data: 122,
+        },
+    );
+    state.record_operation(
         &SteamworksNetworkingSocketsOperation::RealtimeConnectionStatusRead {
             status: realtime_status.clone(),
         },
@@ -1057,6 +1075,26 @@ fn handle_storage_tracks_and_clears_handle_owners() {
     assert!(storage.remove_connection(&connection_id()).is_none());
     assert_eq!(storage.connection_owner(connection_id()), None);
     assert!(!storage.connection_metadata.contains_key(&connection_id()));
+}
+
+#[test]
+fn connection_user_data_read_preserves_unset_sentinel() {
+    assert_eq!(
+        super::commands::connection_user_data_from_info_result(Ok(-1)),
+        Ok(-1)
+    );
+    assert_eq!(
+        super::commands::connection_user_data_from_info_result(Ok(123)),
+        Ok(123)
+    );
+    assert_eq!(
+        super::commands::connection_user_data_from_info_result(Err(
+            steamworks::networking_sockets::InvalidHandle,
+        )),
+        Err(SteamworksNetworkingSocketsError::InvalidHandle {
+            operation: "net_connection.info",
+        })
+    );
 }
 
 #[test]

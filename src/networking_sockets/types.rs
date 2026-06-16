@@ -322,10 +322,10 @@ pub struct SteamworksNetworkingSocketsLaneConfiguration {
     pub lanes: usize,
 }
 
-/// Connection user-data mutation snapshot.
+/// Connection user-data read or mutation snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingSocketsConnectionUserData {
-    /// Connection updated.
+    /// Connection inspected or updated.
     pub connection: SteamworksNetworkingSocketsConnectionId,
     /// User data value.
     pub user_data: i64,
