@@ -1080,15 +1080,15 @@ fn handle_storage_tracks_and_clears_handle_owners() {
 #[test]
 fn connection_user_data_read_preserves_unset_sentinel() {
     assert_eq!(
-        super::commands::connection_user_data_from_info_result(Ok(-1)),
+        super::commands::helpers::connection_user_data_from_info_result(Ok(-1)),
         Ok(-1)
     );
     assert_eq!(
-        super::commands::connection_user_data_from_info_result(Ok(123)),
+        super::commands::helpers::connection_user_data_from_info_result(Ok(123)),
         Ok(123)
     );
     assert_eq!(
-        super::commands::connection_user_data_from_info_result(Err(
+        super::commands::helpers::connection_user_data_from_info_result(Err(
             steamworks::networking_sockets::InvalidHandle,
         )),
         Err(SteamworksNetworkingSocketsError::InvalidHandle {
