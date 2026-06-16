@@ -37,6 +37,27 @@ pub enum SteamworksRemoteStorageOperation {
         /// File metadata snapshot.
         info: SteamworksRemoteStorageFileInfo,
     },
+    /// File existence was read.
+    FileExistsRead {
+        /// File name inspected.
+        name: String,
+        /// Whether Steam reports the file currently exists.
+        exists: bool,
+    },
+    /// File persisted state was read.
+    FilePersistedRead {
+        /// File name inspected.
+        name: String,
+        /// Whether Steam reports the file is persisted in Cloud storage.
+        persisted: bool,
+    },
+    /// File timestamp was read.
+    FileTimestampRead {
+        /// File name inspected.
+        name: String,
+        /// Steam file timestamp, as Unix epoch seconds.
+        timestamp: i64,
+    },
     /// File read was requested.
     FileReadRequested {
         /// Plugin-assigned request ID.

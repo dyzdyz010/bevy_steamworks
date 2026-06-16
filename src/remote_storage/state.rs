@@ -16,6 +16,9 @@ pub struct SteamworksRemoteStorageState {
     cloud_info: Option<SteamworksRemoteStorageCloudInfo>,
     files: Vec<SteamworksRemoteStorageFileSummary>,
     last_file_info: Option<SteamworksRemoteStorageFileInfo>,
+    last_file_exists: Option<(String, bool)>,
+    last_file_persisted: Option<(String, bool)>,
+    last_file_timestamp: Option<(String, i64)>,
     last_file_contents: Option<SteamworksRemoteStorageFileContents>,
     last_file_written: Option<SteamworksRemoteStorageFileWritten>,
     last_shared_file: Option<SteamworksRemoteStorageSharedFile>,
@@ -44,6 +47,27 @@ impl SteamworksRemoteStorageState {
     /// Returns the most recent file metadata snapshot read through the plugin.
     pub fn last_file_info(&self) -> Option<&SteamworksRemoteStorageFileInfo> {
         self.last_file_info.as_ref()
+    }
+
+    /// Returns the most recent file existence result read through the plugin.
+    pub fn last_file_exists(&self) -> Option<(&str, bool)> {
+        self.last_file_exists
+            .as_ref()
+            .map(|(name, exists)| (name.as_str(), *exists))
+    }
+
+    /// Returns the most recent file persisted-state result read through the plugin.
+    pub fn last_file_persisted(&self) -> Option<(&str, bool)> {
+        self.last_file_persisted
+            .as_ref()
+            .map(|(name, persisted)| (name.as_str(), *persisted))
+    }
+
+    /// Returns the most recent file timestamp read through the plugin.
+    pub fn last_file_timestamp(&self) -> Option<(&str, i64)> {
+        self.last_file_timestamp
+            .as_ref()
+            .map(|(name, timestamp)| (name.as_str(), *timestamp))
     }
 
     /// Returns the most recent file contents read through the plugin.
@@ -105,6 +129,18 @@ impl SteamworksRemoteStorageState {
             }
             SteamworksRemoteStorageOperation::FileInfoRead { info } => {
                 self.last_file_info = Some(info.clone());
+                self.last_file_exists = Some((info.name.clone(), info.exists));
+                self.last_file_persisted = Some((info.name.clone(), info.persisted));
+                self.last_file_timestamp = Some((info.name.clone(), info.timestamp));
+            }
+            SteamworksRemoteStorageOperation::FileExistsRead { name, exists } => {
+                self.last_file_exists = Some((name.clone(), *exists));
+            }
+            SteamworksRemoteStorageOperation::FilePersistedRead { name, persisted } => {
+                self.last_file_persisted = Some((name.clone(), *persisted));
+            }
+            SteamworksRemoteStorageOperation::FileTimestampRead { name, timestamp } => {
+                self.last_file_timestamp = Some((name.clone(), *timestamp));
             }
             SteamworksRemoteStorageOperation::FileRead { contents } => {
                 self.last_file_contents = Some(contents.clone());
@@ -112,6 +148,14 @@ impl SteamworksRemoteStorageState {
             }
             SteamworksRemoteStorageOperation::FileWritten { written } => {
                 upsert_file_summary(&mut self.files, &written.name, written.bytes as u64);
+                if let Some(info) = &mut self.last_file_info {
+                    if info.name == written.name {
+                        info.exists = true;
+                    }
+                }
+                self.last_file_exists = Some((written.name.clone(), true));
+                clear_matching_file_cache(&mut self.last_file_persisted, &written.name);
+                clear_matching_file_cache(&mut self.last_file_timestamp, &written.name);
                 self.last_file_written = Some(written.clone());
                 self.write_count = self.write_count.saturating_add(1);
             }
@@ -125,6 +169,9 @@ impl SteamworksRemoteStorageState {
                     {
                         self.last_file_info = None;
                     }
+                    self.last_file_exists = Some((name.clone(), false));
+                    clear_matching_file_cache(&mut self.last_file_persisted, name);
+                    clear_matching_file_cache(&mut self.last_file_timestamp, name);
                 }
             }
             SteamworksRemoteStorageOperation::FileForgotten { name, forgotten } => {
@@ -134,6 +181,7 @@ impl SteamworksRemoteStorageState {
                             info.persisted = false;
                         }
                     }
+                    self.last_file_persisted = Some((name.clone(), false));
                 }
             }
             SteamworksRemoteStorageOperation::FileSyncPlatformsRead { name, platforms }
@@ -174,5 +222,14 @@ fn upsert_file_summary(
             name: name.to_owned(),
             size_bytes,
         });
+    }
+}
+
+fn clear_matching_file_cache<T>(cache: &mut Option<(String, T)>, name: &str) {
+    if cache
+        .as_ref()
+        .is_some_and(|(cached_name, _)| cached_name == name)
+    {
+        *cache = None;
     }
 }

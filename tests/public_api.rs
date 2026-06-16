@@ -1259,6 +1259,32 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         ),
         SteamworksRemoteStorageError::ClientUnavailable,
     );
+    accepts_root_exports(
+        SteamworksRemoteStoragePlugin::new(),
+        SteamworksRemoteStorageCommand::get_file_exists("save.dat"),
+        SteamworksRemoteStorageOperation::FileExistsRead {
+            name: "save.dat".to_owned(),
+            exists: true,
+        },
+        SteamworksRemoteStorageResult::Ok(SteamworksRemoteStorageOperation::FilePersistedRead {
+            name: "save.dat".to_owned(),
+            persisted: true,
+        }),
+        SteamworksRemoteStorageError::ClientUnavailable,
+    );
+    accepts_root_exports(
+        SteamworksRemoteStoragePlugin::new(),
+        SteamworksRemoteStorageCommand::get_file_timestamp("save.dat"),
+        SteamworksRemoteStorageOperation::FileTimestampRead {
+            name: "save.dat".to_owned(),
+            timestamp: 7,
+        },
+        SteamworksRemoteStorageResult::Ok(SteamworksRemoteStorageOperation::FileTimestampRead {
+            name: "save.dat".to_owned(),
+            timestamp: 7,
+        }),
+        SteamworksRemoteStorageError::ClientUnavailable,
+    );
 
     let write = SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
     accepts_root_exports(
@@ -1315,6 +1341,19 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         PreludeRemoteStorageOperation::CloudEnabledForAppRead { enabled: true },
         PreludeRemoteStorageResult::Ok(PreludeRemoteStorageOperation::CloudEnabledForAccountRead {
             enabled: true,
+        }),
+        PreludeRemoteStorageError::ClientUnavailable,
+    );
+    accepts_prelude_exports(
+        PreludeRemoteStoragePlugin::new(),
+        PreludeRemoteStorageCommand::is_file_persisted("save.dat"),
+        PreludeRemoteStorageOperation::FilePersistedRead {
+            name: "save.dat".to_owned(),
+            persisted: true,
+        },
+        PreludeRemoteStorageResult::Ok(PreludeRemoteStorageOperation::FileExistsRead {
+            name: "save.dat".to_owned(),
+            exists: true,
         }),
         PreludeRemoteStorageError::ClientUnavailable,
     );

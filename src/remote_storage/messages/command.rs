@@ -23,6 +23,21 @@ pub enum SteamworksRemoteStorageCommand {
         /// File name in Steam Remote Storage.
         name: String,
     },
+    /// Read whether one file exists in Steam Remote Storage.
+    GetFileExists {
+        /// File name in Steam Remote Storage.
+        name: String,
+    },
+    /// Read whether one file is persisted in Cloud storage.
+    IsFilePersisted {
+        /// File name in Steam Remote Storage.
+        name: String,
+    },
+    /// Read one file's Steam timestamp as Unix epoch seconds.
+    GetFileTimestamp {
+        /// File name in Steam Remote Storage.
+        name: String,
+    },
     /// Read one file's bytes on a background worker.
     ReadFile {
         /// File name in Steam Remote Storage.
@@ -91,6 +106,21 @@ impl SteamworksRemoteStorageCommand {
     /// Creates a [`crate::SteamworksRemoteStorageCommand::GetFileInfo`] command.
     pub fn get_file_info(name: impl Into<String>) -> Self {
         Self::GetFileInfo { name: name.into() }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::GetFileExists`] command.
+    pub fn get_file_exists(name: impl Into<String>) -> Self {
+        Self::GetFileExists { name: name.into() }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::IsFilePersisted`] command.
+    pub fn is_file_persisted(name: impl Into<String>) -> Self {
+        Self::IsFilePersisted { name: name.into() }
+    }
+
+    /// Creates a [`crate::SteamworksRemoteStorageCommand::GetFileTimestamp`] command.
+    pub fn get_file_timestamp(name: impl Into<String>) -> Self {
+        Self::GetFileTimestamp { name: name.into() }
     }
 
     /// Creates a [`crate::SteamworksRemoteStorageCommand::ReadFile`] command.

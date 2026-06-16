@@ -12,12 +12,10 @@ use super::{
         SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
         SteamworksRemoteStorageOperation, SteamworksRemoteStorageResult,
     },
+    snapshots::{snapshot_cloud_info, snapshot_file_info, snapshot_file_summary},
     state::SteamworksRemoteStorageState,
-    types::{
-        SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageFileInfo,
-        SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageFileSummary,
-        SteamworksRemoteStorageSharedFile,
-    },
+    types::{SteamworksRemoteStorageFileShareHandle, SteamworksRemoteStorageSharedFile},
+    validation::validate_command,
 };
 
 pub(super) fn process_remote_storage_commands(
@@ -142,10 +140,7 @@ fn handle_remote_storage_command(
             let files = remote_storage
                 .files()
                 .into_iter()
-                .map(|file| SteamworksRemoteStorageFileSummary {
-                    name: file.name,
-                    size_bytes: file.size,
-                })
+                .map(snapshot_file_summary)
                 .collect();
             Ok(SteamworksRemoteStorageOperation::FilesListed { files })
         }
@@ -154,6 +149,18 @@ fn handle_remote_storage_command(
             Ok(SteamworksRemoteStorageOperation::FileInfoRead {
                 info: snapshot_file_info(name, &file),
             })
+        }
+        SteamworksRemoteStorageCommand::GetFileExists { name } => {
+            let exists = remote_storage.file(&name).exists();
+            Ok(SteamworksRemoteStorageOperation::FileExistsRead { name, exists })
+        }
+        SteamworksRemoteStorageCommand::IsFilePersisted { name } => {
+            let persisted = remote_storage.file(&name).is_persisted();
+            Ok(SteamworksRemoteStorageOperation::FilePersistedRead { name, persisted })
+        }
+        SteamworksRemoteStorageCommand::GetFileTimestamp { name } => {
+            let timestamp = remote_storage.file(&name).timestamp();
+            Ok(SteamworksRemoteStorageOperation::FileTimestampRead { name, timestamp })
         }
         SteamworksRemoteStorageCommand::ReadFile { name } => {
             let request_id = request_id.expect("async Remote Storage command missing request id");
@@ -238,95 +245,9 @@ fn handle_remote_storage_command(
     }
 }
 
-fn snapshot_cloud_info(
-    remote_storage: &steamworks::RemoteStorage,
-) -> SteamworksRemoteStorageCloudInfo {
-    SteamworksRemoteStorageCloudInfo {
-        app_enabled: remote_storage.is_cloud_enabled_for_app(),
-        account_enabled: remote_storage.is_cloud_enabled_for_account(),
-    }
-}
-
-fn snapshot_file_info(
-    name: String,
-    file: &steamworks::SteamFile,
-) -> SteamworksRemoteStorageFileInfo {
-    SteamworksRemoteStorageFileInfo {
-        name,
-        exists: file.exists(),
-        persisted: file.is_persisted(),
-        timestamp: file.timestamp(),
-        sync_platforms: file.get_sync_platforms(),
-    }
-}
-
-fn validate_command(
-    command: &SteamworksRemoteStorageCommand,
-) -> Result<(), SteamworksRemoteStorageError> {
-    match command {
-        SteamworksRemoteStorageCommand::GetFileInfo { name }
-        | SteamworksRemoteStorageCommand::ReadFile { name }
-        | SteamworksRemoteStorageCommand::DeleteFile { name }
-        | SteamworksRemoteStorageCommand::ForgetFile { name }
-        | SteamworksRemoteStorageCommand::GetSyncPlatforms { name }
-        | SteamworksRemoteStorageCommand::SetSyncPlatforms { name, .. }
-        | SteamworksRemoteStorageCommand::ShareFile { name } => validate_steam_string("name", name),
-        SteamworksRemoteStorageCommand::WriteFile { write } => {
-            validate_steam_string("name", &write.name)
-        }
-        SteamworksRemoteStorageCommand::GetCloudInfo
-        | SteamworksRemoteStorageCommand::IsCloudEnabledForApp
-        | SteamworksRemoteStorageCommand::IsCloudEnabledForAccount
-        | SteamworksRemoteStorageCommand::SetCloudEnabledForApp { .. }
-        | SteamworksRemoteStorageCommand::ListFiles => Ok(()),
-    }
-}
-
-fn validate_steam_string(
-    field: &'static str,
-    value: &str,
-) -> Result<(), SteamworksRemoteStorageError> {
-    if value.as_bytes().contains(&0) {
-        Err(SteamworksRemoteStorageError::invalid_string(field))
-    } else {
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn validation_rejects_interior_nul() {
-        let command = SteamworksRemoteStorageCommand::get_file_info("save\0bad.dat");
-
-        assert_eq!(
-            validate_command(&command),
-            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-        );
-
-        let command = SteamworksRemoteStorageCommand::share_file("save\0bad.dat");
-
-        assert_eq!(
-            validate_command(&command),
-            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-        );
-
-        let command = SteamworksRemoteStorageCommand::read_file("save\0bad.dat");
-
-        assert_eq!(
-            validate_command(&command),
-            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-        );
-
-        let command = SteamworksRemoteStorageCommand::write_file("save\0bad.dat", b"payload");
-
-        assert_eq!(
-            validate_command(&command),
-            Err(SteamworksRemoteStorageError::InvalidString { field: "name" })
-        );
-    }
 
     #[test]
     fn async_share_commands_get_unique_request_ids() {

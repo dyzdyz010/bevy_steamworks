@@ -101,6 +101,24 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksRemoteStorageCommand::get_file_exists("save.dat"),
+        SteamworksRemoteStorageCommand::GetFileExists {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::is_file_persisted("save.dat"),
+        SteamworksRemoteStorageCommand::IsFilePersisted {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksRemoteStorageCommand::get_file_timestamp("save.dat"),
+        SteamworksRemoteStorageCommand::GetFileTimestamp {
+            name: "save.dat".to_owned(),
+        }
+    );
+    assert_eq!(
         SteamworksRemoteStorageCommand::read_file("save.dat"),
         SteamworksRemoteStorageCommand::ReadFile {
             name: "save.dat".to_owned(),
@@ -221,6 +239,27 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         state.last_file_info().map(|info| info.sync_platforms),
         Some(platforms)
     );
+    state.record_operation(&SteamworksRemoteStorageOperation::FileExistsRead {
+        name: "manual.dat".to_owned(),
+        exists: false,
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FilePersistedRead {
+        name: "manual.dat".to_owned(),
+        persisted: false,
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileTimestampRead {
+        name: "manual.dat".to_owned(),
+        timestamp: 12,
+    });
+    assert_eq!(state.last_file_exists(), Some(("manual.dat", false)));
+    assert_eq!(state.last_file_persisted(), Some(("manual.dat", false)));
+    assert_eq!(state.last_file_timestamp(), Some(("manual.dat", 12)));
+    assert_eq!(
+        state
+            .last_file_info()
+            .map(|info| (info.exists, info.persisted, info.timestamp)),
+        Some((true, true, 7))
+    );
     assert_eq!(
         state.last_file_contents(),
         Some(&SteamworksRemoteStorageFileContents {
@@ -252,6 +291,9 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             },
         ]
     );
+    assert_eq!(state.last_file_exists(), Some(("manual.dat", false)));
+    assert_eq!(state.last_file_persisted(), Some(("manual.dat", false)));
+    assert_eq!(state.last_file_timestamp(), Some(("manual.dat", 12)));
     state.record_operation(&SteamworksRemoteStorageOperation::FileForgotten {
         name: "save.dat".to_owned(),
         forgotten: true,
@@ -261,6 +303,7 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         state.last_file_info().map(|info| info.persisted),
         Some(false)
     );
+    assert_eq!(state.last_file_persisted(), Some(("save.dat", false)));
     assert_eq!(state.share_count(), 2);
     assert_eq!(
         state.last_shared_file(),
@@ -270,6 +313,61 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             handle: SteamworksRemoteStorageFileShareHandle::from_raw(12),
         })
     );
+}
+
+#[test]
+fn state_updates_file_status_after_delete() {
+    let mut state = SteamworksRemoteStorageState::default();
+
+    state.record_operation(&SteamworksRemoteStorageOperation::FileInfoRead {
+        info: SteamworksRemoteStorageFileInfo {
+            name: "save.dat".to_owned(),
+            exists: true,
+            persisted: true,
+            timestamp: 7,
+            sync_platforms: steamworks::RemoteStoragePlatforms::WINDOWS,
+        },
+    });
+
+    state.record_operation(&SteamworksRemoteStorageOperation::FileDeleted {
+        name: "save.dat".to_owned(),
+        deleted: true,
+    });
+
+    assert!(state.last_file_info().is_none());
+    assert_eq!(state.last_file_exists(), Some(("save.dat", false)));
+    assert_eq!(state.last_file_persisted(), None);
+    assert_eq!(state.last_file_timestamp(), None);
+}
+
+#[test]
+fn state_updates_file_status_after_write() {
+    let mut state = SteamworksRemoteStorageState::default();
+
+    state.record_operation(&SteamworksRemoteStorageOperation::FileExistsRead {
+        name: "save.dat".to_owned(),
+        exists: false,
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FilePersistedRead {
+        name: "save.dat".to_owned(),
+        persisted: true,
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileTimestampRead {
+        name: "save.dat".to_owned(),
+        timestamp: 7,
+    });
+
+    state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
+        written: SteamworksRemoteStorageFileWritten {
+            request_id: 3,
+            name: "save.dat".to_owned(),
+            bytes: 7,
+        },
+    });
+
+    assert_eq!(state.last_file_exists(), Some(("save.dat", true)));
+    assert_eq!(state.last_file_persisted(), None);
+    assert_eq!(state.last_file_timestamp(), None);
 }
 
 #[test]

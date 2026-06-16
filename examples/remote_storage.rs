@@ -26,6 +26,15 @@ fn request_remote_storage(
 
     if let Ok(name) = std::env::var("BEVY_STEAMWORKS_REMOTE_STORAGE_FILE") {
         commands.write(SteamworksRemoteStorageCommand::get_file_info(name.clone()));
+        commands.write(SteamworksRemoteStorageCommand::get_file_exists(
+            name.clone(),
+        ));
+        commands.write(SteamworksRemoteStorageCommand::is_file_persisted(
+            name.clone(),
+        ));
+        commands.write(SteamworksRemoteStorageCommand::get_file_timestamp(
+            name.clone(),
+        ));
         commands.write(SteamworksRemoteStorageCommand::get_sync_platforms(
             name.clone(),
         ));

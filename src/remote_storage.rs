@@ -9,10 +9,12 @@ mod commands;
 mod file_io;
 mod messages;
 mod plugin;
+mod snapshots;
 mod state;
 #[cfg(test)]
 mod tests;
 mod types;
+mod validation;
 
 pub use messages::*;
 pub use state::SteamworksRemoteStorageState;
