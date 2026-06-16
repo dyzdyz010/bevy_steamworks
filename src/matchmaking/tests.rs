@@ -137,6 +137,135 @@ fn validation_rejects_steam_assert_inputs() {
 }
 
 #[test]
+fn command_constructors_preserve_inputs() {
+    let filter = SteamworksLobbyListFilter::new().with_max_results(2);
+    let lobby = steamworks::LobbyId::from_raw(11);
+    let user = steamworks::SteamId::from_raw(22);
+    let server_id = steamworks::SteamId::from_raw(33);
+    let address = "127.0.0.1:27015".parse().expect("valid socket address");
+
+    assert_eq!(
+        SteamworksMatchmakingCommand::request_lobby_list(filter.clone()),
+        SteamworksMatchmakingCommand::RequestLobbyList { filter }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::create_lobby(steamworks::LobbyType::Private, 4),
+        SteamworksMatchmakingCommand::CreateLobby {
+            lobby_type: steamworks::LobbyType::Private,
+            max_members: 4,
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::join_lobby(lobby),
+        SteamworksMatchmakingCommand::JoinLobby { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::leave_lobby(lobby),
+        SteamworksMatchmakingCommand::LeaveLobby { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_data_count(lobby),
+        SteamworksMatchmakingCommand::GetLobbyDataCount { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_data(lobby, "mode"),
+        SteamworksMatchmakingCommand::GetLobbyData {
+            lobby,
+            key: "mode".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_data_by_index(lobby, 3),
+        SteamworksMatchmakingCommand::GetLobbyDataByIndex { lobby, index: 3 }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_all_lobby_data(lobby),
+        SteamworksMatchmakingCommand::GetAllLobbyData { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::set_lobby_data(lobby, "mode", "dm"),
+        SteamworksMatchmakingCommand::SetLobbyData {
+            lobby,
+            key: "mode".to_owned(),
+            value: "dm".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::delete_lobby_data(lobby, "mode"),
+        SteamworksMatchmakingCommand::DeleteLobbyData {
+            lobby,
+            key: "mode".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::set_lobby_member_data(lobby, "loadout", "rail"),
+        SteamworksMatchmakingCommand::SetLobbyMemberData {
+            lobby,
+            key: "loadout".to_owned(),
+            value: "rail".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_member_data(lobby, user, "rank"),
+        SteamworksMatchmakingCommand::GetLobbyMemberData {
+            lobby,
+            user,
+            key: "rank".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_member_limit(lobby),
+        SteamworksMatchmakingCommand::GetLobbyMemberLimit { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_owner(lobby),
+        SteamworksMatchmakingCommand::GetLobbyOwner { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_member_count(lobby),
+        SteamworksMatchmakingCommand::GetLobbyMemberCount { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::list_lobby_members(lobby),
+        SteamworksMatchmakingCommand::ListLobbyMembers { lobby }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::set_lobby_joinable(lobby, false),
+        SteamworksMatchmakingCommand::SetLobbyJoinable {
+            lobby,
+            joinable: false,
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::send_lobby_chat_message(lobby, b"hello".to_vec()),
+        SteamworksMatchmakingCommand::SendLobbyChatMessage {
+            lobby,
+            data: b"hello".to_vec(),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_chat_entry(lobby, 7, 128),
+        SteamworksMatchmakingCommand::GetLobbyChatEntry {
+            lobby,
+            chat_id: 7,
+            max_bytes: 128,
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::set_lobby_game_server(lobby, address, Some(server_id)),
+        SteamworksMatchmakingCommand::SetLobbyGameServer {
+            lobby,
+            address,
+            steam_id: Some(server_id),
+        }
+    );
+    assert_eq!(
+        SteamworksMatchmakingCommand::get_lobby_game_server(lobby),
+        SteamworksMatchmakingCommand::GetLobbyGameServer { lobby }
+    );
+}
+
+#[test]
 fn debug_redacts_lobby_chat_payload_bytes() {
     let lobby = steamworks::LobbyId::from_raw(1);
     let command = SteamworksMatchmakingCommand::send_lobby_chat_message(lobby, vec![1, 2, 3]);

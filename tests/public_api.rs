@@ -753,6 +753,23 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
         error,
     );
 
+    let lobby = steamworks::LobbyId::from_raw(11);
+    let user = steamworks::SteamId::from_raw(22);
+    let address = "127.0.0.1:27015".parse().expect("valid socket address");
+    let _ = SteamworksMatchmakingCommand::get_lobby_data_count(lobby);
+    let _ = SteamworksMatchmakingCommand::get_lobby_data_by_index(lobby, 0);
+    let _ = SteamworksMatchmakingCommand::get_all_lobby_data(lobby);
+    let _ = SteamworksMatchmakingCommand::set_lobby_member_data(lobby, "loadout", "rail");
+    let _ = SteamworksMatchmakingCommand::get_lobby_member_data(lobby, user, "rank");
+    let _ = SteamworksMatchmakingCommand::get_lobby_member_limit(lobby);
+    let _ = SteamworksMatchmakingCommand::get_lobby_owner(lobby);
+    let _ = SteamworksMatchmakingCommand::get_lobby_member_count(lobby);
+    let _ = SteamworksMatchmakingCommand::list_lobby_members(lobby);
+    let _ = SteamworksMatchmakingCommand::set_lobby_joinable(lobby, true);
+    let _ = SteamworksMatchmakingCommand::get_lobby_chat_entry(lobby, 1, 128);
+    let _ = SteamworksMatchmakingCommand::set_lobby_game_server(lobby, address, Some(user));
+    let _ = SteamworksMatchmakingCommand::get_lobby_game_server(lobby);
+
     let filter = PreludeLobbyListFilter::new();
     let command = PreludeMatchmakingCommand::request_lobby_list(filter.clone());
     let operation = PreludeMatchmakingOperation::LobbyListRequested {
@@ -772,6 +789,21 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+
+    let address = "127.0.0.1:27015".parse().expect("valid socket address");
+    let _ = PreludeMatchmakingCommand::get_lobby_data_count(lobby);
+    let _ = PreludeMatchmakingCommand::get_lobby_data_by_index(lobby, 0);
+    let _ = PreludeMatchmakingCommand::get_all_lobby_data(lobby);
+    let _ = PreludeMatchmakingCommand::set_lobby_member_data(lobby, "loadout", "rail");
+    let _ = PreludeMatchmakingCommand::get_lobby_member_data(lobby, user, "rank");
+    let _ = PreludeMatchmakingCommand::get_lobby_member_limit(lobby);
+    let _ = PreludeMatchmakingCommand::get_lobby_owner(lobby);
+    let _ = PreludeMatchmakingCommand::get_lobby_member_count(lobby);
+    let _ = PreludeMatchmakingCommand::list_lobby_members(lobby);
+    let _ = PreludeMatchmakingCommand::set_lobby_joinable(lobby, true);
+    let _ = PreludeMatchmakingCommand::get_lobby_chat_entry(lobby, 1, 128);
+    let _ = PreludeMatchmakingCommand::set_lobby_game_server(lobby, address, Some(user));
+    let _ = PreludeMatchmakingCommand::get_lobby_game_server(lobby);
 }
 
 #[test]
