@@ -99,6 +99,27 @@ fn handle_utils_command(
                 enabled: read_utils(client, server)?.is_steam_running_on_steam_deck(),
             }
         }
+        SteamworksUtilsCommand::InstallWarningCallback => {
+            let utils = client_utils(client)?;
+            utils.set_warning_callback(|severity, message| {
+                let message = message.to_string_lossy();
+                match severity {
+                    0 => tracing::info!(
+                        target: "bevy_steamworks",
+                        severity,
+                        message = %message,
+                        "Steamworks SDK warning"
+                    ),
+                    _ => tracing::warn!(
+                        target: "bevy_steamworks",
+                        severity,
+                        message = %message,
+                        "Steamworks SDK warning"
+                    ),
+                }
+            });
+            SteamworksUtilsOperation::WarningCallbackInstalled
+        }
         SteamworksUtilsCommand::SetOverlayNotificationPosition { position } => {
             let utils = client_utils(client)?;
             utils.set_overlay_notification_position(position.to_steam());
@@ -223,6 +244,10 @@ mod tests {
             validate_command(&SteamworksUtilsCommand::set_overlay_notification_position(
                 SteamworksNotificationPosition::BottomRight
             )),
+            Ok(())
+        );
+        assert_eq!(
+            validate_command(&SteamworksUtilsCommand::install_warning_callback()),
             Ok(())
         );
         assert_eq!(

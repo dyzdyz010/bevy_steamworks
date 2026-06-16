@@ -24,6 +24,8 @@ pub enum SteamworksUtilsCommand {
     IsSteamInBigPictureMode,
     /// Read whether Steam reports that it is running on a Steam Deck device.
     IsSteamRunningOnSteamDeck,
+    /// Install a Steam SDK warning callback that forwards warning messages to `tracing`.
+    InstallWarningCallback,
     /// Set where Steam overlay notification popups should appear.
     SetOverlayNotificationPosition {
         /// Popup position to submit to Steam.
@@ -80,6 +82,11 @@ impl SteamworksUtilsCommand {
     /// Creates a [`crate::SteamworksUtilsCommand::IsSteamRunningOnSteamDeck`] command.
     pub fn is_steam_running_on_steam_deck() -> Self {
         Self::IsSteamRunningOnSteamDeck
+    }
+
+    /// Creates a [`crate::SteamworksUtilsCommand::InstallWarningCallback`] command.
+    pub fn install_warning_callback() -> Self {
+        Self::InstallWarningCallback
     }
 
     /// Creates a [`crate::SteamworksUtilsCommand::SetOverlayNotificationPosition`] command.

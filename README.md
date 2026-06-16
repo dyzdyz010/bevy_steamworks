@@ -373,7 +373,7 @@ cargo run --example user
 
 ## Utilities and Overlay Helpers
 
-`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, overlay notification position, and gamepad text input.
+`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, Steam SDK warning logging, overlay notification position, and gamepad text input.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -381,6 +381,7 @@ cargo run --example user
 fn request_utils(mut utils: MessageWriter<SteamworksUtilsCommand>) {
     utils.write(SteamworksUtilsCommand::get_current_info());
     utils.write(SteamworksUtilsCommand::is_overlay_enabled());
+    utils.write(SteamworksUtilsCommand::install_warning_callback());
     utils.write(SteamworksUtilsCommand::set_overlay_notification_position(
         SteamworksNotificationPosition::BottomRight,
     ));
@@ -416,7 +417,7 @@ fn main() {
 }
 ```
 
-`SteamworksUtilsState` caches both `GetCurrentInfo` snapshots and the latest individual app id, IP country, overlay availability, UI language, server time, Big Picture mode, Steam Deck, submitted overlay notification position, text-input show results, submitted gamepad text, and dismissal callbacks. Read-only utility commands can run with either `SteamworksClient` or `SteamworksServer`; overlay notification and text-input commands require a client resource. Use `SteamworksUtilsCommand::show_gamepad_text_input` or `SteamworksUtilsCommand::show_floating_gamepad_text_input` to open Steam's text input UI. Big Picture gamepad text is captured during Steam's original callback timing and emitted as `SteamworksUtilsOperation::GamepadTextInputSubmitted`; the paired `SteamworksUtilsOperation::GamepadTextInputDismissed` also includes `submitted_text` when it was available. Floating input currently reports show and dismissal state. Avoid registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`, because Steam's text input helpers use typed callbacks internally.
+`SteamworksUtilsState` caches both `GetCurrentInfo` snapshots and the latest individual app id, IP country, overlay availability, UI language, server time, Big Picture mode, Steam Deck, warning callback installation state, submitted overlay notification position, text-input show results, submitted gamepad text, and dismissal callbacks. Read-only utility commands can run with either `SteamworksClient` or `SteamworksServer`; warning callback installation, overlay notification, and text-input commands require a client resource. `SteamworksUtilsCommand::install_warning_callback()` installs Steam's warning hook and forwards SDK warnings to `tracing` with the `bevy_steamworks` target. Use `SteamworksUtilsCommand::show_gamepad_text_input` or `SteamworksUtilsCommand::show_floating_gamepad_text_input` to open Steam's text input UI. Big Picture gamepad text is captured during Steam's original callback timing and emitted as `SteamworksUtilsOperation::GamepadTextInputSubmitted`; the paired `SteamworksUtilsOperation::GamepadTextInputDismissed` also includes `submitted_text` when it was available. Floating input currently reports show and dismissal state. Avoid registering competing callbacks for the same dismissal types through `SteamworksCallbackRegistry`, because Steam's text input helpers use typed callbacks internally.
 
 Run the utils example with:
 

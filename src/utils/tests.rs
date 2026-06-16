@@ -72,6 +72,32 @@ fn commands_fail_when_client_is_unavailable() {
 #[test]
 fn client_only_commands_still_fail_without_client_even_when_read_commands_can_use_server() {
     let mut app = App::new();
+    let command = SteamworksUtilsCommand::install_warning_callback();
+
+    app.add_plugins(SteamworksUtilsPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksUtilsCommand>>()
+        .write(command.clone());
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksUtilsResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksUtilsResult::Err {
+            command,
+            error: SteamworksUtilsError::ClientUnavailable,
+        }]
+    );
+}
+
+#[test]
+fn overlay_position_still_fails_without_client() {
+    let mut app = App::new();
     let command = SteamworksUtilsCommand::set_overlay_notification_position(
         SteamworksNotificationPosition::BottomRight,
     );
@@ -139,6 +165,10 @@ fn constructors_preserve_inputs() {
     assert_eq!(
         SteamworksUtilsCommand::is_steam_running_on_steam_deck(),
         SteamworksUtilsCommand::IsSteamRunningOnSteamDeck
+    );
+    assert_eq!(
+        SteamworksUtilsCommand::install_warning_callback(),
+        SteamworksUtilsCommand::InstallWarningCallback
     );
     assert_eq!(
         SteamworksUtilsCommand::set_overlay_notification_position(
@@ -353,6 +383,7 @@ fn state_records_utility_operations() {
     state.record_operation(&SteamworksUtilsOperation::SteamInBigPictureModeRead { enabled: true });
     state
         .record_operation(&SteamworksUtilsOperation::SteamRunningOnSteamDeckRead { enabled: true });
+    state.record_operation(&SteamworksUtilsOperation::WarningCallbackInstalled);
     state.record_operation(&SteamworksUtilsOperation::OverlayNotificationPositionSet {
         position: SteamworksNotificationPosition::BottomRight,
     });
@@ -405,6 +436,7 @@ fn state_records_utility_operations() {
     assert_eq!(state.server_real_time(), Some(456));
     assert_eq!(state.steam_in_big_picture_mode(), Some(true));
     assert_eq!(state.steam_running_on_steam_deck(), Some(true));
+    assert!(state.warning_callback_installed());
     assert_eq!(
         state.overlay_notification_position(),
         Some(SteamworksNotificationPosition::BottomRight)

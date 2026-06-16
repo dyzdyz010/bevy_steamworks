@@ -14,6 +14,7 @@ pub struct SteamworksUtilsState {
     server_real_time: Option<u32>,
     steam_in_big_picture_mode: Option<bool>,
     steam_running_on_steam_deck: Option<bool>,
+    warning_callback_installed: bool,
     overlay_notification_position: Option<SteamworksNotificationPosition>,
     last_gamepad_text_input_shown: Option<SteamworksGamepadTextInputShown>,
     last_floating_gamepad_text_input_shown: Option<SteamworksFloatingGamepadTextInputShown>,
@@ -66,6 +67,11 @@ impl SteamworksUtilsState {
     /// Returns the most recent Steam Deck state read through this plugin.
     pub fn steam_running_on_steam_deck(&self) -> Option<bool> {
         self.steam_running_on_steam_deck
+    }
+
+    /// Returns whether this plugin installed the Steam SDK warning callback.
+    pub fn warning_callback_installed(&self) -> bool {
+        self.warning_callback_installed
     }
 
     /// Returns the most recent overlay notification position submitted through this plugin.
@@ -142,6 +148,9 @@ impl SteamworksUtilsState {
             }
             SteamworksUtilsOperation::SteamRunningOnSteamDeckRead { enabled } => {
                 self.steam_running_on_steam_deck = Some(*enabled);
+            }
+            SteamworksUtilsOperation::WarningCallbackInstalled => {
+                self.warning_callback_installed = true;
             }
             SteamworksUtilsOperation::OverlayNotificationPositionSet { position } => {
                 self.overlay_notification_position = Some(*position);

@@ -47,6 +47,8 @@ pub enum SteamworksUtilsOperation {
         /// Whether Steam reports it is running on Steam Deck.
         enabled: bool,
     },
+    /// Steam SDK warning callback was installed.
+    WarningCallbackInstalled,
     /// Overlay notification popup position was set.
     OverlayNotificationPositionSet {
         /// Position submitted to Steam.

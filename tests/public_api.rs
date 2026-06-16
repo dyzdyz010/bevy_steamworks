@@ -2027,6 +2027,13 @@ fn utils_api_is_exported_from_root_and_prelude() {
         }),
         SteamworksUtilsError::ClientUnavailable,
     );
+    accepts_root_exports(
+        SteamworksUtilsPlugin::new(),
+        SteamworksUtilsCommand::install_warning_callback(),
+        SteamworksUtilsOperation::WarningCallbackInstalled,
+        SteamworksUtilsResult::Ok(SteamworksUtilsOperation::WarningCallbackInstalled),
+        SteamworksUtilsError::ClientUnavailable,
+    );
 
     accepts_root_exports(
         SteamworksUtilsPlugin::new(),
@@ -2126,6 +2133,13 @@ fn utils_api_is_exported_from_root_and_prelude() {
             },
         },
         PreludeUtilsResult::Ok(PreludeUtilsOperation::OverlayEnabledRead { enabled: true }),
+        PreludeUtilsError::ClientUnavailable,
+    );
+    accepts_prelude_exports(
+        PreludeUtilsPlugin::new(),
+        PreludeUtilsCommand::install_warning_callback(),
+        PreludeUtilsOperation::WarningCallbackInstalled,
+        PreludeUtilsResult::Ok(PreludeUtilsOperation::WarningCallbackInstalled),
         PreludeUtilsError::ClientUnavailable,
     );
     accepts_prelude_exports(
