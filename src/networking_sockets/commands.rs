@@ -5,29 +5,21 @@ use bevy_ecs::{
 
 pub(super) mod helpers;
 
-use helpers::{
-    allocate_outbound_message, connection_owner, connection_user_data_from_info_result,
-    networking_sockets, networking_sockets_for_owner, poll_group_owner, server_networking_sockets,
-    steam_config_entries,
-};
+mod auth_commands;
+mod connection_commands;
+mod listen_socket_commands;
+mod message_commands;
+mod poll_group_commands;
 
 use crate::{SteamworksClient, SteamworksServer};
 
 use super::{
-    handles::{
-        SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleOwner,
-        SteamworksNetworkingSocketsHandleStorage, SteamworksNetworkingSocketsHandles,
-    },
+    handles::{SteamworksNetworkingSocketsHandleStorage, SteamworksNetworkingSocketsHandles},
     polling::{poll_connection_events, poll_listen_socket_events},
-    snapshots::{
-        snapshot_connection_info, snapshot_message, snapshot_poll_group_message,
-        snapshot_realtime_status,
-    },
     validation::validate_command,
-    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConnectionTarget,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingSocketsState,
+    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingSocketsState,
 };
 
 pub(super) fn process_networking_sockets_commands(
@@ -99,134 +91,60 @@ pub(super) fn handle_networking_sockets_command(
 
     Ok(match command {
         SteamworksNetworkingSocketsCommand::InitAuthentication => {
-            let (sockets, _) = networking_sockets(client, server)?;
-            SteamworksNetworkingSocketsOperation::AuthenticationInitialized {
-                availability: sockets.init_authentication(),
-            }
+            auth_commands::init_authentication(client, server)?
         }
         SteamworksNetworkingSocketsCommand::GetAuthenticationStatus => {
-            let (sockets, _) = networking_sockets(client, server)?;
-            SteamworksNetworkingSocketsOperation::AuthenticationStatusRead {
-                availability: sockets.get_authentication_status(),
-            }
+            auth_commands::get_authentication_status(client, server)?
         }
         SteamworksNetworkingSocketsCommand::CreateListenSocketIp {
             local_address,
             options,
-        } => {
-            let (sockets, owner) = networking_sockets(client, server)?;
-            let options = steam_config_entries(options);
-            let socket = sockets
-                .create_listen_socket_ip(*local_address, options)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "networking_sockets.create_listen_socket_ip",
-                    )
-                })?;
-            let listen_socket = handles.insert_listen_socket(socket, owner);
-            SteamworksNetworkingSocketsOperation::ListenSocketCreated {
-                listen_socket,
-                endpoint: SteamworksNetworkingSocketsListenEndpoint::Ip(*local_address),
-            }
-        }
+        } => listen_socket_commands::create_listen_socket_ip(
+            client,
+            server,
+            handles,
+            *local_address,
+            options,
+        )?,
         SteamworksNetworkingSocketsCommand::CreateListenSocketP2p {
             local_virtual_port,
             options,
-        } => {
-            let (sockets, owner) = networking_sockets(client, server)?;
-            let options = steam_config_entries(options);
-            let socket = sockets
-                .create_listen_socket_p2p(*local_virtual_port, options)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "networking_sockets.create_listen_socket_p2p",
-                    )
-                })?;
-            let listen_socket = handles.insert_listen_socket(socket, owner);
-            SteamworksNetworkingSocketsOperation::ListenSocketCreated {
-                listen_socket,
-                endpoint: SteamworksNetworkingSocketsListenEndpoint::P2p {
-                    local_virtual_port: *local_virtual_port,
-                },
-            }
-        }
+        } => listen_socket_commands::create_listen_socket_p2p(
+            client,
+            server,
+            handles,
+            *local_virtual_port,
+            options,
+        )?,
         SteamworksNetworkingSocketsCommand::CreateHostedDedicatedServerListenSocket {
             local_virtual_port,
             options,
-        } => {
-            let (sockets, owner) = server_networking_sockets(server)?;
-            let options = steam_config_entries(options);
-            let socket = sockets
-                .create_hosted_dedicated_server_listen_socket(*local_virtual_port, options)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "networking_sockets.create_hosted_dedicated_server_listen_socket",
-                    )
-                })?;
-            let listen_socket = handles.insert_listen_socket(socket, owner);
-            SteamworksNetworkingSocketsOperation::ListenSocketCreated {
-                listen_socket,
-                endpoint: SteamworksNetworkingSocketsListenEndpoint::HostedDedicatedServer {
-                    local_virtual_port: *local_virtual_port,
-                },
-            }
-        }
+        } => listen_socket_commands::create_hosted_dedicated_server_listen_socket(
+            server,
+            handles,
+            *local_virtual_port,
+            options,
+        )?,
         SteamworksNetworkingSocketsCommand::ConnectByIpAddress { address, options } => {
-            let (sockets, owner) = networking_sockets(client, server)?;
-            let options = steam_config_entries(options);
-            let connection = sockets
-                .connect_by_ip_address(*address, options)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "networking_sockets.connect_by_ip_address",
-                    )
-                })?;
-            let connection = handles.insert_connection(
-                connection,
-                SteamworksNetworkingSocketsConnectionMetadata::independent(),
-                owner,
-            );
-            SteamworksNetworkingSocketsOperation::ConnectionCreated {
-                connection,
-                target: SteamworksNetworkingSocketsConnectionTarget::Ip(*address),
-            }
+            connection_commands::connect_by_ip_address(client, server, handles, *address, options)?
         }
         SteamworksNetworkingSocketsCommand::ConnectP2p {
             identity,
             remote_virtual_port,
             options,
-        } => {
-            let (sockets, owner) = networking_sockets(client, server)?;
-            let options = steam_config_entries(options);
-            let connection = sockets
-                .connect_p2p(identity.clone(), *remote_virtual_port, options)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "networking_sockets.connect_p2p",
-                    )
-                })?;
-            let connection = handles.insert_connection(
-                connection,
-                SteamworksNetworkingSocketsConnectionMetadata::independent(),
-                owner,
-            );
-            SteamworksNetworkingSocketsOperation::ConnectionCreated {
-                connection,
-                target: SteamworksNetworkingSocketsConnectionTarget::P2p {
-                    identity: identity.clone(),
-                    remote_virtual_port: *remote_virtual_port,
-                },
-            }
-        }
+        } => connection_commands::connect_p2p(
+            client,
+            server,
+            handles,
+            identity,
+            *remote_virtual_port,
+            options,
+        )?,
         SteamworksNetworkingSocketsCommand::CreatePollGroup => {
-            let (sockets, owner) = networking_sockets(client, server)?;
-            let poll_group = handles.insert_poll_group(sockets.create_poll_group(), owner);
-            SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group }
+            poll_group_commands::create_poll_group(client, server, handles)?
         }
         SteamworksNetworkingSocketsCommand::CreateServerPollGroup => {
-            let (sockets, owner) = server_networking_sockets(server)?;
-            let poll_group = handles.insert_poll_group(sockets.create_poll_group(), owner);
-            SteamworksNetworkingSocketsOperation::PollGroupCreated { poll_group }
+            poll_group_commands::create_server_poll_group(server, handles)?
         }
         SteamworksNetworkingSocketsCommand::PollListenSocketEvents {
             listen_socket,
@@ -238,322 +156,82 @@ pub(super) fn handle_networking_sockets_command(
             max_events,
         } => poll_connection_events(handles, *connection, *max_events)?,
         SteamworksNetworkingSocketsCommand::GetConnectionInfo { connection } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let info = connection_ref.info().map_err(|_| {
-                SteamworksNetworkingSocketsError::invalid_handle("net_connection.info")
-            })?;
-            SteamworksNetworkingSocketsOperation::ConnectionInfoRead {
-                info: snapshot_connection_info(*connection, info),
-            }
+            connection_commands::get_connection_info(handles, *connection)?
         }
         SteamworksNetworkingSocketsCommand::GetConnectionUserData { connection } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let user_data = connection_user_data_from_info_result(
-                connection_ref.info().map(|info| info.user_data()),
-            )?;
-            handles.update_connection_user_data(*connection, user_data);
-            SteamworksNetworkingSocketsOperation::ConnectionUserDataRead {
-                connection: *connection,
-                user_data,
-            }
+            connection_commands::get_connection_user_data(handles, *connection)?
         }
         SteamworksNetworkingSocketsCommand::GetRealtimeConnectionStatus { connection, lanes } => {
-            let owner = connection_owner(handles, *connection)?;
-            let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let (info, lanes) = sockets
-                .get_realtime_connection_status(connection_ref, *lanes as i32)
-                .map_err(|source| {
-                    SteamworksNetworkingSocketsError::steam_error(
-                        "networking_sockets.get_realtime_connection_status",
-                        source,
-                    )
-                })?;
-            SteamworksNetworkingSocketsOperation::RealtimeConnectionStatusRead {
-                status: snapshot_realtime_status(*connection, info, lanes),
-            }
+            connection_commands::get_realtime_connection_status(
+                client,
+                server,
+                handles,
+                *connection,
+                *lanes,
+            )?
         }
         SteamworksNetworkingSocketsCommand::SendMessage {
             connection,
             send_flags,
             data,
-        } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let message_number =
-                connection_ref
-                    .send_message(data, *send_flags)
-                    .map_err(|source| {
-                        SteamworksNetworkingSocketsError::steam_error(
-                            "net_connection.send_message",
-                            source,
-                        )
-                    })?;
-            SteamworksNetworkingSocketsOperation::MessageSent {
-                connection: *connection,
-                message_number: u64::from(message_number),
-                bytes: data.len(),
-            }
-        }
+        } => message_commands::send_message(handles, *connection, *send_flags, data)?,
         SteamworksNetworkingSocketsCommand::SendMessages { messages } => {
-            let mut outbound = Vec::with_capacity(messages.len());
-            for message in messages {
-                if handles.connection_owner(message.connection)
-                    == Some(SteamworksNetworkingSocketsHandleOwner::Server)
-                {
-                    return Err(
-                        SteamworksNetworkingSocketsError::ServerConnectionBatchSendUnsupported {
-                            connection: message.connection,
-                        },
-                    );
-                }
-            }
-
-            let client = client.ok_or(SteamworksNetworkingSocketsError::ClientUnavailable)?;
-            let (sockets, _) = networking_sockets_for_owner(
-                Some(client),
-                server,
-                SteamworksNetworkingSocketsHandleOwner::Client,
-            )?;
-            for message in messages {
-                let connection_ref = handles.connections.get(&message.connection).ok_or(
-                    SteamworksNetworkingSocketsError::ConnectionNotFound {
-                        id: message.connection,
-                    },
-                )?;
-                outbound.push(allocate_outbound_message(client, connection_ref, message)?);
-            }
-
-            let send_results = sockets.send_messages(outbound);
-            let messages: Vec<SteamworksNetworkingSocketsMessageSendResult> = messages
-                .iter()
-                .zip(send_results)
-                .map(
-                    |(message, result)| SteamworksNetworkingSocketsMessageSendResult {
-                        connection: message.connection,
-                        send_flags: message.send_flags,
-                        channel: message.channel,
-                        bytes: message.data.len(),
-                        user_data: message.user_data,
-                        result: result.map(u64::from),
-                    },
-                )
-                .collect();
-            if messages
-                .iter()
-                .any(|message: &SteamworksNetworkingSocketsMessageSendResult| {
-                    message.result.is_err()
-                })
-            {
-                tracing::warn!(
-                    target: "bevy_steamworks",
-                    messages = ?messages,
-                    "Steamworks networking sockets batch send had per-message failures"
-                );
-            }
-            SteamworksNetworkingSocketsOperation::MessagesSent { messages }
+            message_commands::send_messages(client, server, handles, messages)?
         }
         SteamworksNetworkingSocketsCommand::ReceiveMessages {
             connection,
             batch_size,
-        } => {
-            let connection_ref = handles
-                .connections
-                .get_mut(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let messages = connection_ref.receive_messages(*batch_size).map_err(|_| {
-                SteamworksNetworkingSocketsError::invalid_handle("net_connection.receive_messages")
-            })?;
-            let messages = messages
-                .into_iter()
-                .map(|message| snapshot_message(*connection, message))
-                .collect();
-            SteamworksNetworkingSocketsOperation::MessagesReceived {
-                connection: *connection,
-                messages,
-            }
-        }
+        } => message_commands::receive_messages(handles, *connection, *batch_size)?,
         SteamworksNetworkingSocketsCommand::ReceivePollGroupMessages {
             poll_group,
             batch_size,
-        } => {
-            let poll_group_ref = handles
-                .poll_groups
-                .get_mut(poll_group)
-                .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: *poll_group })?;
-            let messages = poll_group_ref
-                .receive_messages(*batch_size)
-                .into_iter()
-                .map(|message| snapshot_poll_group_message(*poll_group, message))
-                .collect();
-            SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
-                poll_group: *poll_group,
-                messages,
-            }
-        }
+        } => poll_group_commands::receive_poll_group_messages(handles, *poll_group, *batch_size)?,
         SteamworksNetworkingSocketsCommand::FlushMessages { connection } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            connection_ref.flush_messages().map_err(|source| {
-                SteamworksNetworkingSocketsError::steam_error(
-                    "net_connection.flush_messages",
-                    source,
-                )
-            })?;
-            SteamworksNetworkingSocketsOperation::MessagesFlushed {
-                connection: *connection,
-            }
+            message_commands::flush_messages(handles, *connection)?
         }
         SteamworksNetworkingSocketsCommand::SetConnectionPollGroup {
             connection,
             poll_group,
-        } => {
-            let connection_owner = connection_owner(handles, *connection)?;
-            let poll_group_owner = poll_group_owner(handles, *poll_group)?;
-            if connection_owner != poll_group_owner {
-                return Err(SteamworksNetworkingSocketsError::HandleOwnerMismatch {
-                    connection: *connection,
-                    poll_group: *poll_group,
-                });
-            }
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let poll_group_ref = handles
-                .poll_groups
-                .get(poll_group)
-                .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: *poll_group })?;
-            connection_ref.set_poll_group(poll_group_ref);
-            handles.set_connection_poll_group(*connection, *poll_group);
-            SteamworksNetworkingSocketsOperation::ConnectionPollGroupSet {
-                connection: *connection,
-                poll_group: *poll_group,
-            }
-        }
+        } => connection_commands::set_connection_poll_group(handles, *connection, *poll_group)?,
         SteamworksNetworkingSocketsCommand::ClearConnectionPollGroup { connection } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            connection_ref.clear_poll_group().map_err(|_| {
-                SteamworksNetworkingSocketsError::invalid_handle("net_connection.clear_poll_group")
-            })?;
-            handles.clear_connection_poll_group(*connection);
-            SteamworksNetworkingSocketsOperation::ConnectionPollGroupCleared {
-                connection: *connection,
-            }
+            connection_commands::clear_connection_poll_group(handles, *connection)?
         }
         SteamworksNetworkingSocketsCommand::ConfigureConnectionLanes {
             connection,
             lane_priorities,
             lane_weights,
-        } => {
-            let owner = connection_owner(handles, *connection)?;
-            let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            sockets
-                .configure_connection_lanes(
-                    connection_ref,
-                    lane_priorities.len() as i32,
-                    lane_priorities,
-                    lane_weights,
-                )
-                .map_err(|source| {
-                    SteamworksNetworkingSocketsError::steam_error(
-                        "networking_sockets.configure_connection_lanes",
-                        source,
-                    )
-                })?;
-            SteamworksNetworkingSocketsOperation::ConnectionLanesConfigured {
-                connection: *connection,
-                lanes: lane_priorities.len(),
-            }
-        }
+        } => connection_commands::configure_connection_lanes(
+            client,
+            server,
+            handles,
+            *connection,
+            lane_priorities,
+            lane_weights,
+        )?,
         SteamworksNetworkingSocketsCommand::SetConnectionUserData {
             connection,
             user_data,
-        } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            connection_ref
-                .set_connection_user_data(*user_data)
-                .map_err(|_| {
-                    SteamworksNetworkingSocketsError::invalid_handle(
-                        "net_connection.set_connection_user_data",
-                    )
-                })?;
-            handles.update_connection_user_data(*connection, *user_data);
-            SteamworksNetworkingSocketsOperation::ConnectionUserDataSet {
-                connection: *connection,
-                user_data: *user_data,
-            }
-        }
+        } => connection_commands::set_connection_user_data(handles, *connection, *user_data)?,
         SteamworksNetworkingSocketsCommand::SetConnectionName { connection, name } => {
-            let connection_ref = handles
-                .connections
-                .get(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            connection_ref.set_connection_name(name);
-            SteamworksNetworkingSocketsOperation::ConnectionNameSet {
-                connection: *connection,
-                name: name.clone(),
-            }
+            connection_commands::set_connection_name(handles, *connection, name)?
         }
         SteamworksNetworkingSocketsCommand::CloseConnection {
             connection,
             reason,
             debug,
             enable_linger,
-        } => {
-            let connection_handle = handles
-                .remove_connection(connection)
-                .ok_or(SteamworksNetworkingSocketsError::ConnectionNotFound { id: *connection })?;
-            let close_succeeded =
-                connection_handle.close(*reason, debug.as_deref(), *enable_linger);
-            SteamworksNetworkingSocketsOperation::ConnectionClosed {
-                connection: *connection,
-                close_succeeded,
-            }
-        }
+        } => connection_commands::close_connection(
+            handles,
+            *connection,
+            *reason,
+            debug.as_deref(),
+            *enable_linger,
+        )?,
         SteamworksNetworkingSocketsCommand::CloseListenSocket { listen_socket } => {
-            if !handles.listen_sockets.contains_key(listen_socket) {
-                return Err(SteamworksNetworkingSocketsError::ListenSocketNotFound {
-                    id: *listen_socket,
-                });
-            }
-            let closed_connections = handles.remove_connections_for_listen_socket(*listen_socket);
-            handles.remove_listen_socket(listen_socket);
-            SteamworksNetworkingSocketsOperation::ListenSocketClosed {
-                listen_socket: *listen_socket,
-                closed_connections,
-            }
+            listen_socket_commands::close_listen_socket(handles, *listen_socket)?
         }
         SteamworksNetworkingSocketsCommand::ClosePollGroup { poll_group } => {
-            handles
-                .remove_poll_group(poll_group)
-                .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: *poll_group })?;
-            SteamworksNetworkingSocketsOperation::PollGroupClosed {
-                poll_group: *poll_group,
-            }
+            poll_group_commands::close_poll_group(handles, *poll_group)?
         }
     })
 }
