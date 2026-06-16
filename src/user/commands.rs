@@ -96,6 +96,14 @@ fn handle_user_command(
                 steam_id: *steam_id,
             }
         }
+        SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { identity } => {
+            let (ticket, ticket_bytes) = user.authentication_session_ticket(identity.clone());
+            SteamworksUserOperation::AuthenticationSessionTicketForIdentityIssued {
+                ticket,
+                ticket_bytes,
+                identity: identity.clone(),
+            }
+        }
         SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi { identity } => {
             let ticket = user.authentication_session_ticket_for_webapi(identity);
             SteamworksUserOperation::WebApiAuthenticationTicketRequested {

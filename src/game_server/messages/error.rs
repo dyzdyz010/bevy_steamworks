@@ -17,6 +17,9 @@ pub enum SteamworksServerError {
     /// A remote authentication session was requested with no ticket bytes.
     #[error("Steam Game Server command requires a non-empty authentication ticket")]
     EmptyTicket,
+    /// An authentication ticket was requested for an invalid networking identity.
+    #[error("Steam Game Server command requires a valid networking identity")]
+    InvalidNetworkingIdentity,
     /// Token-based server logon was requested with no token.
     #[error("Steam Game Server token logon requires a non-empty token")]
     EmptyLogonToken,

@@ -84,6 +84,14 @@ fn handle_server_command(
                 steam_id: *steam_id,
             }
         }
+        SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { identity } => {
+            let (ticket, ticket_bytes) = server.authentication_session_ticket(identity.clone());
+            SteamworksServerOperation::AuthenticationSessionTicketForIdentityIssued {
+                ticket,
+                ticket_bytes,
+                identity: identity.clone(),
+            }
+        }
         SteamworksServerCommand::CancelAuthenticationTicket { ticket } => {
             server.cancel_authentication_ticket(*ticket);
             SteamworksServerOperation::AuthenticationTicketCancelled { ticket: *ticket }

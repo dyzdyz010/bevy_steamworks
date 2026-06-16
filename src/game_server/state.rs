@@ -16,6 +16,8 @@ pub struct SteamworksServerState {
     active_auth_tickets: Vec<steamworks::AuthTicket>,
     authenticated_users: Vec<steamworks::SteamId>,
     last_auth_session_ticket: Option<SteamworksServerIssuedAuthSessionTicket>,
+    last_auth_session_ticket_for_identity:
+        Option<SteamworksServerIssuedAuthSessionTicketForIdentity>,
     last_cancelled_auth_ticket: Option<steamworks::AuthTicket>,
     last_started_authentication_session: Option<steamworks::SteamId>,
     last_ended_authentication_session: Option<steamworks::SteamId>,
@@ -90,6 +92,13 @@ impl SteamworksServerState {
     /// Returns the most recent auth session ticket issued through this command layer.
     pub fn last_auth_session_ticket(&self) -> Option<&SteamworksServerIssuedAuthSessionTicket> {
         self.last_auth_session_ticket.as_ref()
+    }
+
+    /// Returns the most recent identity-scoped auth session ticket issued through this command layer.
+    pub fn last_auth_session_ticket_for_identity(
+        &self,
+    ) -> Option<&SteamworksServerIssuedAuthSessionTicketForIdentity> {
+        self.last_auth_session_ticket_for_identity.as_ref()
     }
 
     /// Returns the most recent auth ticket cancelled through this command layer.
@@ -286,6 +295,23 @@ impl SteamworksServerState {
                     ticket_bytes: ticket_bytes.clone(),
                     steam_id: *steam_id,
                 });
+                self.auth_session_ticket_issue_count =
+                    self.auth_session_ticket_issue_count.saturating_add(1);
+            }
+            SteamworksServerOperation::AuthenticationSessionTicketForIdentityIssued {
+                ticket,
+                ticket_bytes,
+                identity,
+            } => {
+                if !self.active_auth_tickets.contains(ticket) {
+                    self.active_auth_tickets.push(*ticket);
+                }
+                self.last_auth_session_ticket_for_identity =
+                    Some(SteamworksServerIssuedAuthSessionTicketForIdentity {
+                        ticket: *ticket,
+                        ticket_bytes: ticket_bytes.clone(),
+                        identity: identity.clone(),
+                    });
                 self.auth_session_ticket_issue_count =
                     self.auth_session_ticket_issue_count.saturating_add(1);
             }

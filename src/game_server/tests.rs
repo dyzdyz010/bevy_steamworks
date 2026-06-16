@@ -328,6 +328,9 @@ fn server_callbacks_are_bridged_without_server() {
 #[test]
 fn constructors_preserve_inputs() {
     let user = steamworks::SteamId::from_raw(7);
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
     let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 27015);
 
     assert_eq!(
@@ -337,6 +340,10 @@ fn constructors_preserve_inputs() {
     assert_eq!(
         SteamworksServerCommand::get_authentication_session_ticket(user),
         SteamworksServerCommand::GetAuthenticationSessionTicket { steam_id: user }
+    );
+    assert_eq!(
+        SteamworksServerCommand::get_authentication_session_ticket_for_identity(identity.clone()),
+        SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { identity }
     );
     assert_eq!(
         SteamworksServerCommand::begin_authentication_session(user, [1, 2, 3]),
@@ -476,6 +483,14 @@ fn validation_rejects_inputs_that_would_panic_upstream() {
         Err(SteamworksServerError::EmptyTicket)
     );
     assert_eq!(
+        validate_server_command(
+            &SteamworksServerCommand::get_authentication_session_ticket_for_identity(
+                steamworks::networking_types::NetworkingIdentity::new(),
+            )
+        ),
+        Err(SteamworksServerError::InvalidNetworkingIdentity)
+    );
+    assert_eq!(
         validate_server_command(&SteamworksServerCommand::log_on("")),
         Err(SteamworksServerError::EmptyLogonToken)
     );
@@ -590,6 +605,7 @@ fn state_records_server_operations() {
     assert_eq!(state.authenticated_users(), &[user]);
     assert!(state.active_auth_tickets().is_empty());
     assert!(state.last_auth_session_ticket().is_none());
+    assert!(state.last_auth_session_ticket_for_identity().is_none());
     assert_eq!(state.auth_session_ticket_issue_count(), 0);
     assert!(state.last_cancelled_auth_ticket().is_none());
     assert_eq!(state.auth_ticket_cancel_count(), 0);

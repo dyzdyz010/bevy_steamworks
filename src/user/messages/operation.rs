@@ -40,6 +40,19 @@ pub enum SteamworksUserOperation {
         /// Steam ID used as the network identity for the verifier.
         steam_id: steamworks::SteamId,
     },
+    /// Authentication session ticket bytes were issued for a networking identity.
+    ///
+    /// Final creation confirmation arrives later through both
+    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`] and
+    /// [`crate::SteamworksUserOperation::AuthenticationSessionTicketResponse`].
+    AuthenticationSessionTicketForIdentityIssued {
+        /// Ticket handle that should be cancelled when no longer needed.
+        ticket: steamworks::AuthTicket,
+        /// Raw ticket bytes to send to the verifying entity.
+        ticket_bytes: Vec<u8>,
+        /// Networking identity used for the verifier.
+        identity: steamworks::networking_types::NetworkingIdentity,
+    },
     /// A Steam Web API authentication ticket request was submitted.
     ///
     /// Ticket bytes arrive later through both
@@ -131,6 +144,16 @@ impl std::fmt::Debug for SteamworksUserOperation {
                 .field("ticket", ticket)
                 .field("ticket_bytes_len", &ticket_bytes.len())
                 .field("steam_id", steam_id)
+                .finish(),
+            Self::AuthenticationSessionTicketForIdentityIssued {
+                ticket,
+                ticket_bytes,
+                identity,
+            } => f
+                .debug_struct("AuthenticationSessionTicketForIdentityIssued")
+                .field("ticket", ticket)
+                .field("ticket_bytes_len", &ticket_bytes.len())
+                .field("identity", identity)
                 .finish(),
             Self::WebApiAuthenticationTicketRequested { ticket, identity } => f
                 .debug_struct("WebApiAuthenticationTicketRequested")

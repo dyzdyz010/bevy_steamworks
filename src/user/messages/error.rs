@@ -17,6 +17,9 @@ pub enum SteamworksUserError {
     /// A remote authentication session was requested with no ticket bytes.
     #[error("Steamworks user command requires a non-empty authentication ticket")]
     EmptyTicket,
+    /// An authentication ticket was requested for an invalid networking identity.
+    #[error("Steamworks user command requires a valid networking identity")]
+    InvalidNetworkingIdentity,
     /// The upstream Steamworks API rejected an authentication session.
     #[error("Steamworks authentication session failed: {source}")]
     AuthSession {

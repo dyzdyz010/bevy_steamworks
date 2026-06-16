@@ -7,6 +7,13 @@ pub(super) fn validate_server_command(
     command: &SteamworksServerCommand,
 ) -> Result<(), SteamworksServerError> {
     match command {
+        SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { identity } => {
+            if identity.is_invalid() {
+                Err(SteamworksServerError::InvalidNetworkingIdentity)
+            } else {
+                Ok(())
+            }
+        }
         SteamworksServerCommand::BeginAuthenticationSession { ticket, .. } => {
             if ticket.is_empty() {
                 Err(SteamworksServerError::EmptyTicket)

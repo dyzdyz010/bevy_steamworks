@@ -63,6 +63,9 @@ fn commands_fail_when_client_is_unavailable() {
 #[test]
 fn constructors_preserve_inputs() {
     let steam_id = steamworks::SteamId::from_raw(1);
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
     let app_id = steamworks::AppId(480);
 
     assert_eq!(
@@ -84,6 +87,10 @@ fn constructors_preserve_inputs() {
     assert_eq!(
         SteamworksUserCommand::get_authentication_session_ticket(steam_id),
         SteamworksUserCommand::GetAuthenticationSessionTicket { steam_id }
+    );
+    assert_eq!(
+        SteamworksUserCommand::get_authentication_session_ticket_for_identity(identity.clone()),
+        SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { identity }
     );
     assert_eq!(
         SteamworksUserCommand::get_authentication_session_ticket_for_web_api("service"),
@@ -457,6 +464,7 @@ fn state_records_user_operations_without_unbounded_history() {
     assert_eq!(state.last_level(), Some(9));
     assert!(state.active_auth_tickets().is_empty());
     assert!(state.last_auth_session_ticket().is_none());
+    assert!(state.last_auth_session_ticket_for_identity().is_none());
     assert_eq!(state.auth_session_ticket_issue_count(), 0);
     assert!(state.last_web_api_ticket_request().is_none());
     assert_eq!(state.web_api_ticket_request_count(), 0);

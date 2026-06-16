@@ -120,6 +120,30 @@ impl fmt::Debug for SteamworksServerIssuedAuthSessionTicket {
     }
 }
 
+/// Auth session ticket issued for a networking identity through the game-server command layer.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksServerIssuedAuthSessionTicketForIdentity {
+    /// Ticket handle that should be cancelled when no longer needed.
+    pub ticket: steamworks::AuthTicket,
+    /// Raw ticket bytes returned by Steam.
+    ///
+    /// Treat this as credential material; avoid logging it or storing it longer than needed.
+    pub ticket_bytes: Vec<u8>,
+    /// Networking identity used as the verifier.
+    pub identity: steamworks::networking_types::NetworkingIdentity,
+}
+
+impl fmt::Debug for SteamworksServerIssuedAuthSessionTicketForIdentity {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SteamworksServerIssuedAuthSessionTicketForIdentity")
+            .field("ticket", &self.ticket)
+            .field("ticket_bytes_len", &self.ticket_bytes.len())
+            .field("identity", &self.identity)
+            .finish()
+    }
+}
+
 /// Shared-query incoming packet forwarded to Steam Game Server.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksServerIncomingPacket {

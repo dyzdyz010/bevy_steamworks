@@ -34,6 +34,29 @@ impl std::fmt::Debug for SteamworksIssuedAuthSessionTicket {
     }
 }
 
+/// Auth session ticket issued for a networking identity through this command layer.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SteamworksIssuedAuthSessionTicketForIdentity {
+    /// Ticket handle that should be cancelled when no longer needed.
+    pub ticket: steamworks::AuthTicket,
+    /// Raw ticket bytes returned by Steam.
+    ///
+    /// Treat this as credential material; avoid logging it or storing it longer than needed.
+    pub ticket_bytes: Vec<u8>,
+    /// Networking identity used as the verifier.
+    pub identity: steamworks::networking_types::NetworkingIdentity,
+}
+
+impl std::fmt::Debug for SteamworksIssuedAuthSessionTicketForIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteamworksIssuedAuthSessionTicketForIdentity")
+            .field("ticket", &self.ticket)
+            .field("ticket_bytes_len", &self.ticket_bytes.len())
+            .field("identity", &self.identity)
+            .finish()
+    }
+}
+
 /// Web API auth ticket request submitted through this command layer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksWebApiAuthenticationTicketRequest {

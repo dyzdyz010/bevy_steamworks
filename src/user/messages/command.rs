@@ -20,6 +20,15 @@ pub enum SteamworksUserCommand {
         /// Steam ID for the entity that will verify the ticket.
         steam_id: steamworks::SteamId,
     },
+    /// Request an authentication session ticket for a specific networking identity.
+    ///
+    /// Final ticket creation confirmation arrives later through both
+    /// [`crate::SteamworksEvent::AuthSessionTicketResponse`] and
+    /// [`crate::SteamworksUserOperation::AuthenticationSessionTicketResponse`].
+    GetAuthenticationSessionTicketForIdentity {
+        /// Networking identity for the entity that will verify the ticket.
+        identity: steamworks::networking_types::NetworkingIdentity,
+    },
     /// Request an authentication ticket for Steam Web API verification.
     ///
     /// The ticket bytes arrive later through both
@@ -65,6 +74,10 @@ impl std::fmt::Debug for SteamworksUserCommand {
             Self::GetAuthenticationSessionTicket { steam_id } => f
                 .debug_struct("GetAuthenticationSessionTicket")
                 .field("steam_id", steam_id)
+                .finish(),
+            Self::GetAuthenticationSessionTicketForIdentity { identity } => f
+                .debug_struct("GetAuthenticationSessionTicketForIdentity")
+                .field("identity", identity)
                 .finish(),
             Self::GetAuthenticationSessionTicketForWebApi { identity } => f
                 .debug_struct("GetAuthenticationSessionTicketForWebApi")
@@ -116,6 +129,13 @@ impl SteamworksUserCommand {
     /// Creates a [`crate::SteamworksUserCommand::GetAuthenticationSessionTicket`] command.
     pub fn get_authentication_session_ticket(steam_id: steamworks::SteamId) -> Self {
         Self::GetAuthenticationSessionTicket { steam_id }
+    }
+
+    /// Creates a [`crate::SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity`] command.
+    pub fn get_authentication_session_ticket_for_identity(
+        identity: steamworks::networking_types::NetworkingIdentity,
+    ) -> Self {
+        Self::GetAuthenticationSessionTicketForIdentity { identity }
     }
 
     /// Creates a [`crate::SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi`] command.

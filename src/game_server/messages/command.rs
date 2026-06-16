@@ -14,6 +14,11 @@ pub enum SteamworksServerCommand {
         /// Steam ID for the entity that will verify the ticket.
         steam_id: steamworks::SteamId,
     },
+    /// Request an authentication session ticket for a specific networking identity.
+    GetAuthenticationSessionTicketForIdentity {
+        /// Networking identity for the entity that will verify the ticket.
+        identity: steamworks::networking_types::NetworkingIdentity,
+    },
     /// Cancel a locally issued authentication ticket.
     CancelAuthenticationTicket {
         /// Ticket handle to cancel.
@@ -126,6 +131,10 @@ impl fmt::Debug for SteamworksServerCommand {
                 .debug_struct("GetAuthenticationSessionTicket")
                 .field("steam_id", steam_id)
                 .finish(),
+            Self::GetAuthenticationSessionTicketForIdentity { identity } => formatter
+                .debug_struct("GetAuthenticationSessionTicketForIdentity")
+                .field("identity", identity)
+                .finish(),
             Self::CancelAuthenticationTicket { ticket } => formatter
                 .debug_struct("CancelAuthenticationTicket")
                 .field("ticket", ticket)
@@ -217,6 +226,13 @@ impl SteamworksServerCommand {
     /// Creates a [`SteamworksServerCommand::GetAuthenticationSessionTicket`] command.
     pub fn get_authentication_session_ticket(steam_id: steamworks::SteamId) -> Self {
         Self::GetAuthenticationSessionTicket { steam_id }
+    }
+
+    /// Creates a [`SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity`] command.
+    pub fn get_authentication_session_ticket_for_identity(
+        identity: steamworks::networking_types::NetworkingIdentity,
+    ) -> Self {
+        Self::GetAuthenticationSessionTicketForIdentity { identity }
     }
 
     /// Creates a [`SteamworksServerCommand::CancelAuthenticationTicket`] command.

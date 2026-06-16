@@ -27,6 +27,15 @@ pub enum SteamworksServerOperation {
         /// Steam ID used as the network identity for the verifier.
         steam_id: steamworks::SteamId,
     },
+    /// Authentication session ticket bytes were issued for a networking identity.
+    AuthenticationSessionTicketForIdentityIssued {
+        /// Ticket handle that should be cancelled when no longer needed.
+        ticket: steamworks::AuthTicket,
+        /// Raw ticket bytes to send to the verifying entity.
+        ticket_bytes: Vec<u8>,
+        /// Networking identity used for the verifier.
+        identity: steamworks::networking_types::NetworkingIdentity,
+    },
     /// A locally issued authentication ticket was cancelled.
     AuthenticationTicketCancelled {
         /// Ticket handle that was cancelled.
@@ -182,6 +191,16 @@ impl fmt::Debug for SteamworksServerOperation {
                 .field("ticket", ticket)
                 .field("ticket_bytes_len", &ticket_bytes.len())
                 .field("steam_id", steam_id)
+                .finish(),
+            Self::AuthenticationSessionTicketForIdentityIssued {
+                ticket,
+                ticket_bytes,
+                identity,
+            } => formatter
+                .debug_struct("AuthenticationSessionTicketForIdentityIssued")
+                .field("ticket", ticket)
+                .field("ticket_bytes_len", &ticket_bytes.len())
+                .field("identity", identity)
                 .finish(),
             Self::AuthenticationTicketCancelled { ticket } => formatter
                 .debug_struct("AuthenticationTicketCancelled")

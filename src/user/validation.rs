@@ -5,6 +5,13 @@ pub(super) fn validate_command(command: &SteamworksUserCommand) -> Result<(), St
         SteamworksUserCommand::GetAuthenticationSessionTicketForWebApi { identity } => {
             validate_steam_string("identity", identity)
         }
+        SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { identity } => {
+            if identity.is_invalid() {
+                Err(SteamworksUserError::InvalidNetworkingIdentity)
+            } else {
+                Ok(())
+            }
+        }
         SteamworksUserCommand::BeginAuthenticationSession { ticket, .. } => {
             if ticket.is_empty() {
                 Err(SteamworksUserError::EmptyTicket)
@@ -36,6 +43,18 @@ mod tests {
         assert_eq!(
             validate_command(&command),
             Err(SteamworksUserError::InvalidString { field: "identity" })
+        );
+    }
+
+    #[test]
+    fn validation_rejects_invalid_networking_identity() {
+        let command = SteamworksUserCommand::get_authentication_session_ticket_for_identity(
+            steamworks::networking_types::NetworkingIdentity::new(),
+        );
+
+        assert_eq!(
+            validate_command(&command),
+            Err(SteamworksUserError::InvalidNetworkingIdentity)
         );
     }
 

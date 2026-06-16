@@ -27,6 +27,7 @@ use bevy_steamworks::{
         SteamworksInputError as PreludeInputError,
         SteamworksInputOperation as PreludeInputOperation,
         SteamworksInputPlugin as PreludeInputPlugin, SteamworksInputResult as PreludeInputResult,
+        SteamworksIssuedAuthSessionTicketForIdentity as PreludeIssuedAuthSessionTicketForIdentity,
         SteamworksLobbyListFilter as PreludeLobbyListFilter,
         SteamworksMatchmakingCommand as PreludeMatchmakingCommand,
         SteamworksMatchmakingError as PreludeMatchmakingError,
@@ -88,6 +89,7 @@ use bevy_steamworks::{
         SteamworksServerCommand as PreludeServerCommand,
         SteamworksServerConfig as PreludeServerConfig, SteamworksServerError as PreludeServerError,
         SteamworksServerInitMode as PreludeServerInitMode,
+        SteamworksServerIssuedAuthSessionTicketForIdentity as PreludeServerIssuedAuthSessionTicketForIdentity,
         SteamworksServerListFilters as PreludeServerListFilters,
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
@@ -132,45 +134,47 @@ use bevy_steamworks::{
     SteamworksGamepadTextInputRequest, SteamworksGamepadTextInputShown,
     SteamworksGamepadTextInputSubmitted, SteamworksInitMode, SteamworksInputCommand,
     SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
-    SteamworksLobbyListFilter, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
-    SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
-    SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
-    SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersPlugin,
-    SteamworksMatchmakingServersResult, SteamworksNetworkingCommand, SteamworksNetworkingError,
-    SteamworksNetworkingMessagesCommand, SteamworksNetworkingMessagesError,
-    SteamworksNetworkingMessagesOperation, SteamworksNetworkingMessagesPlugin,
-    SteamworksNetworkingMessagesResult, SteamworksNetworkingOperation, SteamworksNetworkingPlugin,
-    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
-    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsConnectionUserData,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
-    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
-    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksPlugin, SteamworksPlugins,
-    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
-    SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
-    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
-    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
-    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
-    SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
-    SteamworksServerOperation, SteamworksServerPlugin, SteamworksServerResult,
-    SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
-    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem,
-    SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineGameMode,
-    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
-    SteamworksUgcCommand, SteamworksUgcContentDescriptor, SteamworksUgcError,
-    SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryOptions,
-    SteamworksUgcQueryTotal, SteamworksUgcResult, SteamworksUgcWorkshopDepotId,
-    SteamworksUnavailable, SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation,
-    SteamworksUserPlugin, SteamworksUserResult, SteamworksUtilsCommand, SteamworksUtilsError,
-    SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksIssuedAuthSessionTicketForIdentity, SteamworksLobbyListFilter,
+    SteamworksMatchmakingCommand, SteamworksMatchmakingError, SteamworksMatchmakingOperation,
+    SteamworksMatchmakingPlugin, SteamworksMatchmakingResult, SteamworksMatchmakingServersCommand,
+    SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
+    SteamworksMatchmakingServersPlugin, SteamworksMatchmakingServersResult,
+    SteamworksNetworkingCommand, SteamworksNetworkingError, SteamworksNetworkingMessagesCommand,
+    SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
+    SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesResult,
+    SteamworksNetworkingOperation, SteamworksNetworkingPlugin, SteamworksNetworkingResult,
+    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConfigEntry,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionName,
+    SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsResult,
+    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
+    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
+    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksServerError, SteamworksServerInitMode,
+    SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
+    SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
+    SteamworksServerPlugin, SteamworksServerResult, SteamworksServerUnavailable,
+    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
+    SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
+    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
+    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
+    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult,
+    SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
+    SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -583,6 +587,17 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     assert_eq!(unavailable.init_error(), Some(&source));
     assert!(unavailable.init_config().is_some());
     assert_eq!(unavailable.invalid_string_field(), None);
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
+    let identity_command =
+        SteamworksServerCommand::get_authentication_session_ticket_for_identity(identity);
+    assert!(matches!(
+        identity_command,
+        SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { .. }
+    ));
+    let _identity_ticket: Option<SteamworksServerIssuedAuthSessionTicketForIdentity> = None;
+    let _identity_error = SteamworksServerError::InvalidNetworkingIdentity;
 
     accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
@@ -616,6 +631,17 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     assert_eq!(unavailable.init_error(), None);
     assert_eq!(unavailable.init_config(), None);
     assert_eq!(unavailable.invalid_string_field(), Some("version"));
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
+    let identity_command =
+        PreludeServerCommand::get_authentication_session_ticket_for_identity(identity);
+    assert!(matches!(
+        identity_command,
+        PreludeServerCommand::GetAuthenticationSessionTicketForIdentity { .. }
+    ));
+    let _identity_ticket: Option<PreludeServerIssuedAuthSessionTicketForIdentity> = None;
+    let _identity_error = PreludeServerError::InvalidNetworkingIdentity;
 
     accepts_prelude_exports(plugin, command, operation, result, error, unavailable);
 }
@@ -1532,6 +1558,17 @@ fn user_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
+    let identity_command =
+        SteamworksUserCommand::get_authentication_session_ticket_for_identity(identity);
+    assert!(matches!(
+        identity_command,
+        SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { .. }
+    ));
+    let _identity_ticket: Option<SteamworksIssuedAuthSessionTicketForIdentity> = None;
+    let _identity_error = SteamworksUserError::InvalidNetworkingIdentity;
 
     accepts_root_exports(
         SteamworksUserPlugin::new(),
@@ -1548,6 +1585,17 @@ fn user_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
+        std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
+    );
+    let identity_command =
+        PreludeUserCommand::get_authentication_session_ticket_for_identity(identity);
+    assert!(matches!(
+        identity_command,
+        PreludeUserCommand::GetAuthenticationSessionTicketForIdentity { .. }
+    ));
+    let _identity_ticket: Option<PreludeIssuedAuthSessionTicketForIdentity> = None;
+    let _identity_error = PreludeUserError::InvalidNetworkingIdentity;
 
     accepts_prelude_exports(PreludeUserPlugin::new(), command, operation, result, error);
 }
