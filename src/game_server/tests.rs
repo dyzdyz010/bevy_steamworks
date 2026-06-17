@@ -345,6 +345,8 @@ fn constructors_preserve_inputs() {
         SteamworksServerCommand::get_authentication_session_ticket_for_identity(identity.clone()),
         SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { identity }
     );
+    let _cancel_constructor: fn(steamworks::AuthTicket) -> SteamworksServerCommand =
+        SteamworksServerCommand::cancel_authentication_ticket;
     assert_eq!(
         SteamworksServerCommand::begin_authentication_session(user, [1, 2, 3]),
         SteamworksServerCommand::BeginAuthenticationSession {
@@ -376,6 +378,16 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksServerCommand::set_game_data("mode=arena"),
+        SteamworksServerCommand::SetGameData {
+            data: "mode=arena".to_string(),
+        }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_dedicated_server(true),
+        SteamworksServerCommand::SetDedicatedServer { dedicated: true }
+    );
+    assert_eq!(
         SteamworksServerCommand::set_key_value("map", "arena"),
         SteamworksServerCommand::SetKeyValue {
             key: "map".to_string(),
@@ -393,12 +405,52 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksServerCommand::set_advertise_server_active(true),
+        SteamworksServerCommand::SetAdvertiseServerActive { active: true }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_mod_dir("spacewar"),
+        SteamworksServerCommand::SetModDir {
+            mod_dir: "spacewar".to_string(),
+        }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_map_name("arena"),
+        SteamworksServerCommand::SetMapName {
+            map_name: "arena".to_string(),
+        }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_server_name("Test Server"),
+        SteamworksServerCommand::SetServerName {
+            server_name: "Test Server".to_string(),
+        }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_max_players(16),
+        SteamworksServerCommand::SetMaxPlayers { count: 16 }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_game_tags("arena,pvp"),
+        SteamworksServerCommand::SetGameTags {
+            tags: "arena,pvp".to_string(),
+        }
+    );
+    assert_eq!(
         format!("{:?}", SteamworksServerCommand::log_on("secret-token")),
         "LogOn { token: SteamworksServerLoginToken(<redacted>) }"
     );
     assert_eq!(
         SteamworksServerCommand::clear_all_key_values(),
         SteamworksServerCommand::ClearAllKeyValues
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_password_protected(false),
+        SteamworksServerCommand::SetPasswordProtected { protected: false }
+    );
+    assert_eq!(
+        SteamworksServerCommand::set_bot_player_count(2),
+        SteamworksServerCommand::SetBotPlayerCount { count: 2 }
     );
     assert_eq!(
         SteamworksServerCommand::drain_outgoing_packets(),
