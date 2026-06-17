@@ -8,14 +8,17 @@ use bevy_ecs::{
 use crate::SteamworksClient;
 
 use super::{
-    callbacks::server_list_callbacks,
+    callbacks::{
+        ping_callbacks, player_details_callbacks, server_list_callbacks, server_rules_callbacks,
+    },
     requests::{SteamworksMatchmakingServerListRequests, SteamworksMatchmakingServersAsyncResults},
     state::SteamworksMatchmakingServersState,
     validation::{validate_command, validate_server_index_in_request},
     SteamworksGameServerItem, SteamworksMatchmakingServersCommand,
     SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
     SteamworksMatchmakingServersResult, SteamworksServerListFilters, SteamworksServerListKind,
-    SteamworksServerListRequestId,
+    SteamworksServerListRequestId, SteamworksServerQueryId, SteamworksServerQueryInfo,
+    SteamworksServerQueryKind,
 };
 
 pub(super) fn process_matchmaking_servers_commands(
@@ -65,6 +68,14 @@ pub(super) fn process_matchmaking_servers_commands(
             }
             _ => None,
         };
+        let query = match &command {
+            SteamworksMatchmakingServersCommand::PingServer { .. }
+            | SteamworksMatchmakingServersCommand::QueryPlayerDetails { .. }
+            | SteamworksMatchmakingServersCommand::QueryServerRules { .. } => {
+                Some(state.next_query_id())
+            }
+            _ => None,
+        };
 
         match handle_matchmaking_servers_command(
             &client,
@@ -72,6 +83,7 @@ pub(super) fn process_matchmaking_servers_commands(
             &requests,
             command.clone(),
             request,
+            query,
         ) {
             Ok(operation) => {
                 state.record_operation(&operation);
@@ -104,10 +116,62 @@ fn handle_matchmaking_servers_command(
     requests: &SteamworksMatchmakingServerListRequests,
     command: SteamworksMatchmakingServersCommand,
     request: Option<SteamworksServerListRequestId>,
+    query: Option<SteamworksServerQueryId>,
 ) -> Result<SteamworksMatchmakingServersOperation, SteamworksMatchmakingServersError> {
     validate_command(&command)?;
 
     match command {
+        SteamworksMatchmakingServersCommand::PingServer { target } => {
+            let query = query.expect("server query command missing query id");
+            client.matchmaking_servers().ping_server(
+                target.address,
+                target.query_port,
+                ping_callbacks(query, target, async_results.clone()),
+            );
+            Ok(
+                SteamworksMatchmakingServersOperation::ServerQuerySubmitted {
+                    query: SteamworksServerQueryInfo {
+                        query,
+                        kind: SteamworksServerQueryKind::Ping,
+                        target,
+                    },
+                },
+            )
+        }
+        SteamworksMatchmakingServersCommand::QueryPlayerDetails { target } => {
+            let query = query.expect("server query command missing query id");
+            client.matchmaking_servers().player_details(
+                target.address,
+                target.query_port,
+                player_details_callbacks(query, target, async_results.clone()),
+            );
+            Ok(
+                SteamworksMatchmakingServersOperation::ServerQuerySubmitted {
+                    query: SteamworksServerQueryInfo {
+                        query,
+                        kind: SteamworksServerQueryKind::PlayerDetails,
+                        target,
+                    },
+                },
+            )
+        }
+        SteamworksMatchmakingServersCommand::QueryServerRules { target } => {
+            let query = query.expect("server query command missing query id");
+            client.matchmaking_servers().server_rules(
+                target.address,
+                target.query_port,
+                server_rules_callbacks(query, target, async_results.clone()),
+            );
+            Ok(
+                SteamworksMatchmakingServersOperation::ServerQuerySubmitted {
+                    query: SteamworksServerQueryInfo {
+                        query,
+                        kind: SteamworksServerQueryKind::Rules,
+                        target,
+                    },
+                },
+            )
+        }
         SteamworksMatchmakingServersCommand::RequestServerList {
             app_id,
             kind,

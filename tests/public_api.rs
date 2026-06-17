@@ -94,8 +94,16 @@ use bevy_steamworks::{
         SteamworksServerListKind as PreludeServerListKind,
         SteamworksServerListRequestId as PreludeServerListRequestId,
         SteamworksServerOperation as PreludeServerOperation,
+        SteamworksServerPing as PreludeServerPing,
+        SteamworksServerPlayerDetails as PreludeServerPlayerDetails,
+        SteamworksServerPlayerInfo as PreludeServerPlayerInfo,
         SteamworksServerPlugin as PreludeServerPlugin,
-        SteamworksServerResult as PreludeServerResult,
+        SteamworksServerQueryId as PreludeServerQueryId,
+        SteamworksServerQueryInfo as PreludeServerQueryInfo,
+        SteamworksServerQueryKind as PreludeServerQueryKind,
+        SteamworksServerQueryTarget as PreludeServerQueryTarget,
+        SteamworksServerResult as PreludeServerResult, SteamworksServerRule as PreludeServerRule,
+        SteamworksServerRules as PreludeServerRules,
         SteamworksServerUnavailable as PreludeServerUnavailable,
         SteamworksStatsCommand as PreludeStatsCommand, SteamworksStatsError as PreludeStatsError,
         SteamworksStatsOperation as PreludeStatsOperation,
@@ -163,7 +171,10 @@ use bevy_steamworks::{
     SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
-    SteamworksServerPlugin, SteamworksServerResult, SteamworksServerUnavailable,
+    SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
+    SteamworksServerPlugin, SteamworksServerQueryId, SteamworksServerQueryInfo,
+    SteamworksServerQueryKind, SteamworksServerQueryTarget, SteamworksServerResult,
+    SteamworksServerRule, SteamworksServerRules, SteamworksServerUnavailable,
     SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
@@ -2281,6 +2292,24 @@ fn matchmaking_servers_api_is_exported_from_root_and_prelude() {
         kind: SteamworksServerListKind::Internet,
         filters,
     };
+    let query = SteamworksServerQueryId::from_raw(2);
+    let target = SteamworksServerQueryTarget {
+        address: std::net::Ipv4Addr::LOCALHOST,
+        query_port: 27015,
+    };
+    let query_info = SteamworksServerQueryInfo {
+        query,
+        kind: SteamworksServerQueryKind::Ping,
+        target,
+    };
+    let _root_query_types: (
+        Option<SteamworksServerPing>,
+        Option<SteamworksServerPlayerDetails>,
+        Option<SteamworksServerPlayerInfo>,
+        SteamworksServerQueryInfo,
+        Option<SteamworksServerRule>,
+        Option<SteamworksServerRules>,
+    ) = (None, None, None, query_info, None, None);
     let error = SteamworksMatchmakingServersError::ClientUnavailable;
     let result = SteamworksMatchmakingServersResult::Err {
         command: command.clone(),
@@ -2305,6 +2334,24 @@ fn matchmaking_servers_api_is_exported_from_root_and_prelude() {
         kind: PreludeServerListKind::Internet,
         filters,
     };
+    let query = PreludeServerQueryId::from_raw(2);
+    let target = PreludeServerQueryTarget {
+        address: std::net::Ipv4Addr::LOCALHOST,
+        query_port: 27015,
+    };
+    let query_info = PreludeServerQueryInfo {
+        query,
+        kind: PreludeServerQueryKind::Ping,
+        target,
+    };
+    let _prelude_query_types: (
+        Option<PreludeServerPing>,
+        Option<PreludeServerPlayerDetails>,
+        Option<PreludeServerPlayerInfo>,
+        PreludeServerQueryInfo,
+        Option<PreludeServerRule>,
+        Option<PreludeServerRules>,
+    ) = (None, None, None, query_info, None, None);
     let error = PreludeMatchmakingServersError::ClientUnavailable;
     let result = PreludeMatchmakingServersResult::Err {
         command: command.clone(),

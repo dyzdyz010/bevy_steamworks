@@ -1,11 +1,48 @@
 use super::super::{
     SteamworksGameServerItem, SteamworksServerListFilters, SteamworksServerListKind,
-    SteamworksServerListRequestId, SteamworksServerListResponse,
+    SteamworksServerListRequestId, SteamworksServerListResponse, SteamworksServerPing,
+    SteamworksServerPlayerDetails, SteamworksServerQueryId, SteamworksServerQueryInfo,
+    SteamworksServerRules,
 };
 
 /// A successfully submitted Matchmaking Servers operation or callback.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SteamworksMatchmakingServersOperation {
+    /// A direct single-server query was submitted.
+    ServerQuerySubmitted {
+        /// Submitted query context.
+        query: SteamworksServerQueryInfo,
+    },
+    /// A direct server ping returned a server snapshot.
+    ServerPingResponded {
+        /// Ping snapshot.
+        ping: SteamworksServerPing,
+    },
+    /// A direct server ping failed.
+    ServerPingFailed {
+        /// Plugin-owned query ID.
+        query: SteamworksServerQueryId,
+    },
+    /// A direct player-details query returned all player rows and completed.
+    ServerPlayerDetailsReceived {
+        /// Player-details snapshot.
+        details: SteamworksServerPlayerDetails,
+    },
+    /// A direct player-details query failed.
+    ServerPlayerDetailsFailed {
+        /// Plugin-owned query ID.
+        query: SteamworksServerQueryId,
+    },
+    /// A direct server-rules query returned all rules and completed.
+    ServerRulesReceived {
+        /// Server-rules snapshot.
+        rules: SteamworksServerRules,
+    },
+    /// A direct server-rules query failed.
+    ServerRulesFailed {
+        /// Plugin-owned query ID.
+        query: SteamworksServerQueryId,
+    },
     /// A server-list request was submitted.
     ServerListRequested {
         /// Plugin-owned request ID.

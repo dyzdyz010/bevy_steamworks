@@ -1,9 +1,10 @@
 //! High-level Bevy ECS integration for Steam Matchmaking Servers.
 //!
 //! This module builds on top of the upstream
-//! [`steamworks::MatchmakingServers`] API. It exposes Steam server-browser
-//! list requests through Bevy commands/results while keeping the upstream
-//! request handles owned by the plugin.
+//! [`steamworks::MatchmakingServers`] API. It exposes direct single-server
+//! ping/player/rules queries and Steam server-browser list requests through
+//! Bevy commands/results while keeping upstream request handles owned by the
+//! plugin.
 
 mod callbacks;
 mod commands;

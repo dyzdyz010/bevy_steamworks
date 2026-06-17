@@ -281,13 +281,17 @@ cargo run --example matchmaking
 
 ## Matchmaking Servers
 
-`SteamworksMatchmakingServersPlugin` adds a Bevy-native command/result layer for Steam's server browser APIs: LAN, Internet, favorites, history, and friends server lists. The plugin owns upstream request handles and exposes stable `SteamworksServerListRequestId` values for refresh, count/details reads, refreshing checks, and release.
+`SteamworksMatchmakingServersPlugin` adds a Bevy-native command/result layer for Steam's server browser APIs: direct single-server ping/player/rules queries plus LAN, Internet, favorites, history, and friends server lists. The plugin owns upstream list request handles and exposes stable `SteamworksServerListRequestId` values for refresh, count/details reads, refreshing checks, and release. Direct queries emit `SteamworksServerQuerySubmitted` immediately and later return `ServerPingResponded` / `ServerPlayerDetailsReceived` / `ServerRulesReceived` or the corresponding failed operation.
 
 ```rust,no_run
 # use bevy::prelude::*;
 # use bevy_steamworks::prelude::*;
 fn request_servers(mut servers: MessageWriter<SteamworksMatchmakingServersCommand>) {
     let filters = SteamworksServerListFilters::new().with("map", "arena");
+    servers.write(SteamworksMatchmakingServersCommand::ping_server(
+        std::net::Ipv4Addr::LOCALHOST,
+        27015,
+    ));
     servers.write(SteamworksMatchmakingServersCommand::request_internet_server_list(
         480,
         filters,
@@ -310,9 +314,9 @@ fn read_servers(
 }
 ```
 
-Server-list callbacks are converted into owned Bevy result messages: `ServerResponded`, `ServerFailedToRespond`, and `ServerListRefreshCompleted`. Server snapshots use `SteamworksGameServerItem`, which can be stored safely in ECS. LAN requests do not accept filters; non-LAN simple keyed filter names and values are validated before calling upstream Steamworks. The upstream wrapper models filters as a map, so repeated or order-sensitive boolean filter clauses are not represented by `SteamworksServerListFilters`. Release can fail while the upstream request is still refreshing, in which case the request remains owned by the plugin and can be released later.
+Direct single-server queries are callback based and do not create long-lived plugin handles; use the returned `SteamworksServerQueryId` to correlate submitted queries with later ping, player-details, and rules results. Server-list callbacks are converted into owned Bevy result messages: `ServerResponded`, `ServerFailedToRespond`, and `ServerListRefreshCompleted`. Server snapshots use `SteamworksGameServerItem`, which can be stored safely in ECS. LAN requests do not accept filters; non-LAN simple keyed filter names and values are validated before calling upstream Steamworks. The upstream wrapper models filters as a map, so repeated or order-sensitive boolean filter clauses are not represented by `SteamworksServerListFilters`. Release can fail while the upstream request is still refreshing, in which case the request remains owned by the plugin and can be released later.
 
-`SteamworksMatchmakingServersState` caches bounded server-browser snapshots: active request count, latest submitted/released server-list request, latest refresh and single-server refresh submissions, latest count/refreshing reads, latest server response/failure/details contexts, latest server snapshot, and refresh completion counters. It keeps counters and last snapshots instead of retaining unbounded server or callback history.
+`SteamworksMatchmakingServersState` caches bounded server-browser snapshots: active request count, latest direct query and direct query result, latest submitted/released server-list request, latest refresh and single-server refresh submissions, latest count/refreshing reads, latest server response/failure/details contexts, latest server snapshot, and refresh completion counters. It keeps counters and last snapshots instead of retaining unbounded server or callback history.
 
 Run the server browser example with:
 
@@ -321,6 +325,10 @@ cargo run --example matchmaking_servers
 $env:BEVY_STEAMWORKS_SERVER_LIST = "internet"
 $env:BEVY_STEAMWORKS_SERVER_FILTER_KEY = "map"
 $env:BEVY_STEAMWORKS_SERVER_FILTER_VALUE = "arena"
+cargo run --example matchmaking_servers
+$env:BEVY_STEAMWORKS_DIRECT_SERVER = "127.0.0.1:27015"
+$env:BEVY_STEAMWORKS_DIRECT_SERVER_PLAYERS = "1"
+$env:BEVY_STEAMWORKS_DIRECT_SERVER_RULES = "1"
 cargo run --example matchmaking_servers
 ```
 

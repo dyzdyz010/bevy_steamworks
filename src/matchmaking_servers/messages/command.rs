@@ -2,11 +2,27 @@ use bevy_ecs::message::Message;
 
 use super::super::{
     SteamworksServerListFilters, SteamworksServerListKind, SteamworksServerListRequestId,
+    SteamworksServerQueryTarget,
 };
 
 /// A high-level command for Steam Matchmaking Servers workflows.
 #[derive(Clone, Debug, Message, PartialEq, Eq)]
 pub enum SteamworksMatchmakingServersCommand {
+    /// Ping one server directly.
+    PingServer {
+        /// Target server endpoint.
+        target: SteamworksServerQueryTarget,
+    },
+    /// Query player details from one server directly.
+    QueryPlayerDetails {
+        /// Target server endpoint.
+        target: SteamworksServerQueryTarget,
+    },
+    /// Query server rules from one server directly.
+    QueryServerRules {
+        /// Target server endpoint.
+        target: SteamworksServerQueryTarget,
+    },
     /// Request a Steam server list.
     RequestServerList {
         /// Steam app ID to query.
@@ -53,6 +69,36 @@ pub enum SteamworksMatchmakingServersCommand {
 }
 
 impl SteamworksMatchmakingServersCommand {
+    /// Creates a direct server ping command.
+    pub fn ping_server(address: std::net::Ipv4Addr, query_port: u16) -> Self {
+        Self::PingServer {
+            target: SteamworksServerQueryTarget {
+                address,
+                query_port,
+            },
+        }
+    }
+
+    /// Creates a direct player-details query command.
+    pub fn query_player_details(address: std::net::Ipv4Addr, query_port: u16) -> Self {
+        Self::QueryPlayerDetails {
+            target: SteamworksServerQueryTarget {
+                address,
+                query_port,
+            },
+        }
+    }
+
+    /// Creates a direct server-rules query command.
+    pub fn query_server_rules(address: std::net::Ipv4Addr, query_port: u16) -> Self {
+        Self::QueryServerRules {
+            target: SteamworksServerQueryTarget {
+                address,
+                query_port,
+            },
+        }
+    }
+
     /// Creates a LAN server-list request command.
     pub fn request_lan_server_list(app_id: impl Into<steamworks::AppId>) -> Self {
         Self::RequestServerList {

@@ -19,6 +19,13 @@ pub struct SteamworksMatchmakingServersState {
     last_server_details_read: Option<SteamworksServerListServerIndex>,
     last_server: Option<SteamworksGameServerItem>,
     last_refresh_response: Option<SteamworksServerListResponse>,
+    last_server_query: Option<SteamworksServerQueryInfo>,
+    last_server_ping: Option<SteamworksServerPing>,
+    last_failed_server_ping: Option<SteamworksServerQueryId>,
+    last_server_player_details: Option<SteamworksServerPlayerDetails>,
+    last_failed_server_player_details: Option<SteamworksServerQueryId>,
+    last_server_rules: Option<SteamworksServerRules>,
+    last_failed_server_rules: Option<SteamworksServerQueryId>,
     server_list_request_count: u64,
     server_list_release_count: u64,
     server_list_refresh_request_count: u64,
@@ -28,7 +35,15 @@ pub struct SteamworksMatchmakingServersState {
     server_response_count: u64,
     server_failure_count: u64,
     refresh_complete_count: u64,
+    server_query_count: u64,
+    server_ping_response_count: u64,
+    server_ping_failure_count: u64,
+    server_player_details_count: u64,
+    server_player_details_failure_count: u64,
+    server_rules_count: u64,
+    server_rules_failure_count: u64,
     next_request_id: u64,
+    next_query_id: u64,
 }
 
 impl SteamworksMatchmakingServersState {
@@ -102,6 +117,41 @@ impl SteamworksMatchmakingServersState {
         self.last_refresh_response
     }
 
+    /// Returns the most recent direct server query submitted through this plugin.
+    pub fn last_server_query(&self) -> Option<SteamworksServerQueryInfo> {
+        self.last_server_query
+    }
+
+    /// Returns the most recent direct server ping response.
+    pub fn last_server_ping(&self) -> Option<&SteamworksServerPing> {
+        self.last_server_ping.as_ref()
+    }
+
+    /// Returns the most recent direct server ping query that failed.
+    pub fn last_failed_server_ping(&self) -> Option<SteamworksServerQueryId> {
+        self.last_failed_server_ping
+    }
+
+    /// Returns the most recent direct server player-details response.
+    pub fn last_server_player_details(&self) -> Option<&SteamworksServerPlayerDetails> {
+        self.last_server_player_details.as_ref()
+    }
+
+    /// Returns the most recent direct server player-details query that failed.
+    pub fn last_failed_server_player_details(&self) -> Option<SteamworksServerQueryId> {
+        self.last_failed_server_player_details
+    }
+
+    /// Returns the most recent direct server-rules response.
+    pub fn last_server_rules(&self) -> Option<&SteamworksServerRules> {
+        self.last_server_rules.as_ref()
+    }
+
+    /// Returns the most recent direct server-rules query that failed.
+    pub fn last_failed_server_rules(&self) -> Option<SteamworksServerQueryId> {
+        self.last_failed_server_rules
+    }
+
     /// Returns how many server-list requests were submitted.
     pub fn server_list_request_count(&self) -> u64 {
         self.server_list_request_count
@@ -147,12 +197,78 @@ impl SteamworksMatchmakingServersState {
         self.refresh_complete_count
     }
 
+    /// Returns how many direct server queries were submitted.
+    pub fn server_query_count(&self) -> u64 {
+        self.server_query_count
+    }
+
+    /// Returns how many direct server ping responses were observed.
+    pub fn server_ping_response_count(&self) -> u64 {
+        self.server_ping_response_count
+    }
+
+    /// Returns how many direct server ping failures were observed.
+    pub fn server_ping_failure_count(&self) -> u64 {
+        self.server_ping_failure_count
+    }
+
+    /// Returns how many direct server player-details responses were observed.
+    pub fn server_player_details_count(&self) -> u64 {
+        self.server_player_details_count
+    }
+
+    /// Returns how many direct server player-details failures were observed.
+    pub fn server_player_details_failure_count(&self) -> u64 {
+        self.server_player_details_failure_count
+    }
+
+    /// Returns how many direct server-rules responses were observed.
+    pub fn server_rules_count(&self) -> u64 {
+        self.server_rules_count
+    }
+
+    /// Returns how many direct server-rules failures were observed.
+    pub fn server_rules_failure_count(&self) -> u64 {
+        self.server_rules_failure_count
+    }
+
     pub(super) fn record_error(&mut self, error: SteamworksMatchmakingServersError) {
         self.last_error = Some(error);
     }
 
     pub(super) fn record_operation(&mut self, operation: &SteamworksMatchmakingServersOperation) {
         match operation {
+            SteamworksMatchmakingServersOperation::ServerQuerySubmitted { query } => {
+                self.last_server_query = Some(*query);
+                self.server_query_count = self.server_query_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerPingResponded { ping } => {
+                self.last_server = Some(ping.server.clone());
+                self.last_server_ping = Some(ping.clone());
+                self.server_ping_response_count = self.server_ping_response_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerPingFailed { query } => {
+                self.last_failed_server_ping = Some(*query);
+                self.server_ping_failure_count = self.server_ping_failure_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerPlayerDetailsReceived { details } => {
+                self.last_server_player_details = Some(details.clone());
+                self.server_player_details_count =
+                    self.server_player_details_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerPlayerDetailsFailed { query } => {
+                self.last_failed_server_player_details = Some(*query);
+                self.server_player_details_failure_count =
+                    self.server_player_details_failure_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerRulesReceived { rules } => {
+                self.last_server_rules = Some(rules.clone());
+                self.server_rules_count = self.server_rules_count.saturating_add(1);
+            }
+            SteamworksMatchmakingServersOperation::ServerRulesFailed { query } => {
+                self.last_failed_server_rules = Some(*query);
+                self.server_rules_failure_count = self.server_rules_failure_count.saturating_add(1);
+            }
             SteamworksMatchmakingServersOperation::ServerListRequested {
                 request,
                 app_id,
@@ -259,5 +375,11 @@ impl SteamworksMatchmakingServersState {
         let request_id = self.next_request_id;
         self.next_request_id = self.next_request_id.wrapping_add(1);
         SteamworksServerListRequestId::from_raw(request_id)
+    }
+
+    pub(super) fn next_query_id(&mut self) -> SteamworksServerQueryId {
+        let query_id = self.next_query_id;
+        self.next_query_id = self.next_query_id.wrapping_add(1);
+        SteamworksServerQueryId::from_raw(query_id)
     }
 }

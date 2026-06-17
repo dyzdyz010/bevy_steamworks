@@ -47,9 +47,28 @@ fn plugin_name_matches_matchmaking_servers_type_path_for_bevy_tracking() {
 #[test]
 fn server_list_commands_preserve_inputs() {
     let request = SteamworksServerListRequestId::from_raw(4);
+    let target = SteamworksServerQueryTarget {
+        address: Ipv4Addr::LOCALHOST,
+        query_port: 27015,
+    };
     let filters = SteamworksServerListFilters::new().with("map", "arena");
 
     assert_eq!(request.raw(), 4);
+    assert_eq!(
+        SteamworksMatchmakingServersCommand::ping_server(target.address, target.query_port),
+        SteamworksMatchmakingServersCommand::PingServer { target }
+    );
+    assert_eq!(
+        SteamworksMatchmakingServersCommand::query_player_details(
+            target.address,
+            target.query_port
+        ),
+        SteamworksMatchmakingServersCommand::QueryPlayerDetails { target }
+    );
+    assert_eq!(
+        SteamworksMatchmakingServersCommand::query_server_rules(target.address, target.query_port),
+        SteamworksMatchmakingServersCommand::QueryServerRules { target }
+    );
     assert_eq!(
         SteamworksMatchmakingServersCommand::request_lan_server_list(480),
         SteamworksMatchmakingServersCommand::RequestServerList {
@@ -120,6 +139,11 @@ fn server_list_commands_preserve_inputs() {
 fn state_records_callback_operations_without_unbounded_history() {
     let mut state = SteamworksMatchmakingServersState::default();
     let request = SteamworksServerListRequestId::from_raw(1);
+    let query = SteamworksServerQueryId::from_raw(2);
+    let target = SteamworksServerQueryTarget {
+        address: Ipv4Addr::LOCALHOST,
+        query_port: 27015,
+    };
     let filters = SteamworksServerListFilters::new().with("map", "arena");
     let server = SteamworksGameServerItem {
         app_id: 480,
@@ -143,7 +167,56 @@ fn state_records_callback_operations_without_unbounded_history() {
         map: "arena".to_owned(),
         tags: "tag".to_owned(),
     };
+    let ping = SteamworksServerPing {
+        query,
+        target,
+        server: server.clone(),
+    };
+    let player_details = SteamworksServerPlayerDetails {
+        query,
+        target,
+        players: vec![SteamworksServerPlayerInfo {
+            name: "Ada".to_owned(),
+            score: 10,
+            time_played: Duration::from_secs(60),
+        }],
+    };
+    let rules = SteamworksServerRules {
+        query,
+        target,
+        rules: vec![SteamworksServerRule {
+            key: "map".to_owned(),
+            value: "arena".to_owned(),
+        }],
+    };
 
+    state.record_operation(
+        &SteamworksMatchmakingServersOperation::ServerQuerySubmitted {
+            query: SteamworksServerQueryInfo {
+                query,
+                kind: SteamworksServerQueryKind::Ping,
+                target,
+            },
+        },
+    );
+    state.record_operation(
+        &SteamworksMatchmakingServersOperation::ServerPingResponded { ping: ping.clone() },
+    );
+    state.record_operation(&SteamworksMatchmakingServersOperation::ServerPingFailed { query });
+    state.record_operation(
+        &SteamworksMatchmakingServersOperation::ServerPlayerDetailsReceived {
+            details: player_details.clone(),
+        },
+    );
+    state.record_operation(
+        &SteamworksMatchmakingServersOperation::ServerPlayerDetailsFailed { query },
+    );
+    state.record_operation(
+        &SteamworksMatchmakingServersOperation::ServerRulesReceived {
+            rules: rules.clone(),
+        },
+    );
+    state.record_operation(&SteamworksMatchmakingServersOperation::ServerRulesFailed { query });
     state.record_operation(
         &SteamworksMatchmakingServersOperation::ServerListRequested {
             request,
@@ -203,6 +276,27 @@ fn state_records_callback_operations_without_unbounded_history() {
             filters,
         })
     );
+    assert_eq!(
+        state.last_server_query(),
+        Some(SteamworksServerQueryInfo {
+            query,
+            kind: SteamworksServerQueryKind::Ping,
+            target,
+        })
+    );
+    assert_eq!(state.last_server_ping(), Some(&ping));
+    assert_eq!(state.last_failed_server_ping(), Some(query));
+    assert_eq!(state.last_server_player_details(), Some(&player_details));
+    assert_eq!(state.last_failed_server_player_details(), Some(query));
+    assert_eq!(state.last_server_rules(), Some(&rules));
+    assert_eq!(state.last_failed_server_rules(), Some(query));
+    assert_eq!(state.server_query_count(), 1);
+    assert_eq!(state.server_ping_response_count(), 1);
+    assert_eq!(state.server_ping_failure_count(), 1);
+    assert_eq!(state.server_player_details_count(), 1);
+    assert_eq!(state.server_player_details_failure_count(), 1);
+    assert_eq!(state.server_rules_count(), 1);
+    assert_eq!(state.server_rules_failure_count(), 1);
     assert_eq!(state.server_list_request_count(), 1);
     assert_eq!(state.last_server_list_refresh_request(), Some(request));
     assert_eq!(state.server_list_refresh_request_count(), 1);

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{net::SocketAddrV4, time::Duration};
 
 use bevy_app::{prelude::*, ScheduleRunnerPlugin};
 use bevy_ecs::prelude::*;
@@ -35,6 +35,27 @@ fn request_server_list(
         .unwrap_or_else(|_| "lan".to_owned())
         .to_ascii_lowercase();
     let filters = server_filters_from_env();
+
+    if let Ok(target) = std::env::var("BEVY_STEAMWORKS_DIRECT_SERVER") {
+        if let Ok(target) = target.parse::<SocketAddrV4>() {
+            commands.write(SteamworksMatchmakingServersCommand::ping_server(
+                *target.ip(),
+                target.port(),
+            ));
+            if std::env::var("BEVY_STEAMWORKS_DIRECT_SERVER_PLAYERS").is_ok() {
+                commands.write(SteamworksMatchmakingServersCommand::query_player_details(
+                    *target.ip(),
+                    target.port(),
+                ));
+            }
+            if std::env::var("BEVY_STEAMWORKS_DIRECT_SERVER_RULES").is_ok() {
+                commands.write(SteamworksMatchmakingServersCommand::query_server_rules(
+                    *target.ip(),
+                    target.port(),
+                ));
+            }
+        }
+    }
 
     let command = match list_kind.as_str() {
         "internet" => {

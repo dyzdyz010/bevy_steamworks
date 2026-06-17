@@ -42,6 +42,53 @@ pub struct SteamworksServerListServerIndex {
     pub server_index: i32,
 }
 
+/// Opaque ID for a single-server query owned by this plugin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SteamworksServerQueryId(u64);
+
+impl SteamworksServerQueryId {
+    /// Creates an ID from a raw integer.
+    pub fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the raw integer backing this plugin-owned ID.
+    pub fn raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// Target address for direct Steam matchmaking server queries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SteamworksServerQueryTarget {
+    /// IPv4 address of the server.
+    pub address: Ipv4Addr,
+    /// Query port of the server.
+    pub query_port: u16,
+}
+
+/// Direct server query kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SteamworksServerQueryKind {
+    /// Ping one server and read its server item snapshot.
+    Ping,
+    /// Query player details from one server.
+    PlayerDetails,
+    /// Query server rules from one server.
+    Rules,
+}
+
+/// Submitted direct server query context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SteamworksServerQueryInfo {
+    /// Plugin-owned query ID.
+    pub query: SteamworksServerQueryId,
+    /// Direct query kind.
+    pub kind: SteamworksServerQueryKind,
+    /// Target server endpoint.
+    pub target: SteamworksServerQueryTarget,
+}
+
 /// Server-list count read context.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SteamworksServerListCount {
@@ -178,6 +225,84 @@ pub struct SteamworksGameServerItem {
     pub map: String,
     /// Server tags.
     pub tags: String,
+}
+
+/// Successful direct ping result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerPing {
+    /// Plugin-owned query ID.
+    pub query: SteamworksServerQueryId,
+    /// Target server endpoint.
+    pub target: SteamworksServerQueryTarget,
+    /// Server snapshot returned by Steam.
+    pub server: SteamworksGameServerItem,
+}
+
+/// Player row returned by a direct player-details query.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerPlayerInfo {
+    /// Player name reported by the server.
+    pub name: String,
+    /// Player score reported by the server.
+    pub score: i32,
+    /// Time played reported by the server.
+    pub time_played: Duration,
+}
+
+impl SteamworksServerPlayerInfo {
+    pub(super) fn from_steam(name: &std::ffi::CStr, score: i32, time_played: f32) -> Self {
+        let seconds = if time_played.is_finite() && time_played > 0.0 {
+            time_played
+        } else {
+            0.0
+        };
+
+        Self {
+            name: name.to_string_lossy().into_owned(),
+            score,
+            time_played: Duration::from_secs_f32(seconds),
+        }
+    }
+}
+
+/// Successful direct player-details query result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerPlayerDetails {
+    /// Plugin-owned query ID.
+    pub query: SteamworksServerQueryId,
+    /// Target server endpoint.
+    pub target: SteamworksServerQueryTarget,
+    /// Players returned by the server.
+    pub players: Vec<SteamworksServerPlayerInfo>,
+}
+
+/// Rule row returned by a direct server-rules query.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerRule {
+    /// Rule key reported by the server.
+    pub key: String,
+    /// Rule value reported by the server.
+    pub value: String,
+}
+
+impl SteamworksServerRule {
+    pub(super) fn from_steam(key: &std::ffi::CStr, value: &std::ffi::CStr) -> Self {
+        Self {
+            key: key.to_string_lossy().into_owned(),
+            value: value.to_string_lossy().into_owned(),
+        }
+    }
+}
+
+/// Successful direct server-rules query result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksServerRules {
+    /// Plugin-owned query ID.
+    pub query: SteamworksServerQueryId,
+    /// Target server endpoint.
+    pub target: SteamworksServerQueryTarget,
+    /// Rules returned by the server.
+    pub rules: Vec<SteamworksServerRule>,
 }
 
 impl SteamworksGameServerItem {
