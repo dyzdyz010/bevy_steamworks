@@ -145,7 +145,24 @@ fn auto_accept_command_applies_before_run_callbacks_set() {
 
 #[test]
 fn constructors_preserve_inputs() {
-    let peer = SteamworksNetworkingPeer::steam_id(steamworks::SteamId::from_raw(42));
+    let steam_id = steamworks::SteamId::from_raw(42);
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 27015));
+    let identity = steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id);
+    let peer = SteamworksNetworkingPeer::steam_id(steam_id);
+
+    assert_eq!(peer, SteamworksNetworkingPeer::SteamId(steam_id));
+    assert_eq!(
+        SteamworksNetworkingPeer::ip(addr),
+        SteamworksNetworkingPeer::Ip(addr)
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::local_host(),
+        SteamworksNetworkingPeer::LocalHost
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::identity(identity.clone()),
+        SteamworksNetworkingPeer::Identity(identity)
+    );
 
     assert_eq!(
         SteamworksNetworkingMessagesCommand::send_message(
@@ -162,8 +179,33 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingMessagesCommand::send_message_to_steam_id(
+            steam_id,
+            steamworks::networking_types::SendFlags::RELIABLE,
+            3,
+            [4, 5],
+        ),
+        SteamworksNetworkingMessagesCommand::SendMessage {
+            peer: SteamworksNetworkingPeer::SteamId(steam_id),
+            send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+            channel: 3,
+            data: vec![4, 5],
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingMessagesCommand::receive_messages(2, 16),
+        SteamworksNetworkingMessagesCommand::ReceiveMessages {
+            channel: 2,
+            batch_size: 16,
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingMessagesCommand::get_session_connection_info(peer.clone()),
         SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo { peer }
+    );
+    assert_eq!(
+        SteamworksNetworkingMessagesCommand::set_auto_accept_session_requests(false),
+        SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled: false }
     );
 }
 
