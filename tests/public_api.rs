@@ -47,6 +47,7 @@ use bevy_steamworks::{
         SteamworksNetworkingMessagesOperation as PreludeNetworkingMessagesOperation,
         SteamworksNetworkingMessagesPlugin as PreludeNetworkingMessagesPlugin,
         SteamworksNetworkingMessagesResult as PreludeNetworkingMessagesResult,
+        SteamworksNetworkingMessagesState as PreludeNetworkingMessagesState,
         SteamworksNetworkingOperation as PreludeNetworkingOperation,
         SteamworksNetworkingPeer as PreludeNetworkingPeer,
         SteamworksNetworkingPlugin as PreludeNetworkingPlugin,
@@ -162,8 +163,8 @@ use bevy_steamworks::{
     SteamworksNetworkingCommand, SteamworksNetworkingError, SteamworksNetworkingMessagesCommand,
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
     SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesResult,
-    SteamworksNetworkingOperation, SteamworksNetworkingPeer, SteamworksNetworkingPlugin,
-    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
+    SteamworksNetworkingMessagesState, SteamworksNetworkingOperation, SteamworksNetworkingPeer,
+    SteamworksNetworkingPlugin, SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
     SteamworksNetworkingSocketsConnectionMessages, SteamworksNetworkingSocketsConnectionName,
     SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
@@ -952,6 +953,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         _operation: SteamworksNetworkingMessagesOperation,
         _result: SteamworksNetworkingMessagesResult,
         _error: SteamworksNetworkingMessagesError,
+        _state: SteamworksNetworkingMessagesState,
     ) {
     }
 
@@ -962,6 +964,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         _operation: PreludeNetworkingMessagesOperation,
         _result: PreludeNetworkingMessagesResult,
         _error: PreludeNetworkingMessagesError,
+        _state: PreludeNetworkingMessagesState,
     ) {
     }
 
@@ -986,8 +989,18 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     };
     let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
+    let state = SteamworksNetworkingMessagesState::default();
+    assert_eq!(state.last_received_message(), None);
+    assert_eq!(
+        state.last_received_message_from_peer(&peer.to_identity()),
+        None
+    );
+    assert!(state.session_requests().is_empty());
+    assert_eq!(state.session_request(&peer.to_identity()), None);
+    assert!(state.session_failures().is_empty());
+    assert_eq!(state.session_failure(&peer.to_identity()), None);
 
-    accepts_root_exports(plugin, peer, command, operation, result, error);
+    accepts_root_exports(plugin, peer, command, operation, result, error, state);
 
     let steam_id = steamworks::SteamId::from_raw(7);
     let peer = PreludeNetworkingPeer::from(steam_id);
@@ -1010,8 +1023,18 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     };
     let plugin = PreludeNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
+    let state = PreludeNetworkingMessagesState::default();
+    assert_eq!(state.last_received_message(), None);
+    assert_eq!(
+        state.last_received_message_from_peer(&peer.to_identity()),
+        None
+    );
+    assert!(state.session_requests().is_empty());
+    assert_eq!(state.session_request(&peer.to_identity()), None);
+    assert!(state.session_failures().is_empty());
+    assert_eq!(state.session_failure(&peer.to_identity()), None);
 
-    accepts_prelude_exports(plugin, peer, command, operation, result, error);
+    accepts_prelude_exports(plugin, peer, command, operation, result, error, state);
 }
 
 #[test]

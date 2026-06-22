@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use super::SteamworksNetworkingMessagesState;
+use super::{
+    push_bounded_session_failure, push_bounded_session_request, SteamworksNetworkingMessagesState,
+};
 use crate::networking_messages::{
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
     SteamworksNetworkingMessagesResult,
@@ -36,10 +38,12 @@ impl SteamworksNetworkingMessagesState {
             }
             SteamworksNetworkingMessagesOperation::SessionRequestReceived { request } => {
                 self.session_request_count = self.session_request_count.saturating_add(1);
+                push_bounded_session_request(&mut self.session_requests, request.clone());
                 self.last_session_request = Some(request.clone());
             }
             SteamworksNetworkingMessagesOperation::SessionFailed { info } => {
                 self.session_failure_count = self.session_failure_count.saturating_add(1);
+                push_bounded_session_failure(&mut self.session_failures, info.clone());
                 self.last_session_failure = Some(info.clone());
             }
         }

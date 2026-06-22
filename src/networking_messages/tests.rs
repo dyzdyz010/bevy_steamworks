@@ -243,6 +243,9 @@ fn state_records_operations_without_unbounded_message_history() {
     let peer = steamworks::networking_types::NetworkingIdentity::new_steam_id(
         steamworks::SteamId::from_raw(42),
     );
+    let other_peer = steamworks::networking_types::NetworkingIdentity::new_steam_id(
+        steamworks::SteamId::from_raw(43),
+    );
     let first = SteamworksNetworkingMessage {
         peer: peer.clone(),
         data: vec![1],
@@ -259,6 +262,14 @@ fn state_records_operations_without_unbounded_message_history() {
         message_number: 2,
         connection_user_data: 0,
     };
+    let third = SteamworksNetworkingMessage {
+        peer: other_peer.clone(),
+        data: vec![3],
+        channel: 1,
+        send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
+        message_number: 3,
+        connection_user_data: 0,
+    };
 
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
         channel: 0,
@@ -266,7 +277,7 @@ fn state_records_operations_without_unbounded_message_history() {
     });
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
         channel: 0,
-        messages: vec![second.clone()],
+        messages: vec![second.clone(), third.clone()],
     });
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessageSent {
         peer: SteamworksNetworkingPeer::identity(peer.clone()),
@@ -277,18 +288,117 @@ fn state_records_operations_without_unbounded_message_history() {
     state.record_operation(
         &SteamworksNetworkingMessagesOperation::SessionRequestReceived {
             request: SteamworksNetworkingMessagesSessionRequestInfo {
-                remote: peer,
+                remote: peer.clone(),
                 accepted: true,
             },
         },
     );
+    state.record_operation(&SteamworksNetworkingMessagesOperation::SessionFailed {
+        info: SteamworksNetworkingMessagesConnectionInfo {
+            state: steamworks::networking_types::NetworkingConnectionState::ProblemDetectedLocally,
+            remote: Some(peer.clone()),
+            user_data: Some(7),
+            end_reason: None,
+            realtime: None,
+        },
+    });
     state.record_operation(
         &SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: false },
     );
 
-    assert_eq!(state.received_messages(), &[second]);
-    assert_eq!(state.received_count(), 2);
+    assert_eq!(state.received_messages(), &[second.clone(), third.clone()]);
+    assert_eq!(state.last_received_message(), Some(&third));
+    assert_eq!(
+        state
+            .received_messages_on_channel(0)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![second.clone()]
+    );
+    assert_eq!(
+        state
+            .received_messages_from_peer(&peer)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![second.clone()]
+    );
+    assert_eq!(state.last_received_message_from_peer(&peer), Some(&second));
+    assert_eq!(state.received_count(), 3);
     assert_eq!(state.sent_count(), 1);
     assert_eq!(state.session_request_count(), 1);
+    assert_eq!(state.session_requests().len(), 1);
+    assert_eq!(
+        state.session_request(&peer),
+        Some(&SteamworksNetworkingMessagesSessionRequestInfo {
+            remote: peer.clone(),
+            accepted: true,
+        })
+    );
+    assert_eq!(state.session_failure_count(), 1);
+    assert_eq!(state.session_failures().len(), 1);
+    assert_eq!(
+        state.session_failure(&peer),
+        Some(&SteamworksNetworkingMessagesConnectionInfo {
+            state: steamworks::networking_types::NetworkingConnectionState::ProblemDetectedLocally,
+            remote: Some(peer),
+            user_data: Some(7),
+            end_reason: None,
+            realtime: None,
+        })
+    );
     assert!(!state.auto_accept_session_requests());
+}
+
+#[test]
+fn session_callback_caches_are_bounded() {
+    let mut state = SteamworksNetworkingMessagesState::new(true);
+
+    for raw in 1..=(super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT as u64 + 1) {
+        let remote = steamworks::networking_types::NetworkingIdentity::new_steam_id(
+            steamworks::SteamId::from_raw(raw),
+        );
+        state.record_operation(
+            &SteamworksNetworkingMessagesOperation::SessionRequestReceived {
+                request: SteamworksNetworkingMessagesSessionRequestInfo {
+                    remote: remote.clone(),
+                    accepted: raw % 2 == 0,
+                },
+            },
+        );
+        state.record_operation(&SteamworksNetworkingMessagesOperation::SessionFailed {
+            info: SteamworksNetworkingMessagesConnectionInfo {
+                state: steamworks::networking_types::NetworkingConnectionState::ClosedByPeer,
+                remote: Some(remote),
+                user_data: None,
+                end_reason: None,
+                realtime: None,
+            },
+        });
+    }
+
+    let first_remote = steamworks::networking_types::NetworkingIdentity::new_steam_id(
+        steamworks::SteamId::from_raw(1),
+    );
+    let second_remote = steamworks::networking_types::NetworkingIdentity::new_steam_id(
+        steamworks::SteamId::from_raw(2),
+    );
+
+    assert_eq!(
+        state.session_requests().len(),
+        super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.session_failures().len(),
+        super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT
+    );
+    assert_eq!(state.session_request(&first_remote), None);
+    assert_eq!(state.session_failure(&first_remote), None);
+    assert_eq!(
+        state.session_request(&second_remote),
+        Some(&SteamworksNetworkingMessagesSessionRequestInfo {
+            remote: second_remote.clone(),
+            accepted: true,
+        })
+    );
+    assert!(state.session_failure(&second_remote).is_some());
 }
