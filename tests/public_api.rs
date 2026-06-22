@@ -677,6 +677,15 @@ fn input_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
+    assert!(bevy_steamworks::SteamworksInputHandle::from_raw(1).is_valid());
+    assert!(!bevy_steamworks::SteamworksInputHandle::from_raw(0).is_valid());
+    assert!(bevy_steamworks::SteamworksInputActionSetHandle::from_raw(1).is_valid());
+    assert!(!bevy_steamworks::SteamworksInputActionSetHandle::from_raw(0).is_valid());
+    assert!(bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1).is_valid());
+    assert!(!bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(0).is_valid());
+    assert!(bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1).is_valid());
+    assert!(!bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(0).is_valid());
+
     let command = SteamworksInputCommand::init(false);
     let operation = SteamworksInputOperation::Initialized {
         explicitly_call_run_frame: false,

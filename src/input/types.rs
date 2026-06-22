@@ -13,7 +13,8 @@ impl SteamworksInputHandle {
         self.0
     }
 
-    pub(super) fn is_valid(self) -> bool {
+    /// Returns whether this is not Steam Input's invalid zero handle.
+    pub const fn is_valid(self) -> bool {
         self.0 != 0
     }
 }
@@ -33,7 +34,8 @@ impl SteamworksInputActionSetHandle {
         self.0
     }
 
-    pub(super) fn is_valid(self) -> bool {
+    /// Returns whether this is not Steam Input's invalid zero handle.
+    pub const fn is_valid(self) -> bool {
         self.0 != 0
     }
 }
@@ -53,7 +55,8 @@ impl SteamworksInputDigitalActionHandle {
         self.0
     }
 
-    pub(super) fn is_valid(self) -> bool {
+    /// Returns whether this is not Steam Input's invalid zero handle.
+    pub const fn is_valid(self) -> bool {
         self.0 != 0
     }
 }
@@ -73,7 +76,8 @@ impl SteamworksInputAnalogActionHandle {
         self.0
     }
 
-    pub(super) fn is_valid(self) -> bool {
+    /// Returns whether this is not Steam Input's invalid zero handle.
+    pub const fn is_valid(self) -> bool {
         self.0 != 0
     }
 }

@@ -71,6 +71,14 @@ fn constructors_preserve_inputs() {
     let analog_action = SteamworksInputAnalogActionHandle::from_raw(4);
 
     assert_eq!(controller.raw(), 1);
+    assert!(controller.is_valid());
+    assert!(action_set.is_valid());
+    assert!(digital_action.is_valid());
+    assert!(analog_action.is_valid());
+    assert!(!SteamworksInputHandle::from_raw(0).is_valid());
+    assert!(!SteamworksInputActionSetHandle::from_raw(0).is_valid());
+    assert!(!SteamworksInputDigitalActionHandle::from_raw(0).is_valid());
+    assert!(!SteamworksInputAnalogActionHandle::from_raw(0).is_valid());
     assert_eq!(
         SteamworksInputCommand::init(true),
         SteamworksInputCommand::Init {
