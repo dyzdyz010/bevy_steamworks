@@ -1,9 +1,12 @@
 use super::{
     helpers::{
         merge_achievement_display_attributes, merge_achievement_info, remove_leaderboard_id,
-        remove_leaderboard_info, update_achievement, upsert_achievement_display_attribute,
-        upsert_global_achievement_percentage, upsert_leaderboard_id, upsert_leaderboard_info,
-        upsert_named_value,
+        remove_leaderboard_info, remove_leaderboard_result_caches, update_achievement,
+        upsert_achievement_display_attribute, upsert_global_achievement_percentage,
+        upsert_global_stat_history, upsert_global_stat_value,
+        upsert_leaderboard_entries_download_request, upsert_leaderboard_entries_download_result,
+        upsert_leaderboard_id, upsert_leaderboard_info, upsert_leaderboard_score_upload_request,
+        upsert_leaderboard_score_upload_result, upsert_named_value,
     },
     SteamworksAchievementInfo, SteamworksGlobalStatHistory, SteamworksGlobalStatValue,
     SteamworksLeaderboardEntriesDownloadRequest, SteamworksLeaderboardEntriesDownloadResult,
@@ -166,34 +169,46 @@ impl SteamworksStatsState {
             }
             SteamworksStatsOperation::GlobalStatsRequested { .. } => {
                 self.last_global_stats_game_id = None;
+                self.global_stat_i64.clear();
                 self.last_global_stat_i64 = None;
+                self.global_stat_f64.clear();
                 self.last_global_stat_f64 = None;
+                self.global_stat_history_i64.clear();
                 self.last_global_stat_history_i64 = None;
+                self.global_stat_history_f64.clear();
                 self.last_global_stat_history_f64 = None;
             }
             SteamworksStatsOperation::GlobalStatI64Read { name, value } => {
-                self.last_global_stat_i64 = Some(SteamworksGlobalStatValue {
+                let value = SteamworksGlobalStatValue {
                     name: name.clone(),
                     value: *value,
-                });
+                };
+                upsert_global_stat_value(&mut self.global_stat_i64, value.clone());
+                self.last_global_stat_i64 = Some(value);
             }
             SteamworksStatsOperation::GlobalStatF64Read { name, value } => {
-                self.last_global_stat_f64 = Some(SteamworksGlobalStatValue {
+                let value = SteamworksGlobalStatValue {
                     name: name.clone(),
                     value: *value,
-                });
+                };
+                upsert_global_stat_value(&mut self.global_stat_f64, value.clone());
+                self.last_global_stat_f64 = Some(value);
             }
             SteamworksStatsOperation::GlobalStatHistoryI64Read { name, values } => {
-                self.last_global_stat_history_i64 = Some(SteamworksGlobalStatHistory {
+                let history = SteamworksGlobalStatHistory {
                     name: name.clone(),
                     values: values.clone(),
-                });
+                };
+                upsert_global_stat_history(&mut self.global_stat_history_i64, history.clone());
+                self.last_global_stat_history_i64 = Some(history);
             }
             SteamworksStatsOperation::GlobalStatHistoryF64Read { name, values } => {
-                self.last_global_stat_history_f64 = Some(SteamworksGlobalStatHistory {
+                let history = SteamworksGlobalStatHistory {
                     name: name.clone(),
                     values: values.clone(),
-                });
+                };
+                upsert_global_stat_history(&mut self.global_stat_history_f64, history.clone());
+                self.last_global_stat_history_f64 = Some(history);
             }
             SteamworksStatsOperation::StatsStoreSubmitted => {
                 self.pending_store = false;
@@ -263,50 +278,73 @@ impl SteamworksStatsState {
                 score,
                 details,
             } => {
-                self.last_leaderboard_score_upload_request =
-                    Some(SteamworksLeaderboardScoreUploadRequest {
-                        leaderboard: *leaderboard,
-                        method: *method,
-                        score: *score,
-                        details: details.clone(),
-                    });
+                let request = SteamworksLeaderboardScoreUploadRequest {
+                    leaderboard: *leaderboard,
+                    method: *method,
+                    score: *score,
+                    details: details.clone(),
+                };
+                upsert_leaderboard_score_upload_request(
+                    &mut self.leaderboard_score_upload_requests,
+                    request.clone(),
+                );
+                self.last_leaderboard_score_upload_request = Some(request);
             }
             SteamworksStatsOperation::LeaderboardScoreUploaded {
                 leaderboard,
                 upload,
             } => {
-                self.last_leaderboard_score_upload_result =
-                    Some(SteamworksLeaderboardScoreUploadResult {
-                        leaderboard: *leaderboard,
-                        upload: upload.clone(),
-                    });
+                let result = SteamworksLeaderboardScoreUploadResult {
+                    leaderboard: *leaderboard,
+                    upload: upload.clone(),
+                };
+                upsert_leaderboard_score_upload_result(
+                    &mut self.leaderboard_score_upload_results,
+                    result.clone(),
+                );
+                self.last_leaderboard_score_upload_result = Some(result);
             }
             SteamworksStatsOperation::LeaderboardEntriesDownloadSubmitted {
                 leaderboard,
                 request,
                 max_details,
             } => {
-                self.last_leaderboard_entries_download_request =
-                    Some(SteamworksLeaderboardEntriesDownloadRequest {
-                        leaderboard: *leaderboard,
-                        request: *request,
-                        max_details: *max_details,
-                    });
+                let request = SteamworksLeaderboardEntriesDownloadRequest {
+                    leaderboard: *leaderboard,
+                    request: *request,
+                    max_details: *max_details,
+                };
+                upsert_leaderboard_entries_download_request(
+                    &mut self.leaderboard_entries_download_requests,
+                    request,
+                );
+                self.last_leaderboard_entries_download_request = Some(request);
             }
             SteamworksStatsOperation::LeaderboardEntriesDownloaded {
                 leaderboard,
                 entries,
             } => {
                 self.last_leaderboard_entries.clone_from(entries);
-                self.last_leaderboard_entries_download_result =
-                    Some(SteamworksLeaderboardEntriesDownloadResult {
-                        leaderboard: *leaderboard,
-                        entries: entries.clone(),
-                    });
+                let result = SteamworksLeaderboardEntriesDownloadResult {
+                    leaderboard: *leaderboard,
+                    entries: entries.clone(),
+                };
+                upsert_leaderboard_entries_download_result(
+                    &mut self.leaderboard_entries_download_results,
+                    result.clone(),
+                );
+                self.last_leaderboard_entries_download_result = Some(result);
             }
             SteamworksStatsOperation::LeaderboardForgotten { leaderboard } => {
                 remove_leaderboard_id(&mut self.leaderboard_ids, *leaderboard);
                 remove_leaderboard_info(&mut self.leaderboard_infos, *leaderboard);
+                remove_leaderboard_result_caches(
+                    &mut self.leaderboard_score_upload_requests,
+                    &mut self.leaderboard_score_upload_results,
+                    &mut self.leaderboard_entries_download_requests,
+                    &mut self.leaderboard_entries_download_results,
+                    *leaderboard,
+                );
                 self.last_forgotten_leaderboard = Some(*leaderboard);
             }
         }

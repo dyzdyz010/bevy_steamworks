@@ -1,7 +1,9 @@
 use super::{
     SteamworksAchievementDisplayAttribute, SteamworksAchievementGlobalPercentage,
-    SteamworksAchievementInfo, SteamworksLeaderboardId, SteamworksLeaderboardInfo,
-    STEAMWORKS_STATS_STATE_CACHE_LIMIT,
+    SteamworksAchievementInfo, SteamworksGlobalStatHistory, SteamworksGlobalStatValue,
+    SteamworksLeaderboardEntriesDownloadRequest, SteamworksLeaderboardEntriesDownloadResult,
+    SteamworksLeaderboardId, SteamworksLeaderboardInfo, SteamworksLeaderboardScoreUploadRequest,
+    SteamworksLeaderboardScoreUploadResult, STEAMWORKS_STATS_STATE_CACHE_LIMIT,
 };
 use crate::cache::trim_oldest;
 
@@ -133,6 +135,36 @@ pub(super) fn upsert_global_achievement_percentage(
     }
 }
 
+pub(super) fn upsert_global_stat_value<T>(
+    values: &mut Vec<SteamworksGlobalStatValue<T>>,
+    value: SteamworksGlobalStatValue<T>,
+) {
+    if let Some(known_value) = values
+        .iter_mut()
+        .find(|known_value| known_value.name == value.name)
+    {
+        *known_value = value;
+    } else {
+        values.push(value);
+        trim_oldest(values, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_global_stat_history<T>(
+    histories: &mut Vec<SteamworksGlobalStatHistory<T>>,
+    history: SteamworksGlobalStatHistory<T>,
+) {
+    if let Some(known_history) = histories
+        .iter_mut()
+        .find(|known_history| known_history.name == history.name)
+    {
+        *known_history = history;
+    } else {
+        histories.push(history);
+        trim_oldest(histories, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
 pub(super) fn upsert_leaderboard_id(
     leaderboards: &mut Vec<(String, SteamworksLeaderboardId)>,
     name: String,
@@ -176,4 +208,77 @@ pub(super) fn remove_leaderboard_info(
     leaderboard: SteamworksLeaderboardId,
 ) {
     leaderboards.retain(|info| info.leaderboard != leaderboard);
+}
+
+pub(super) fn upsert_leaderboard_score_upload_request(
+    requests: &mut Vec<SteamworksLeaderboardScoreUploadRequest>,
+    request: SteamworksLeaderboardScoreUploadRequest,
+) {
+    if let Some(known_request) = requests
+        .iter_mut()
+        .find(|known_request| known_request.leaderboard == request.leaderboard)
+    {
+        *known_request = request;
+    } else {
+        requests.push(request);
+        trim_oldest(requests, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_leaderboard_score_upload_result(
+    results: &mut Vec<SteamworksLeaderboardScoreUploadResult>,
+    result: SteamworksLeaderboardScoreUploadResult,
+) {
+    if let Some(known_result) = results
+        .iter_mut()
+        .find(|known_result| known_result.leaderboard == result.leaderboard)
+    {
+        *known_result = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_leaderboard_entries_download_request(
+    requests: &mut Vec<SteamworksLeaderboardEntriesDownloadRequest>,
+    request: SteamworksLeaderboardEntriesDownloadRequest,
+) {
+    if let Some(known_request) = requests
+        .iter_mut()
+        .find(|known_request| known_request.leaderboard == request.leaderboard)
+    {
+        *known_request = request;
+    } else {
+        requests.push(request);
+        trim_oldest(requests, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_leaderboard_entries_download_result(
+    results: &mut Vec<SteamworksLeaderboardEntriesDownloadResult>,
+    result: SteamworksLeaderboardEntriesDownloadResult,
+) {
+    if let Some(known_result) = results
+        .iter_mut()
+        .find(|known_result| known_result.leaderboard == result.leaderboard)
+    {
+        *known_result = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn remove_leaderboard_result_caches(
+    score_upload_requests: &mut Vec<SteamworksLeaderboardScoreUploadRequest>,
+    score_upload_results: &mut Vec<SteamworksLeaderboardScoreUploadResult>,
+    entries_download_requests: &mut Vec<SteamworksLeaderboardEntriesDownloadRequest>,
+    entries_download_results: &mut Vec<SteamworksLeaderboardEntriesDownloadResult>,
+    leaderboard: SteamworksLeaderboardId,
+) {
+    score_upload_requests.retain(|request| request.leaderboard != leaderboard);
+    score_upload_results.retain(|result| result.leaderboard != leaderboard);
+    entries_download_requests.retain(|request| request.leaderboard != leaderboard);
+    entries_download_results.retain(|result| result.leaderboard != leaderboard);
 }

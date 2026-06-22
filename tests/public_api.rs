@@ -2150,6 +2150,37 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.leaderboard_info(root_leaderboard), None);
     assert_eq!(root_state.leaderboard_info_by_name("daily"), None);
     assert!(root_state.leaderboards().is_empty());
+    assert!(root_state.global_stat_i64_values().is_empty());
+    assert_eq!(root_state.global_stat_i64("kills"), None);
+    assert!(root_state.global_stat_f64_values().is_empty());
+    assert_eq!(root_state.global_stat_f64("accuracy"), None);
+    assert!(root_state.global_stat_history_i64_values().is_empty());
+    assert_eq!(root_state.global_stat_history_i64("daily_kills"), None);
+    assert!(root_state.global_stat_history_f64_values().is_empty());
+    assert_eq!(root_state.global_stat_history_f64("daily_accuracy"), None);
+    assert!(root_state.leaderboard_score_upload_requests().is_empty());
+    assert_eq!(
+        root_state.leaderboard_score_upload_request(root_leaderboard),
+        None
+    );
+    assert!(root_state.leaderboard_score_upload_results().is_empty());
+    assert_eq!(
+        root_state.leaderboard_score_upload_result(root_leaderboard),
+        None
+    );
+    assert!(root_state
+        .leaderboard_entries_download_requests()
+        .is_empty());
+    assert_eq!(
+        root_state.leaderboard_entries_download_request(root_leaderboard),
+        None
+    );
+    assert!(root_state.leaderboard_entries_download_results().is_empty());
+    assert_eq!(
+        root_state.leaderboard_entries_download_result(root_leaderboard),
+        None
+    );
+    assert_eq!(root_state.leaderboard_entries(root_leaderboard), None);
     let _root_achievement: Option<bevy_steamworks::SteamworksAchievementInfo> = None;
     let _root_achievement_icon: Option<bevy_steamworks::SteamworksAchievementIcon> = None;
     let _root_achievement_icon_status: bevy_steamworks::SteamworksAchievementIconStatus =
@@ -2184,6 +2215,42 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.leaderboard_info(prelude_leaderboard), None);
     assert_eq!(prelude_state.leaderboard_info_by_name("daily"), None);
     assert!(prelude_state.leaderboards().is_empty());
+    assert!(prelude_state.global_stat_i64_values().is_empty());
+    assert_eq!(prelude_state.global_stat_i64("kills"), None);
+    assert!(prelude_state.global_stat_f64_values().is_empty());
+    assert_eq!(prelude_state.global_stat_f64("accuracy"), None);
+    assert!(prelude_state.global_stat_history_i64_values().is_empty());
+    assert_eq!(prelude_state.global_stat_history_i64("daily_kills"), None);
+    assert!(prelude_state.global_stat_history_f64_values().is_empty());
+    assert_eq!(
+        prelude_state.global_stat_history_f64("daily_accuracy"),
+        None
+    );
+    assert!(prelude_state.leaderboard_score_upload_requests().is_empty());
+    assert_eq!(
+        prelude_state.leaderboard_score_upload_request(prelude_leaderboard),
+        None
+    );
+    assert!(prelude_state.leaderboard_score_upload_results().is_empty());
+    assert_eq!(
+        prelude_state.leaderboard_score_upload_result(prelude_leaderboard),
+        None
+    );
+    assert!(prelude_state
+        .leaderboard_entries_download_requests()
+        .is_empty());
+    assert_eq!(
+        prelude_state.leaderboard_entries_download_request(prelude_leaderboard),
+        None
+    );
+    assert!(prelude_state
+        .leaderboard_entries_download_results()
+        .is_empty());
+    assert_eq!(
+        prelude_state.leaderboard_entries_download_result(prelude_leaderboard),
+        None
+    );
+    assert_eq!(prelude_state.leaderboard_entries(prelude_leaderboard), None);
     let _prelude_achievement: Option<bevy_steamworks::prelude::SteamworksAchievementInfo> = None;
     let _prelude_achievement_icon: Option<bevy_steamworks::prelude::SteamworksAchievementIcon> =
         None;

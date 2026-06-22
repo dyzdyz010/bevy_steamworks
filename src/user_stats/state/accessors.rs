@@ -129,9 +129,33 @@ impl SteamworksStatsState {
         self.last_global_stat_i64.as_ref()
     }
 
+    /// Returns bounded aggregated global integer stat snapshots keyed by stat name.
+    pub fn global_stat_i64_values(&self) -> &[SteamworksGlobalStatValue<i64>] {
+        &self.global_stat_i64
+    }
+
+    /// Returns the cached aggregated global integer stat value for one stat name.
+    pub fn global_stat_i64(&self, name: &str) -> Option<i64> {
+        self.global_stat_i64
+            .iter()
+            .find_map(|value| (value.name == name).then_some(value.value))
+    }
+
     /// Returns the most recent aggregated global floating-point stat read through this plugin.
     pub fn last_global_stat_f64(&self) -> Option<&SteamworksGlobalStatValue<f64>> {
         self.last_global_stat_f64.as_ref()
+    }
+
+    /// Returns bounded aggregated global floating-point stat snapshots keyed by stat name.
+    pub fn global_stat_f64_values(&self) -> &[SteamworksGlobalStatValue<f64>] {
+        &self.global_stat_f64
+    }
+
+    /// Returns the cached aggregated global floating-point stat value for one stat name.
+    pub fn global_stat_f64(&self, name: &str) -> Option<f64> {
+        self.global_stat_f64
+            .iter()
+            .find_map(|value| (value.name == name).then_some(value.value))
     }
 
     /// Returns the most recent aggregated global integer stat history read through this plugin.
@@ -139,9 +163,33 @@ impl SteamworksStatsState {
         self.last_global_stat_history_i64.as_ref()
     }
 
+    /// Returns bounded aggregated global integer stat history snapshots keyed by stat name.
+    pub fn global_stat_history_i64_values(&self) -> &[SteamworksGlobalStatHistory<i64>] {
+        &self.global_stat_history_i64
+    }
+
+    /// Returns the cached aggregated global integer stat history for one stat name.
+    pub fn global_stat_history_i64(&self, name: &str) -> Option<&SteamworksGlobalStatHistory<i64>> {
+        self.global_stat_history_i64
+            .iter()
+            .find(|history| history.name == name)
+    }
+
     /// Returns the most recent aggregated global floating-point stat history read through this plugin.
     pub fn last_global_stat_history_f64(&self) -> Option<&SteamworksGlobalStatHistory<f64>> {
         self.last_global_stat_history_f64.as_ref()
+    }
+
+    /// Returns bounded aggregated global floating-point stat history snapshots keyed by stat name.
+    pub fn global_stat_history_f64_values(&self) -> &[SteamworksGlobalStatHistory<f64>] {
+        &self.global_stat_history_f64
+    }
+
+    /// Returns the cached aggregated global floating-point stat history for one stat name.
+    pub fn global_stat_history_f64(&self, name: &str) -> Option<&SteamworksGlobalStatHistory<f64>> {
+        self.global_stat_history_f64
+            .iter()
+            .find(|history| history.name == name)
     }
 
     /// Returns the number of leaderboard handles currently owned by this plugin.
@@ -212,11 +260,41 @@ impl SteamworksStatsState {
         self.last_leaderboard_score_upload_request.as_ref()
     }
 
+    /// Returns bounded submitted leaderboard score upload requests keyed by leaderboard.
+    pub fn leaderboard_score_upload_requests(&self) -> &[SteamworksLeaderboardScoreUploadRequest] {
+        &self.leaderboard_score_upload_requests
+    }
+
+    /// Returns the cached score upload request for one leaderboard.
+    pub fn leaderboard_score_upload_request(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&SteamworksLeaderboardScoreUploadRequest> {
+        self.leaderboard_score_upload_requests
+            .iter()
+            .find(|request| request.leaderboard == leaderboard)
+    }
+
     /// Returns the most recent completed leaderboard score upload result.
     pub fn last_leaderboard_score_upload_result(
         &self,
     ) -> Option<&SteamworksLeaderboardScoreUploadResult> {
         self.last_leaderboard_score_upload_result.as_ref()
+    }
+
+    /// Returns bounded completed leaderboard score upload results keyed by leaderboard.
+    pub fn leaderboard_score_upload_results(&self) -> &[SteamworksLeaderboardScoreUploadResult] {
+        &self.leaderboard_score_upload_results
+    }
+
+    /// Returns the cached score upload result for one leaderboard.
+    pub fn leaderboard_score_upload_result(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&SteamworksLeaderboardScoreUploadResult> {
+        self.leaderboard_score_upload_results
+            .iter()
+            .find(|result| result.leaderboard == leaderboard)
     }
 
     /// Returns the most recent submitted leaderboard entries download request.
@@ -226,6 +304,23 @@ impl SteamworksStatsState {
         self.last_leaderboard_entries_download_request.as_ref()
     }
 
+    /// Returns bounded submitted leaderboard entries download requests keyed by leaderboard.
+    pub fn leaderboard_entries_download_requests(
+        &self,
+    ) -> &[SteamworksLeaderboardEntriesDownloadRequest] {
+        &self.leaderboard_entries_download_requests
+    }
+
+    /// Returns the cached entries download request for one leaderboard.
+    pub fn leaderboard_entries_download_request(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&SteamworksLeaderboardEntriesDownloadRequest> {
+        self.leaderboard_entries_download_requests
+            .iter()
+            .find(|request| request.leaderboard == leaderboard)
+    }
+
     /// Returns the most recent completed leaderboard entries download result.
     pub fn last_leaderboard_entries_download_result(
         &self,
@@ -233,9 +328,35 @@ impl SteamworksStatsState {
         self.last_leaderboard_entries_download_result.as_ref()
     }
 
+    /// Returns bounded completed leaderboard entries download results keyed by leaderboard.
+    pub fn leaderboard_entries_download_results(
+        &self,
+    ) -> &[SteamworksLeaderboardEntriesDownloadResult] {
+        &self.leaderboard_entries_download_results
+    }
+
+    /// Returns the cached entries download result for one leaderboard.
+    pub fn leaderboard_entries_download_result(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&SteamworksLeaderboardEntriesDownloadResult> {
+        self.leaderboard_entries_download_results
+            .iter()
+            .find(|result| result.leaderboard == leaderboard)
+    }
+
     /// Returns the most recent downloaded leaderboard entries.
     pub fn last_leaderboard_entries(&self) -> &[SteamworksLeaderboardEntry] {
         &self.last_leaderboard_entries
+    }
+
+    /// Returns the cached downloaded entries for one leaderboard.
+    pub fn leaderboard_entries(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&[SteamworksLeaderboardEntry]> {
+        self.leaderboard_entries_download_result(leaderboard)
+            .map(|result| result.entries.as_slice())
     }
 
     /// Returns the most recent leaderboard ID forgotten by this plugin.

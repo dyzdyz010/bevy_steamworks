@@ -697,6 +697,41 @@ fn leaderboard_state_records_latest_info_and_entries() {
         leaderboard,
         entries: vec![entry.clone()],
     });
+    assert_eq!(
+        state.leaderboard_score_upload_request(leaderboard),
+        Some(&SteamworksLeaderboardScoreUploadRequest {
+            leaderboard,
+            method: SteamworksLeaderboardUploadScoreMethod::KeepBest,
+            score: 9000,
+            details: vec![7, 8],
+        })
+    );
+    assert_eq!(
+        state.leaderboard_score_upload_result(leaderboard),
+        Some(&SteamworksLeaderboardScoreUploadResult {
+            leaderboard,
+            upload: Some(upload.clone()),
+        })
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_request(leaderboard),
+        Some(&SteamworksLeaderboardEntriesDownloadRequest {
+            leaderboard,
+            request: SteamworksLeaderboardDataRequest::Global { start: 1, end: 10 },
+            max_details: 2,
+        })
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_result(leaderboard),
+        Some(&SteamworksLeaderboardEntriesDownloadResult {
+            leaderboard,
+            entries: vec![entry.clone()],
+        })
+    );
+    assert_eq!(
+        state.leaderboard_entries(leaderboard),
+        Some(&[entry.clone()][..])
+    );
     state.record_operation(&SteamworksStatsOperation::LeaderboardForgotten { leaderboard });
     assert_eq!(state.leaderboard_id("daily_score"), None);
     assert_eq!(
@@ -749,7 +784,7 @@ fn leaderboard_state_records_latest_info_and_entries() {
         state.last_leaderboard_score_upload_result(),
         Some(&SteamworksLeaderboardScoreUploadResult {
             leaderboard,
-            upload: Some(upload),
+            upload: Some(upload.clone()),
         })
     );
     assert_eq!(
@@ -767,8 +802,16 @@ fn leaderboard_state_records_latest_info_and_entries() {
             entries: vec![entry.clone()],
         })
     );
-    assert_eq!(state.last_leaderboard_entries(), &[entry]);
+    assert_eq!(state.last_leaderboard_entries(), &[entry.clone()]);
     assert_eq!(state.last_forgotten_leaderboard(), Some(leaderboard));
+    assert_eq!(state.leaderboard_score_upload_request(leaderboard), None);
+    assert_eq!(state.leaderboard_score_upload_result(leaderboard), None);
+    assert_eq!(
+        state.leaderboard_entries_download_request(leaderboard),
+        None
+    );
+    assert_eq!(state.leaderboard_entries_download_result(leaderboard), None);
+    assert_eq!(state.leaderboard_entries(leaderboard), None);
 }
 
 #[test]
@@ -788,6 +831,22 @@ fn stats_lookup_caches_are_bounded() {
             name: name.clone(),
             value: raw as f32,
         });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatI64Read {
+            name: name.clone(),
+            value: raw as i64,
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatF64Read {
+            name: name.clone(),
+            value: raw as f64,
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatHistoryI64Read {
+            name: name.clone(),
+            values: vec![raw as i64],
+        });
+        state.record_operation(&SteamworksStatsOperation::GlobalStatHistoryF64Read {
+            name: name.clone(),
+            values: vec![raw as f64],
+        });
         state.record_operation(&SteamworksStatsOperation::LeaderboardInfoRead {
             info: SteamworksLeaderboardInfo {
                 leaderboard,
@@ -797,17 +856,87 @@ fn stats_lookup_caches_are_bounded() {
                 entry_count: raw as i32,
             },
         });
+        state.record_operation(&SteamworksStatsOperation::LeaderboardScoreUploadSubmitted {
+            leaderboard,
+            method: SteamworksLeaderboardUploadScoreMethod::KeepBest,
+            score: raw as i32,
+            details: vec![raw as i32],
+        });
+        state.record_operation(&SteamworksStatsOperation::LeaderboardScoreUploaded {
+            leaderboard,
+            upload: Some(SteamworksLeaderboardScoreUploaded {
+                score: raw as i32,
+                was_changed: true,
+                global_rank_new: raw as i32,
+                global_rank_previous: raw as i32 + 1,
+            }),
+        });
+        state.record_operation(
+            &SteamworksStatsOperation::LeaderboardEntriesDownloadSubmitted {
+                leaderboard,
+                request: SteamworksLeaderboardDataRequest::Global {
+                    start: raw as i32,
+                    end: raw as i32,
+                },
+                max_details: 1,
+            },
+        );
+        state.record_operation(&SteamworksStatsOperation::LeaderboardEntriesDownloaded {
+            leaderboard,
+            entries: vec![SteamworksLeaderboardEntry {
+                user: steamworks::SteamId::from_raw(raw),
+                global_rank: raw as i32,
+                score: raw as i32,
+                details: vec![raw as i32],
+            }],
+        });
     }
 
     assert_eq!(state.stat_i32("stat-1"), None);
     assert_eq!(state.stat_f32("stat-1"), None);
+    assert_eq!(state.global_stat_i64("stat-1"), None);
+    assert_eq!(state.global_stat_f64("stat-1"), None);
+    assert_eq!(state.global_stat_history_i64("stat-1"), None);
+    assert_eq!(state.global_stat_history_f64("stat-1"), None);
     assert_eq!(state.leaderboard_id("leaderboard-1"), None);
     assert_eq!(
         state.leaderboard_info(SteamworksLeaderboardId::from_raw(1)),
         None
     );
+    assert_eq!(
+        state.leaderboard_score_upload_request(SteamworksLeaderboardId::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_score_upload_result(SteamworksLeaderboardId::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_request(SteamworksLeaderboardId::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_result(SteamworksLeaderboardId::from_raw(1)),
+        None
+    );
     assert_eq!(state.stat_i32("stat-2"), Some(2));
     assert_eq!(state.stat_f32("stat-2"), Some(2.0));
+    assert_eq!(state.global_stat_i64("stat-2"), Some(2));
+    assert_eq!(state.global_stat_f64("stat-2"), Some(2.0));
+    assert_eq!(
+        state.global_stat_history_i64("stat-2"),
+        Some(&SteamworksGlobalStatHistory {
+            name: "stat-2".to_owned(),
+            values: vec![2],
+        })
+    );
+    assert_eq!(
+        state.global_stat_history_f64("stat-2"),
+        Some(&SteamworksGlobalStatHistory {
+            name: "stat-2".to_owned(),
+            values: vec![2.0],
+        })
+    );
     assert_eq!(
         state.leaderboard_id("leaderboard-2"),
         Some(SteamworksLeaderboardId::from_raw(2))
@@ -822,8 +951,60 @@ fn stats_lookup_caches_are_bounded() {
             entry_count: 2,
         })
     );
+    assert!(state
+        .leaderboard_score_upload_request(SteamworksLeaderboardId::from_raw(2))
+        .is_some());
+    assert!(state
+        .leaderboard_score_upload_result(SteamworksLeaderboardId::from_raw(2))
+        .is_some());
+    assert!(state
+        .leaderboard_entries_download_request(SteamworksLeaderboardId::from_raw(2))
+        .is_some());
+    assert_eq!(
+        state.leaderboard_entries(SteamworksLeaderboardId::from_raw(2)),
+        Some(
+            &[SteamworksLeaderboardEntry {
+                user: steamworks::SteamId::from_raw(2),
+                global_rank: 2,
+                score: 2,
+                details: vec![2],
+            }][..]
+        )
+    );
     assert_eq!(
         state.leaderboards().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.global_stat_i64_values().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.global_stat_f64_values().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.global_stat_history_i64_values().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.global_stat_history_f64_values().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.leaderboard_score_upload_requests().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.leaderboard_score_upload_results().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_requests().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.leaderboard_entries_download_results().len(),
         super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
     );
 }
@@ -936,6 +1117,8 @@ fn global_stats_state_records_latest_values() {
             value: 123,
         })
     );
+    assert_eq!(state.global_stat_i64("total_kills"), Some(123));
+    assert_eq!(state.global_stat_i64("missing"), None);
     assert_eq!(
         state.last_global_stat_f64(),
         Some(&SteamworksGlobalStatValue {
@@ -943,6 +1126,8 @@ fn global_stats_state_records_latest_values() {
             value: 0.75,
         })
     );
+    assert_eq!(state.global_stat_f64("average_accuracy"), Some(0.75));
+    assert_eq!(state.global_stat_f64("missing"), None);
     assert_eq!(
         state.last_global_stat_history_i64(),
         Some(&SteamworksGlobalStatHistory {
@@ -951,7 +1136,21 @@ fn global_stats_state_records_latest_values() {
         })
     );
     assert_eq!(
+        state.global_stat_history_i64("daily_kills"),
+        Some(&SteamworksGlobalStatHistory {
+            name: "daily_kills".to_owned(),
+            values: vec![3, 2, 1],
+        })
+    );
+    assert_eq!(
         state.last_global_stat_history_f64(),
+        Some(&SteamworksGlobalStatHistory {
+            name: "daily_accuracy".to_owned(),
+            values: vec![0.5, 0.6],
+        })
+    );
+    assert_eq!(
+        state.global_stat_history_f64("daily_accuracy"),
         Some(&SteamworksGlobalStatHistory {
             name: "daily_accuracy".to_owned(),
             values: vec![0.5, 0.6],
@@ -965,6 +1164,14 @@ fn global_stats_state_records_latest_values() {
     assert_eq!(state.last_global_stat_f64(), None);
     assert_eq!(state.last_global_stat_history_i64(), None);
     assert_eq!(state.last_global_stat_history_f64(), None);
+    assert_eq!(state.global_stat_i64("total_kills"), None);
+    assert_eq!(state.global_stat_f64("average_accuracy"), None);
+    assert_eq!(state.global_stat_history_i64("daily_kills"), None);
+    assert_eq!(state.global_stat_history_f64("daily_accuracy"), None);
+    assert!(state.global_stat_i64_values().is_empty());
+    assert!(state.global_stat_f64_values().is_empty());
+    assert!(state.global_stat_history_i64_values().is_empty());
+    assert!(state.global_stat_history_f64_values().is_empty());
 }
 
 #[test]
