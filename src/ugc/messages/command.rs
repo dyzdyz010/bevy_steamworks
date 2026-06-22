@@ -137,18 +137,18 @@ impl SteamworksUgcCommand {
     }
 
     /// Creates a [`SteamworksUgcCommand::GetItemState`] command.
-    pub fn get_item_state(item: steamworks::PublishedFileId) -> Self {
-        Self::GetItemState { item }
+    pub fn get_item_state(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::GetItemState { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::GetItemDownloadInfo`] command.
-    pub fn get_item_download_info(item: steamworks::PublishedFileId) -> Self {
-        Self::GetItemDownloadInfo { item }
+    pub fn get_item_download_info(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::GetItemDownloadInfo { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::GetItemInstallInfo`] command.
-    pub fn get_item_install_info(item: steamworks::PublishedFileId) -> Self {
-        Self::GetItemInstallInfo { item }
+    pub fn get_item_install_info(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::GetItemInstallInfo { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::Query`] command.
@@ -167,19 +167,25 @@ impl SteamworksUgcCommand {
     }
 
     /// Creates a [`SteamworksUgcCommand::CreateItem`] command.
-    pub fn create_item(app_id: steamworks::AppId, file_type: steamworks::FileType) -> Self {
-        Self::CreateItem { app_id, file_type }
+    pub fn create_item(
+        app_id: impl Into<steamworks::AppId>,
+        file_type: steamworks::FileType,
+    ) -> Self {
+        Self::CreateItem {
+            app_id: app_id.into(),
+            file_type,
+        }
     }
 
     /// Creates a [`SteamworksUgcCommand::SubmitItemUpdate`] command.
     pub fn submit_item_update(
-        app_id: steamworks::AppId,
-        item: steamworks::PublishedFileId,
+        app_id: impl Into<steamworks::AppId>,
+        item: impl Into<steamworks::PublishedFileId>,
         update: SteamworksUgcItemUpdate,
     ) -> Self {
         Self::SubmitItemUpdate {
-            app_id,
-            item,
+            app_id: app_id.into(),
+            item: item.into(),
             update,
         }
     }
@@ -195,39 +201,50 @@ impl SteamworksUgcCommand {
     }
 
     /// Creates a [`SteamworksUgcCommand::DownloadItem`] command.
-    pub fn download_item(item: steamworks::PublishedFileId, high_priority: bool) -> Self {
+    pub fn download_item(
+        item: impl Into<steamworks::PublishedFileId>,
+        high_priority: bool,
+    ) -> Self {
         Self::DownloadItem {
-            item,
+            item: item.into(),
             high_priority,
         }
     }
 
     /// Creates a [`SteamworksUgcCommand::SubscribeItem`] command.
-    pub fn subscribe_item(item: steamworks::PublishedFileId) -> Self {
-        Self::SubscribeItem { item }
+    pub fn subscribe_item(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::SubscribeItem { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::UnsubscribeItem`] command.
-    pub fn unsubscribe_item(item: steamworks::PublishedFileId) -> Self {
-        Self::UnsubscribeItem { item }
+    pub fn unsubscribe_item(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::UnsubscribeItem { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::DeleteItem`] command.
-    pub fn delete_item(item: steamworks::PublishedFileId) -> Self {
-        Self::DeleteItem { item }
+    pub fn delete_item(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::DeleteItem { item: item.into() }
     }
 
     /// Creates a [`SteamworksUgcCommand::StartPlaytimeTracking`] command.
-    pub fn start_playtime_tracking(items: impl Into<Vec<steamworks::PublishedFileId>>) -> Self {
+    pub fn start_playtime_tracking<I, T>(items: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<steamworks::PublishedFileId>,
+    {
         Self::StartPlaytimeTracking {
-            items: items.into(),
+            items: items.into_iter().map(Into::into).collect(),
         }
     }
 
     /// Creates a [`SteamworksUgcCommand::StopPlaytimeTracking`] command.
-    pub fn stop_playtime_tracking(items: impl Into<Vec<steamworks::PublishedFileId>>) -> Self {
+    pub fn stop_playtime_tracking<I, T>(items: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<steamworks::PublishedFileId>,
+    {
         Self::StopPlaytimeTracking {
-            items: items.into(),
+            items: items.into_iter().map(Into::into).collect(),
         }
     }
 

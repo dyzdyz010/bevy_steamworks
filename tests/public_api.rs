@@ -121,7 +121,7 @@ use bevy_steamworks::{
         SteamworksUgcGameServerWorkshopInit as PreludeUgcGameServerWorkshopInit,
         SteamworksUgcItemDetails as PreludeUgcItemDetails,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
-        SteamworksUgcQueryIds as PreludeUgcQueryIds,
+        SteamworksUgcQuery as PreludeUgcQuery, SteamworksUgcQueryIds as PreludeUgcQueryIds,
         SteamworksUgcQueryOptions as PreludeUgcQueryOptions,
         SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
         SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
@@ -1948,11 +1948,18 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     );
 
     let item = steamworks::PublishedFileId(42);
-    let query = SteamworksUgcQuery::item(item)
+    let query = SteamworksUgcQuery::item(42_u64)
         .with_metadata(true)
         .with_key_value_tags(true)
         .with_statistic(steamworks::UGCStatisticType::Subscriptions);
-    let workshop_depot = SteamworksUgcWorkshopDepotId::from(steamworks::AppId(480));
+    assert_eq!(
+        SteamworksUgcQuery::items([42_u64]),
+        SteamworksUgcQuery::Items {
+            items: vec![item],
+            options: SteamworksUgcQueryOptions::new(),
+        }
+    );
+    let workshop_depot = SteamworksUgcWorkshopDepotId::from(480_u32);
     let _game_server_workshop_init = SteamworksUgcGameServerWorkshopInit {
         workshop_depot,
         folder: "workshop_server".to_owned(),
@@ -1991,6 +1998,34 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     );
     accepts_root_exports(
         SteamworksUgcPlugin::new(),
+        SteamworksUgcCommand::download_item(42_u64, true),
+        SteamworksUgcOperation::DownloadItemSubmitted {
+            item,
+            high_priority: true,
+        },
+        SteamworksUgcResult::Ok(SteamworksUgcOperation::DownloadItemSubmitted {
+            item,
+            high_priority: true,
+        }),
+        SteamworksUgcError::ClientUnavailable,
+    );
+    accepts_root_exports(
+        SteamworksUgcPlugin::new(),
+        SteamworksUgcCommand::create_item(480_u32, steamworks::FileType::Community),
+        SteamworksUgcOperation::ItemCreateRequested {
+            request_id: 4,
+            app_id: steamworks::AppId(480),
+            file_type: steamworks::FileType::Community,
+        },
+        SteamworksUgcResult::Ok(SteamworksUgcOperation::ItemCreateRequested {
+            request_id: 4,
+            app_id: steamworks::AppId(480),
+            file_type: steamworks::FileType::Community,
+        }),
+        SteamworksUgcError::ClientUnavailable,
+    );
+    accepts_root_exports(
+        SteamworksUgcPlugin::new(),
         SteamworksUgcCommand::query_ids(query.clone()),
         SteamworksUgcOperation::QueryIdsRequested {
             request_id: 2,
@@ -1998,7 +2033,7 @@ fn ugc_api_is_exported_from_root_and_prelude() {
         },
         SteamworksUgcResult::Ok(SteamworksUgcOperation::QueryIdsCompleted {
             request_id: 3,
-            query: query.clone(),
+            query,
             ids: SteamworksUgcQueryIds { items: vec![item] },
         }),
         SteamworksUgcError::ClientUnavailable,
@@ -2014,9 +2049,15 @@ fn ugc_api_is_exported_from_root_and_prelude() {
 
     accepts_prelude_exports(PreludeUgcPlugin::new(), command, operation, result, error);
 
+    let prelude_query = PreludeUgcQuery::item(42_u64)
+        .with_metadata(true)
+        .with_key_value_tags(true)
+        .with_statistic(steamworks::UGCStatisticType::Subscriptions);
+    let _prelude_download = PreludeUgcCommand::download_item(42_u64, true);
+    let _prelude_create = PreludeUgcCommand::create_item(480_u32, steamworks::FileType::Community);
     let _prelude_query_options = PreludeUgcQueryOptions::new().with_additional_previews(true);
     let _prelude_item_detail = prelude_item_detail(item);
-    let prelude_workshop_depot = PreludeUgcWorkshopDepotId::from(steamworks::AppId(480));
+    let prelude_workshop_depot = PreludeUgcWorkshopDepotId::from(480_u32);
     let _prelude_game_server_workshop_init = PreludeUgcGameServerWorkshopInit {
         workshop_depot: prelude_workshop_depot,
         folder: "workshop_server".to_owned(),
@@ -2039,28 +2080,28 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     );
     accepts_prelude_exports(
         PreludeUgcPlugin::new(),
-        PreludeUgcCommand::query_total(query.clone()),
+        PreludeUgcCommand::query_total(prelude_query.clone()),
         PreludeUgcOperation::QueryTotalRequested {
             request_id: 0,
-            query: query.clone(),
+            query: prelude_query.clone(),
         },
         PreludeUgcResult::Ok(PreludeUgcOperation::QueryTotalCompleted {
             request_id: 1,
-            query: query.clone(),
+            query: prelude_query.clone(),
             total: PreludeUgcQueryTotal { total_results: 1 },
         }),
         PreludeUgcError::ClientUnavailable,
     );
     accepts_prelude_exports(
         PreludeUgcPlugin::new(),
-        PreludeUgcCommand::query_ids(query.clone()),
+        PreludeUgcCommand::query_ids(prelude_query.clone()),
         PreludeUgcOperation::QueryIdsRequested {
             request_id: 2,
-            query: query.clone(),
+            query: prelude_query.clone(),
         },
         PreludeUgcResult::Ok(PreludeUgcOperation::QueryIdsCompleted {
             request_id: 3,
-            query,
+            query: prelude_query,
             ids: PreludeUgcQueryIds { items: vec![item] },
         }),
         PreludeUgcError::ClientUnavailable,

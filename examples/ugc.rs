@@ -31,7 +31,6 @@ fn request_ugc(
 
     if let Ok(item) = std::env::var("BEVY_STEAMWORKS_UGC_ITEM") {
         if let Ok(item) = item.parse::<u64>() {
-            let item = PublishedFileId(item);
             commands.write(SteamworksUgcCommand::query(
                 SteamworksUgcQuery::item(item)
                     .with_metadata(true)
@@ -53,7 +52,7 @@ fn request_ugc(
             }
             if std::env::var("BEVY_STEAMWORKS_UGC_UPDATE").as_deref() == Ok("1") {
                 commands.write(SteamworksUgcCommand::submit_item_update(
-                    AppId(480),
+                    480_u32,
                     item,
                     item_update_from_env(),
                 ));

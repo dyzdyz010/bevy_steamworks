@@ -135,7 +135,7 @@ fn validation_rejects_invalid_inputs() {
 
     assert_eq!(
         validate_command(&SteamworksUgcCommand::query(SteamworksUgcQuery::items(
-            Vec::new()
+            Vec::<steamworks::PublishedFileId>::new()
         ))),
         Err(SteamworksUgcError::EmptyItemList)
     );
@@ -340,7 +340,7 @@ fn download_item_callbacks_are_bridged_without_client() {
 #[test]
 fn constructors_preserve_inputs() {
     let item = steamworks::PublishedFileId(42);
-    let query = SteamworksUgcQuery::item(item).with_options(
+    let query = SteamworksUgcQuery::item(42_u64).with_options(
         SteamworksUgcQueryOptions::new()
             .with_metadata(true)
             .with_key_value_tags(true),
@@ -405,6 +405,13 @@ fn constructors_preserve_inputs() {
         SteamworksUgcWorkshopDepotId::from(steamworks::AppId(480)),
         SteamworksUgcWorkshopDepotId::from_raw(480)
     );
+    assert_eq!(
+        SteamworksUgcQuery::items([42_u64]),
+        SteamworksUgcQuery::Items {
+            items: vec![item],
+            options: SteamworksUgcQueryOptions::new(),
+        }
+    );
 
     assert_eq!(
         SteamworksUgcCommand::query(query.clone()),
@@ -423,30 +430,30 @@ fn constructors_preserve_inputs() {
         SteamworksUgcCommand::QueryIds { query }
     );
     assert_eq!(
-        SteamworksUgcCommand::download_item(item, true),
+        SteamworksUgcCommand::download_item(42_u64, true),
         SteamworksUgcCommand::DownloadItem {
             item,
             high_priority: true,
         }
     );
     assert_eq!(
-        SteamworksUgcCommand::start_playtime_tracking(vec![item]),
+        SteamworksUgcCommand::start_playtime_tracking([42_u64]),
         SteamworksUgcCommand::StartPlaytimeTracking { items: vec![item] }
     );
     assert_eq!(
-        SteamworksUgcCommand::get_item_state(item),
+        SteamworksUgcCommand::get_item_state(42_u64),
         SteamworksUgcCommand::GetItemState { item }
     );
     assert_eq!(
-        SteamworksUgcCommand::get_item_download_info(item),
+        SteamworksUgcCommand::get_item_download_info(42_u64),
         SteamworksUgcCommand::GetItemDownloadInfo { item }
     );
     assert_eq!(
-        SteamworksUgcCommand::get_item_install_info(item),
+        SteamworksUgcCommand::get_item_install_info(42_u64),
         SteamworksUgcCommand::GetItemInstallInfo { item }
     );
     assert_eq!(
-        SteamworksUgcCommand::create_item(steamworks::AppId(480), steamworks::FileType::Community),
+        SteamworksUgcCommand::create_item(480_u32, steamworks::FileType::Community),
         SteamworksUgcCommand::CreateItem {
             app_id: steamworks::AppId(480),
             file_type: steamworks::FileType::Community,
@@ -466,7 +473,7 @@ fn constructors_preserve_inputs() {
         .with_removed_content_descriptor(SteamworksUgcContentDescriptor::FrequentViolenceOrGore)
         .with_change_note("Updated metadata");
     assert_eq!(
-        SteamworksUgcCommand::submit_item_update(steamworks::AppId(480), item, update.clone(),),
+        SteamworksUgcCommand::submit_item_update(480_u32, 42_u64, update.clone(),),
         SteamworksUgcCommand::SubmitItemUpdate {
             app_id: steamworks::AppId(480),
             item,
@@ -482,11 +489,19 @@ fn constructors_preserve_inputs() {
         SteamworksUgcCommand::ForgetItemUpdate { request_id: 9 }
     );
     assert_eq!(
-        SteamworksUgcCommand::delete_item(item),
+        SteamworksUgcCommand::subscribe_item(42_u64),
+        SteamworksUgcCommand::SubscribeItem { item }
+    );
+    assert_eq!(
+        SteamworksUgcCommand::unsubscribe_item(42_u64),
+        SteamworksUgcCommand::UnsubscribeItem { item }
+    );
+    assert_eq!(
+        SteamworksUgcCommand::delete_item(42_u64),
         SteamworksUgcCommand::DeleteItem { item }
     );
     assert_eq!(
-        SteamworksUgcCommand::stop_playtime_tracking(vec![item]),
+        SteamworksUgcCommand::stop_playtime_tracking([42_u64]),
         SteamworksUgcCommand::StopPlaytimeTracking { items: vec![item] }
     );
     assert_eq!(

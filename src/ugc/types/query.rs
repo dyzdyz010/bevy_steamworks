@@ -234,16 +234,20 @@ impl SteamworksUgcQuery {
     }
 
     /// Creates an explicit item-details query.
-    pub fn items(items: impl Into<Vec<steamworks::PublishedFileId>>) -> Self {
+    pub fn items<I, T>(items: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<steamworks::PublishedFileId>,
+    {
         Self::Items {
-            items: items.into(),
+            items: items.into_iter().map(Into::into).collect(),
             options: SteamworksUgcQueryOptions::new(),
         }
     }
 
     /// Creates a single-item details query.
-    pub fn item(item: steamworks::PublishedFileId) -> Self {
-        Self::items(vec![item])
+    pub fn item(item: impl Into<steamworks::PublishedFileId>) -> Self {
+        Self::items([item.into()])
     }
 
     /// Replaces the query options.
