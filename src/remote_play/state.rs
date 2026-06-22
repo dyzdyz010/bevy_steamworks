@@ -11,6 +11,8 @@ use super::{
 mod accessors;
 mod operations;
 
+pub(in crate::remote_play) const STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT: usize = 1_024;
+
 /// Runtime state for [`super::SteamworksRemotePlayPlugin`].
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksRemotePlayState {

@@ -165,6 +165,41 @@ fn state_records_remote_play_operations() {
 }
 
 #[test]
+fn remote_play_session_caches_are_bounded() {
+    let mut state = SteamworksRemotePlayState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT as u32 + 1) {
+        let session = steamworks::RemotePlaySessionId::from_raw(raw);
+        state.record_operation(&SteamworksRemotePlayOperation::SessionRead {
+            session: SteamworksRemotePlaySessionInfo {
+                session,
+                user: steamworks::SteamId::from_raw(raw as u64),
+                client_name: Some(format!("Client {raw}")),
+                client_form_factor: None,
+                client_resolution: Some((1280, 720)),
+            },
+        });
+        state.record_operation(&SteamworksRemotePlayOperation::SessionConnected { session });
+    }
+
+    assert_eq!(
+        state.known_sessions().len(),
+        super::state::STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.observed_connected_sessions().len(),
+        super::state::STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT
+    );
+
+    let evicted = steamworks::RemotePlaySessionId::from_raw(1);
+    let retained = steamworks::RemotePlaySessionId::from_raw(2);
+    assert_eq!(state.known_session(evicted), None);
+    assert!(!state.is_session_observed_connected(evicted));
+    assert!(state.known_session(retained).is_some());
+    assert!(state.is_session_observed_connected(retained));
+}
+
+#[test]
 fn remote_play_callbacks_are_bridged_without_client() {
     let mut app = App::new();
     let first = steamworks::RemotePlaySessionId::from_raw(1);

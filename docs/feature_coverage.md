@@ -21,7 +21,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Screenshots | Implemented | Hook state, trigger, library add with bounded submission caches, requested/ready callbacks. |
 | Remote Storage | Implemented | Cloud state, files, metadata/existence/persisted/timestamps, read/write/delete/forget, sync platforms, file share. |
 | UGC | Implemented | Subscriptions, item state/download/install info with bounded per-item caches, item downloads, queries, total/ID-only query paths, item create/update/delete, update progress, playtime tracking, game-server workshop init. |
-| Remote Play | Implemented | Session lists, ID-based session reads, invites, connect/disconnect callbacks. |
+| Remote Play | Implemented | Session lists, ID-based session reads with bounded caches, invites, connect/disconnect callbacks. |
 | Timeline | Implemented | Game mode, state descriptions, events. |
 | Game server | Implemented | Server lifecycle plugin, auth tickets, remote ticket validation, shared query packets, product/description/data, logon, advertisement/heartbeats, server browser metadata. |
 

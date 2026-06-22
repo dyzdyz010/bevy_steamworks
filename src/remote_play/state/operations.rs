@@ -1,4 +1,4 @@
-use super::SteamworksRemotePlayState;
+use super::{SteamworksRemotePlayState, STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT};
 use crate::remote_play::{
     SteamworksRemotePlayError, SteamworksRemotePlayInvite, SteamworksRemotePlayOperation,
 };
@@ -25,6 +25,7 @@ impl SteamworksRemotePlayState {
                     *existing = session.clone();
                 } else {
                     self.known_sessions.push(session.clone());
+                    trim_cache(&mut self.known_sessions);
                 }
             }
             SteamworksRemotePlayOperation::InviteSubmitted { session, friend } => {
@@ -37,6 +38,7 @@ impl SteamworksRemotePlayState {
             SteamworksRemotePlayOperation::SessionConnected { session } => {
                 if !self.observed_connected_sessions.contains(session) {
                     self.observed_connected_sessions.push(*session);
+                    trim_cache(&mut self.observed_connected_sessions);
                 }
             }
             SteamworksRemotePlayOperation::SessionDisconnected { session } => {
@@ -46,5 +48,12 @@ impl SteamworksRemotePlayState {
                     .retain(|known| known.session != *session);
             }
         }
+    }
+}
+
+fn trim_cache<T>(items: &mut Vec<T>) {
+    if items.len() > STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT {
+        let overflow = items.len() - STEAMWORKS_REMOTE_PLAY_STATE_CACHE_LIMIT;
+        items.drain(0..overflow);
     }
 }
