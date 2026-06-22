@@ -8,6 +8,8 @@ use super::{
 mod accessors;
 mod operations;
 
+pub(in crate::apps) const STEAMWORKS_APPS_STATE_CACHE_LIMIT: usize = 1_024;
+
 /// Runtime state for [`super::SteamworksAppsPlugin`].
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksAppsState {
@@ -53,5 +55,13 @@ pub(super) fn upsert_app_value<T>(
         *known_value = value;
     } else {
         values.push((app_id, value));
+        trim_cache(values);
+    }
+}
+
+pub(super) fn trim_cache<T>(values: &mut Vec<T>) {
+    if values.len() > STEAMWORKS_APPS_STATE_CACHE_LIMIT {
+        let overflow = values.len() - STEAMWORKS_APPS_STATE_CACHE_LIMIT;
+        values.drain(0..overflow);
     }
 }

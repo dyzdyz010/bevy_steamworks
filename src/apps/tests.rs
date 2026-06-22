@@ -246,6 +246,53 @@ fn state_records_app_operations() {
 }
 
 #[test]
+fn app_state_caches_are_bounded() {
+    let mut state = SteamworksAppsState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_APPS_STATE_CACHE_LIMIT as u32 + 1) {
+        let app_id = steamworks::AppId(raw);
+        state.record_operation(&SteamworksAppsOperation::AppInstalledRead {
+            app_id,
+            installed: raw % 2 == 0,
+        });
+        state.record_operation(&SteamworksAppsOperation::DlcInstalledRead {
+            app_id,
+            installed: raw % 2 != 0,
+        });
+        state.record_operation(&SteamworksAppsOperation::SubscribedAppRead {
+            app_id,
+            subscribed: raw % 3 == 0,
+        });
+        state.record_operation(&SteamworksAppsOperation::AppInstallDirRead {
+            app_id,
+            install_dir: format!("C:/Steam/app-{raw}"),
+        });
+        state.record_operation(&SteamworksAppsOperation::LaunchQueryParamRead {
+            key: format!("key-{raw}"),
+            value: format!("value-{raw}"),
+        });
+    }
+
+    let evicted = steamworks::AppId(1);
+    let retained = steamworks::AppId(2);
+    assert_eq!(state.app_installed(evicted), None);
+    assert_eq!(state.dlc_installed(evicted), None);
+    assert_eq!(state.subscribed_app(evicted), None);
+    assert_eq!(state.app_install_dir(evicted), None);
+    assert_eq!(state.launch_query_param("key-1"), None);
+
+    assert_eq!(state.app_installed(retained), Some(true));
+    assert_eq!(state.dlc_installed(retained), Some(false));
+    assert_eq!(state.subscribed_app(retained), Some(false));
+    assert_eq!(state.app_install_dir(retained), Some("C:/Steam/app-2"));
+    assert_eq!(state.launch_query_param("key-2"), Some("value-2"));
+    assert_eq!(
+        state.launch_query_params().len(),
+        super::state::STEAMWORKS_APPS_STATE_CACHE_LIMIT
+    );
+}
+
+#[test]
 fn new_url_launch_parameters_callbacks_are_bridged_without_client() {
     let mut app = App::new();
 

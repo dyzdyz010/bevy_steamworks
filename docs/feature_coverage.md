@@ -7,7 +7,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Area | Status | Notes |
 |:-----|:-------|:------|
 | Client lifecycle | Implemented | `SteamworksPlugin`, `SteamworksPlugins`, fail-fast by default, `LogAndContinue` diagnostics, callback pump in `SteamworksSystem::RunCallbacks`. |
-| Apps | Implemented | Subscription, install/DLC checks, ownership, languages, beta, launch command/query params, URL launch callback. |
+| Apps | Implemented | Subscription, install/DLC checks, ownership, languages, beta, launch command/query params with bounded lookup caches, URL launch callback. |
 | Friends | Implemented | Persona/friend snapshots with bounded lookup caches, coplay, user info requests, rich presence, overlays, invites, played-with, relationship checks, avatars, callbacks. |
 | User | Implemented | Steam ID, level, logged-on state, auth session tickets, Web API tickets, remote ticket validation, license checks, relevant callbacks. |
 | User stats | Implemented | Current stats lifecycle, int/float stats, achievements, global stats/history, global achievement percentages, leaderboards with ID/metadata caches, store/reset. |

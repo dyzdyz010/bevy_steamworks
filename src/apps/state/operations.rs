@@ -1,4 +1,6 @@
-use super::{upsert_app_value, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsState};
+use super::{
+    trim_cache, upsert_app_value, SteamworksAppsError, SteamworksAppsOperation, SteamworksAppsState,
+};
 
 impl SteamworksAppsState {
     pub(in crate::apps) fn record_error(&mut self, error: SteamworksAppsError) {
@@ -79,6 +81,7 @@ impl SteamworksAppsState {
                     *known_value = value.clone();
                 } else {
                     self.launch_query_params.push((key.clone(), value.clone()));
+                    trim_cache(&mut self.launch_query_params);
                 }
             }
             SteamworksAppsOperation::NewUrlLaunchParametersReceived { count } => {
