@@ -1,4 +1,5 @@
 use super::{SteamworksScreenshotsState, STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT};
+use crate::cache::trim_oldest;
 use crate::screenshots::{
     SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksSubmittedScreenshot,
 };
@@ -29,7 +30,10 @@ impl SteamworksScreenshotsState {
             } => {
                 if !self.added_screenshots.contains(handle) {
                     self.added_screenshots.push(*handle);
-                    trim_cache(&mut self.added_screenshots);
+                    trim_oldest(
+                        &mut self.added_screenshots,
+                        STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT,
+                    );
                 }
                 upsert_submitted_screenshot(
                     &mut self.submitted_screenshots,
@@ -64,12 +68,5 @@ fn upsert_submitted_screenshot(
     }
 
     submissions.push(submission);
-    trim_cache(submissions);
-}
-
-fn trim_cache<T>(items: &mut Vec<T>) {
-    if items.len() > STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT {
-        let overflow = items.len() - STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT;
-        items.drain(0..overflow);
-    }
+    trim_oldest(submissions, STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT);
 }

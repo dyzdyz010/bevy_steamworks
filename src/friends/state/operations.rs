@@ -5,6 +5,7 @@ use super::{
     SteamworksOverlayUserActivation, SteamworksRichPresenceChange, SteamworksUserGameInvite,
     SteamworksUserInformationRequest, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT,
 };
+use crate::cache::trim_oldest;
 
 impl SteamworksFriendsState {
     pub(in crate::friends) fn record_error(&mut self, error: SteamworksFriendsError) {
@@ -139,7 +140,7 @@ fn upsert_friend(friends: &mut Vec<SteamworksFriendInfo>, friend: SteamworksFrie
         *known = friend;
     } else {
         friends.push(friend);
-        trim_cache(friends);
+        trim_oldest(friends, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -160,7 +161,7 @@ fn upsert_friend_rich_presence(
             key,
             value,
         });
-        trim_cache(values);
+        trim_oldest(values, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -181,7 +182,7 @@ fn upsert_has_friend_result(
             flags,
             has_friend,
         });
-        trim_cache(values);
+        trim_oldest(values, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -202,13 +203,6 @@ fn upsert_friend_avatar(
             size,
             avatar,
         });
-        trim_cache(values);
-    }
-}
-
-fn trim_cache<T>(items: &mut Vec<T>) {
-    if items.len() > STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT {
-        let overflow = items.len() - STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT;
-        items.drain(0..overflow);
+        trim_oldest(values, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT);
     }
 }

@@ -1,5 +1,7 @@
 use bevy_ecs::prelude::Resource;
 
+use crate::cache::trim_oldest;
+
 use super::{
     messages::{SteamworksAppsError, SteamworksAppsOperation},
     types::SteamworksCurrentAppInfo,
@@ -55,13 +57,6 @@ pub(super) fn upsert_app_value<T>(
         *known_value = value;
     } else {
         values.push((app_id, value));
-        trim_cache(values);
-    }
-}
-
-pub(super) fn trim_cache<T>(values: &mut Vec<T>) {
-    if values.len() > STEAMWORKS_APPS_STATE_CACHE_LIMIT {
-        let overflow = values.len() - STEAMWORKS_APPS_STATE_CACHE_LIMIT;
-        values.drain(0..overflow);
+        trim_oldest(values, STEAMWORKS_APPS_STATE_CACHE_LIMIT);
     }
 }

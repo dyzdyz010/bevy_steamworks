@@ -3,6 +3,7 @@ use super::{
     SteamworksAchievementInfo, SteamworksLeaderboardId, SteamworksLeaderboardInfo,
     STEAMWORKS_STATS_STATE_CACHE_LIMIT,
 };
+use crate::cache::trim_oldest;
 
 pub(super) fn named_value<'a, T>(values: &'a [(String, T)], name: &str) -> Option<&'a T> {
     values
@@ -18,7 +19,7 @@ pub(super) fn upsert_named_value<T>(values: &mut Vec<(String, T)>, name: String,
         *known_value = value;
     } else {
         values.push((name, value));
-        trim_cache(values);
+        trim_oldest(values, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -144,7 +145,7 @@ pub(super) fn upsert_leaderboard_id(
         *known_leaderboard = leaderboard;
     } else {
         leaderboards.push((name, leaderboard));
-        trim_cache(leaderboards);
+        trim_oldest(leaderboards, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -159,7 +160,7 @@ pub(super) fn upsert_leaderboard_info(
         *known_info = info;
     } else {
         leaderboards.push(info);
-        trim_cache(leaderboards);
+        trim_oldest(leaderboards, STEAMWORKS_STATS_STATE_CACHE_LIMIT);
     }
 }
 
@@ -175,11 +176,4 @@ pub(super) fn remove_leaderboard_info(
     leaderboard: SteamworksLeaderboardId,
 ) {
     leaderboards.retain(|info| info.leaderboard != leaderboard);
-}
-
-fn trim_cache<T>(items: &mut Vec<T>) {
-    if items.len() > STEAMWORKS_STATS_STATE_CACHE_LIMIT {
-        let overflow = items.len() - STEAMWORKS_STATS_STATE_CACHE_LIMIT;
-        items.drain(0..overflow);
-    }
 }

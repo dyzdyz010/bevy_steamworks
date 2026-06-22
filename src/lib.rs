@@ -22,6 +22,7 @@ pub use steamworks::{
 
 pub mod apps;
 mod availability;
+mod cache;
 mod client;
 mod events;
 pub mod friends;

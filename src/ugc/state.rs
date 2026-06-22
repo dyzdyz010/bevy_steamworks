@@ -1,5 +1,7 @@
 use bevy_ecs::prelude::Resource;
 
+use crate::cache::trim_oldest;
+
 use super::*;
 
 mod accessors;
@@ -43,7 +45,7 @@ pub(super) fn upsert_item_details(
         *existing = details;
     } else {
         items.push(details);
-        trim_cache(items);
+        trim_oldest(items, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
     }
 }
 
@@ -58,7 +60,7 @@ pub(super) fn upsert_item_state(
         *existing = info;
     } else {
         states.push(info);
-        trim_cache(states);
+        trim_oldest(states, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
     }
 }
 
@@ -70,7 +72,7 @@ pub(super) fn upsert_item_download_info(
         *existing = info;
     } else {
         infos.push(info);
-        trim_cache(infos);
+        trim_oldest(infos, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
     }
 }
 
@@ -82,7 +84,7 @@ pub(super) fn upsert_item_install_info(
         *existing = info;
     } else {
         infos.push(info);
-        trim_cache(infos);
+        trim_oldest(infos, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
     }
 }
 
@@ -93,11 +95,4 @@ pub(super) fn remove_item_cache(state: &mut SteamworksUgcState, item: steamworks
     state.item_states.retain(|info| info.item != item);
     state.item_download_infos.retain(|info| info.item != item);
     state.item_install_infos.retain(|info| info.item != item);
-}
-
-fn trim_cache<T>(items: &mut Vec<T>) {
-    if items.len() > STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT {
-        let overflow = items.len() - STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT;
-        items.drain(0..overflow);
-    }
 }
