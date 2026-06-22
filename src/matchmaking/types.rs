@@ -189,6 +189,17 @@ pub struct SteamworksLobbyListRequest {
     pub filter: SteamworksLobbyListFilter,
 }
 
+/// Completed lobby-list request context and results.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksLobbyListResult {
+    /// Unique request ID assigned by the plugin.
+    pub request_id: u64,
+    /// Filters applied to the request.
+    pub filter: SteamworksLobbyListFilter,
+    /// Lobby IDs returned by Steam.
+    pub lobbies: Vec<steamworks::LobbyId>,
+}
+
 /// Submitted lobby-create request context.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SteamworksLobbyCreateRequest {

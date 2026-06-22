@@ -620,6 +620,118 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
             server: Some(server),
         })
     );
+    assert_eq!(state.lobby_list_requests().len(), 1);
+    assert_eq!(state.lobby_list_request(1), state.last_lobby_list_request());
+    assert_eq!(
+        state.lobby_list_result(1),
+        Some(&SteamworksLobbyListResult {
+            request_id: 1,
+            filter,
+            lobbies: vec![first_lobby, second_lobby],
+        })
+    );
+    assert_eq!(
+        state.lobby_create_request(2),
+        state.last_lobby_create_request()
+    );
+    assert_eq!(state.lobby_join_request(3), state.last_lobby_join_request());
+    assert_eq!(state.created_lobby(2), state.last_created_lobby());
+    assert_eq!(state.joined_lobby_result(3), state.last_joined_lobby());
+    assert_eq!(
+        state.lobby_data_count(second_lobby),
+        state.last_lobby_data_count()
+    );
+    assert_eq!(
+        state.lobby_data_value(second_lobby, "mode"),
+        state.last_lobby_data()
+    );
+    assert_eq!(
+        state.lobby_data_entry(second_lobby, 1),
+        state.last_lobby_data_entry()
+    );
+    assert_eq!(
+        state.all_lobby_data(second_lobby),
+        state.last_all_lobby_data()
+    );
+    assert_eq!(
+        state.lobby_data_set(second_lobby, "mode"),
+        state.last_lobby_data_set()
+    );
+    assert_eq!(
+        state.lobby_data_deletion(second_lobby, "old"),
+        state.last_lobby_data_deleted()
+    );
+    assert_eq!(
+        state.lobby_member_data_set(second_lobby, "loadout"),
+        state.last_lobby_member_data_set()
+    );
+    assert_eq!(
+        state.lobby_member_data_value(second_lobby, user, "rank"),
+        state.last_lobby_member_data()
+    );
+    assert_eq!(
+        state.lobby_member_limit(second_lobby),
+        state.last_lobby_member_limit()
+    );
+    assert_eq!(state.lobby_owner(second_lobby), state.last_lobby_owner());
+    assert_eq!(
+        state.lobby_member_count(second_lobby),
+        state.last_lobby_member_count()
+    );
+    assert_eq!(
+        state.lobby_members(second_lobby),
+        state.last_lobby_members()
+    );
+    assert_eq!(
+        state.lobby_joinability(second_lobby),
+        state.last_lobby_joinability()
+    );
+    assert_eq!(
+        state.lobby_chat_message_sent(second_lobby),
+        state.last_lobby_chat_message_sent()
+    );
+    assert_eq!(
+        state.lobby_chat_entry(second_lobby, 7),
+        state.last_lobby_chat_entry()
+    );
+    assert_eq!(
+        state.lobby_game_server_assignment(second_lobby),
+        state.last_lobby_game_server_set()
+    );
+    assert_eq!(
+        state.lobby_game_server(second_lobby),
+        state.last_lobby_game_server()
+    );
+}
+
+#[test]
+fn matchmaking_state_lookup_caches_are_bounded() {
+    let mut state = SteamworksMatchmakingState::default();
+    let limit = 1_024;
+
+    for index in 0..(limit + 4) {
+        state.record_operation(&SteamworksMatchmakingOperation::LobbyDataRead {
+            lobby: steamworks::LobbyId::from_raw((index + 1) as u64),
+            key: format!("key-{index}"),
+            value: Some(format!("value-{index}")),
+        });
+    }
+
+    assert_eq!(state.lobby_data_values().len(), limit);
+    assert!(state
+        .lobby_data_value(steamworks::LobbyId::from_raw(1), "key-0")
+        .is_none());
+    assert_eq!(
+        state.lobby_data_value(
+            steamworks::LobbyId::from_raw((limit + 4) as u64),
+            format!("key-{}", limit + 3)
+        ),
+        Some(&SteamworksLobbyDataValue {
+            lobby: steamworks::LobbyId::from_raw((limit + 4) as u64),
+            key: format!("key-{}", limit + 3),
+            value: Some(format!("value-{}", limit + 3)),
+        })
+    );
 }
 
 #[test]
