@@ -239,6 +239,32 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         state.last_file_info().map(|info| info.sync_platforms),
         Some(platforms)
     );
+    assert_eq!(
+        state.file_summary("save.dat"),
+        Some(&SteamworksRemoteStorageFileSummary {
+            name: "save.dat".to_owned(),
+            size_bytes: 10,
+        })
+    );
+    assert_eq!(state.file_summary("missing.dat"), None);
+    assert_eq!(
+        state.file_info("save.dat"),
+        Some(&SteamworksRemoteStorageFileInfo {
+            name: "save.dat".to_owned(),
+            exists: true,
+            persisted: true,
+            timestamp: 7,
+            sync_platforms: platforms,
+        })
+    );
+    assert_eq!(state.file_exists("save.dat"), Some(true));
+    assert_eq!(state.file_persisted("save.dat"), Some(true));
+    assert_eq!(state.file_timestamp("save.dat"), Some(7));
+    assert_eq!(
+        state.last_file_sync_platforms(),
+        Some(("save.dat", platforms))
+    );
+    assert_eq!(state.file_sync_platforms("save.dat"), Some(platforms));
     state.record_operation(&SteamworksRemoteStorageOperation::FileExistsRead {
         name: "manual.dat".to_owned(),
         exists: false,
@@ -254,6 +280,10 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
     assert_eq!(state.last_file_exists(), Some(("manual.dat", false)));
     assert_eq!(state.last_file_persisted(), Some(("manual.dat", false)));
     assert_eq!(state.last_file_timestamp(), Some(("manual.dat", 12)));
+    assert_eq!(state.file_exists("manual.dat"), Some(false));
+    assert_eq!(state.file_persisted("manual.dat"), Some(false));
+    assert_eq!(state.file_timestamp("manual.dat"), Some(12));
+    assert_eq!(state.file_sync_platforms("manual.dat"), None);
     assert_eq!(
         state
             .last_file_info()
@@ -303,6 +333,7 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         state.last_file_info().map(|info| info.persisted),
         Some(false)
     );
+    assert_eq!(state.file_persisted("save.dat"), Some(false));
     assert_eq!(state.last_file_persisted(), Some(("save.dat", false)));
     assert_eq!(state.share_count(), 2);
     assert_eq!(
@@ -335,9 +366,16 @@ fn state_updates_file_status_after_delete() {
     });
 
     assert!(state.last_file_info().is_none());
+    assert_eq!(state.file_info("save.dat"), None);
+    assert_eq!(state.file_summary("save.dat"), None);
+    assert_eq!(state.file_exists("save.dat"), Some(false));
+    assert_eq!(state.file_persisted("save.dat"), None);
+    assert_eq!(state.file_timestamp("save.dat"), None);
+    assert_eq!(state.file_sync_platforms("save.dat"), None);
     assert_eq!(state.last_file_exists(), Some(("save.dat", false)));
     assert_eq!(state.last_file_persisted(), None);
     assert_eq!(state.last_file_timestamp(), None);
+    assert_eq!(state.last_file_sync_platforms(), None);
 }
 
 #[test]
@@ -356,6 +394,15 @@ fn state_updates_file_status_after_write() {
         name: "save.dat".to_owned(),
         timestamp: 7,
     });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileInfoRead {
+        info: SteamworksRemoteStorageFileInfo {
+            name: "save.dat".to_owned(),
+            exists: false,
+            persisted: true,
+            timestamp: 12,
+            sync_platforms: steamworks::RemoteStoragePlatforms::LINUX,
+        },
+    });
 
     state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
         written: SteamworksRemoteStorageFileWritten {
@@ -368,6 +415,14 @@ fn state_updates_file_status_after_write() {
     assert_eq!(state.last_file_exists(), Some(("save.dat", true)));
     assert_eq!(state.last_file_persisted(), None);
     assert_eq!(state.last_file_timestamp(), None);
+    assert_eq!(state.file_exists("save.dat"), Some(true));
+    assert_eq!(
+        state.file_summary("save.dat").map(|file| file.size_bytes),
+        Some(7)
+    );
+    assert_eq!(state.file_info("save.dat"), None);
+    assert_eq!(state.file_persisted("save.dat"), None);
+    assert_eq!(state.file_timestamp("save.dat"), None);
 }
 
 #[test]

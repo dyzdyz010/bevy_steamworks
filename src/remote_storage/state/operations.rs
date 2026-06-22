@@ -1,4 +1,4 @@
-use super::SteamworksRemoteStorageState;
+use super::{update_file_info, upsert_file_info, SteamworksRemoteStorageState};
 use crate::remote_storage::{
     SteamworksRemoteStorageError, SteamworksRemoteStorageFileSummary,
     SteamworksRemoteStorageOperation,
@@ -36,18 +36,29 @@ impl SteamworksRemoteStorageState {
                 self.files.clone_from(files);
             }
             SteamworksRemoteStorageOperation::FileInfoRead { info } => {
+                upsert_file_info(&mut self.file_infos, info.clone());
                 self.last_file_info = Some(info.clone());
                 self.last_file_exists = Some((info.name.clone(), info.exists));
                 self.last_file_persisted = Some((info.name.clone(), info.persisted));
                 self.last_file_timestamp = Some((info.name.clone(), info.timestamp));
+                self.last_file_sync_platforms = Some((info.name.clone(), info.sync_platforms));
             }
             SteamworksRemoteStorageOperation::FileExistsRead { name, exists } => {
+                update_file_info(&mut self.file_infos, name, |info| {
+                    info.exists = *exists;
+                });
                 self.last_file_exists = Some((name.clone(), *exists));
             }
             SteamworksRemoteStorageOperation::FilePersistedRead { name, persisted } => {
+                update_file_info(&mut self.file_infos, name, |info| {
+                    info.persisted = *persisted;
+                });
                 self.last_file_persisted = Some((name.clone(), *persisted));
             }
             SteamworksRemoteStorageOperation::FileTimestampRead { name, timestamp } => {
+                update_file_info(&mut self.file_infos, name, |info| {
+                    info.timestamp = *timestamp;
+                });
                 self.last_file_timestamp = Some((name.clone(), *timestamp));
             }
             SteamworksRemoteStorageOperation::FileRead { contents } => {
@@ -56,10 +67,13 @@ impl SteamworksRemoteStorageState {
             }
             SteamworksRemoteStorageOperation::FileWritten { written } => {
                 upsert_file_summary(&mut self.files, &written.name, written.bytes as u64);
-                if let Some(info) = &mut self.last_file_info {
-                    if info.name == written.name {
-                        info.exists = true;
-                    }
+                self.file_infos.retain(|info| info.name != written.name);
+                if self
+                    .last_file_info
+                    .as_ref()
+                    .is_some_and(|info| info.name == written.name)
+                {
+                    self.last_file_info = None;
                 }
                 self.last_file_exists = Some((written.name.clone(), true));
                 clear_matching_file_cache(&mut self.last_file_persisted, &written.name);
@@ -70,6 +84,7 @@ impl SteamworksRemoteStorageState {
             SteamworksRemoteStorageOperation::FileDeleted { name, deleted } => {
                 if *deleted {
                     self.files.retain(|file| file.name != *name);
+                    self.file_infos.retain(|info| info.name != *name);
                     if self
                         .last_file_info
                         .as_ref()
@@ -80,10 +95,14 @@ impl SteamworksRemoteStorageState {
                     self.last_file_exists = Some((name.clone(), false));
                     clear_matching_file_cache(&mut self.last_file_persisted, name);
                     clear_matching_file_cache(&mut self.last_file_timestamp, name);
+                    clear_matching_file_cache(&mut self.last_file_sync_platforms, name);
                 }
             }
             SteamworksRemoteStorageOperation::FileForgotten { name, forgotten } => {
                 if *forgotten {
+                    update_file_info(&mut self.file_infos, name, |info| {
+                        info.persisted = false;
+                    });
                     if let Some(info) = &mut self.last_file_info {
                         if info.name == *name {
                             info.persisted = false;
@@ -94,6 +113,10 @@ impl SteamworksRemoteStorageState {
             }
             SteamworksRemoteStorageOperation::FileSyncPlatformsRead { name, platforms }
             | SteamworksRemoteStorageOperation::FileSyncPlatformsSet { name, platforms } => {
+                update_file_info(&mut self.file_infos, name, |info| {
+                    info.sync_platforms = *platforms;
+                });
+                self.last_file_sync_platforms = Some((name.clone(), *platforms));
                 if let Some(info) = &mut self.last_file_info {
                     if info.name != *name {
                         return;
