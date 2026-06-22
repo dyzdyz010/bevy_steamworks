@@ -360,7 +360,7 @@ fn download_item_callbacks_are_bridged_without_client() {
         drained,
         vec![
             SteamworksUgcResult::Ok(SteamworksUgcOperation::DownloadItemResultReceived {
-                result: successful,
+                result: successful.clone(),
             }),
             SteamworksUgcResult::Ok(SteamworksUgcOperation::DownloadItemResultReceived {
                 result: failed.clone(),
@@ -370,6 +370,9 @@ fn download_item_callbacks_are_bridged_without_client() {
 
     let state = app.world().resource::<SteamworksUgcState>();
     assert_eq!(state.last_download_item_result(), Some(&failed));
+    assert_eq!(state.download_item_results(), &[failed.clone()]);
+    assert_eq!(state.download_item_result(item), Some(&failed));
+    assert_eq!(state.download_item_failed(item), Some(true));
     assert_eq!(state.last_error(), None);
 }
 
@@ -625,6 +628,13 @@ fn state_records_operations_without_unbounded_query_history() {
         item,
         high_priority: false,
     });
+    state.record_operation(&SteamworksUgcOperation::DownloadItemResultReceived {
+        result: SteamworksUgcDownloadItemResult {
+            app_id: steamworks::AppId(480),
+            item,
+            error: None,
+        },
+    });
     state.record_operation(&SteamworksUgcOperation::ItemSubscribed {
         request_id: 2,
         item,
@@ -672,6 +682,15 @@ fn state_records_operations_without_unbounded_query_history() {
             }),
         })
     );
+    assert_eq!(
+        state.download_item_result(item),
+        Some(&SteamworksUgcDownloadItemResult {
+            app_id: steamworks::AppId(480),
+            item,
+            error: None,
+        })
+    );
+    assert_eq!(state.download_item_failed(item), Some(false));
 
     state.record_operation(&SteamworksUgcOperation::ItemDeleted {
         request_id: 3,
@@ -688,6 +707,7 @@ fn state_records_operations_without_unbounded_query_history() {
     assert_eq!(state.item_state(item), None);
     assert_eq!(state.item_download_info(item), None);
     assert_eq!(state.item_install_info(item), None);
+    assert_eq!(state.download_item_result(item), None);
     assert_eq!(state.last_query(), Some(&second));
     assert_eq!(
         state.last_query_total(),
@@ -723,6 +743,35 @@ fn state_records_operations_without_unbounded_query_history() {
             workshop_depot: SteamworksUgcWorkshopDepotId::from_raw(480),
             folder: "workshop".to_owned(),
         })
+    );
+}
+
+#[test]
+fn download_item_result_cache_is_bounded() {
+    let mut state = SteamworksUgcState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT as u64 + 1) {
+        let item = steamworks::PublishedFileId(raw);
+        state.record_operation(&SteamworksUgcOperation::DownloadItemResultReceived {
+            result: SteamworksUgcDownloadItemResult {
+                app_id: steamworks::AppId(480),
+                item,
+                error: (raw % 2 == 0).then_some(steamworks::SteamError::PersistFailed),
+            },
+        });
+    }
+
+    assert_eq!(
+        state.download_item_results().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.download_item_result(steamworks::PublishedFileId(1)),
+        None
+    );
+    assert_eq!(
+        state.download_item_failed(steamworks::PublishedFileId(2)),
+        Some(true)
     );
 }
 

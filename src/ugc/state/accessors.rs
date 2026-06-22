@@ -101,6 +101,27 @@ impl SteamworksUgcState {
         self.last_download_item_result.as_ref()
     }
 
+    /// Returns bounded Workshop download completion callback snapshots by item.
+    pub fn download_item_results(&self) -> &[SteamworksUgcDownloadItemResult] {
+        &self.download_item_results
+    }
+
+    /// Returns the most recent Workshop download completion callback for one item.
+    pub fn download_item_result(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<&SteamworksUgcDownloadItemResult> {
+        self.download_item_results
+            .iter()
+            .find(|result| result.item == item)
+    }
+
+    /// Returns whether the most recent download completion for one item failed.
+    pub fn download_item_failed(&self, item: steamworks::PublishedFileId) -> Option<bool> {
+        self.download_item_result(item)
+            .map(|result| result.error.is_some())
+    }
+
     /// Returns the most recent Steam Game Server Workshop initialization.
     pub fn last_game_server_workshop_init(&self) -> Option<&SteamworksUgcGameServerWorkshopInit> {
         self.last_game_server_workshop_init.as_ref()

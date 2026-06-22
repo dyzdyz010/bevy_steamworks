@@ -1,6 +1,6 @@
 use super::{
-    remove_item_cache, upsert_item_details, upsert_item_download_info, upsert_item_install_info,
-    upsert_item_state, SteamworksUgcState,
+    remove_item_cache, upsert_download_item_result, upsert_item_details, upsert_item_download_info,
+    upsert_item_install_info, upsert_item_state, SteamworksUgcState,
 };
 use crate::ugc::{
     update_watches::SteamworksUgcUpdateWatches, SteamworksUgcError,
@@ -51,6 +51,7 @@ impl SteamworksUgcState {
                 self.submitted_downloads = self.submitted_downloads.saturating_add(1);
             }
             SteamworksUgcOperation::DownloadItemResultReceived { result } => {
+                upsert_download_item_result(&mut self.download_item_results, result.clone());
                 self.last_download_item_result = Some(result.clone());
             }
             SteamworksUgcOperation::GameServerWorkshopInitialized {

@@ -18,6 +18,7 @@ pub struct SteamworksUgcState {
     item_states: Vec<SteamworksUgcItemStateInfo>,
     item_download_infos: Vec<SteamworksUgcItemDownloadInfoResult>,
     item_install_infos: Vec<SteamworksUgcItemInstallInfoResult>,
+    download_item_results: Vec<SteamworksUgcDownloadItemResult>,
     last_query: Option<SteamworksUgcQueryResults>,
     last_query_total: Option<SteamworksUgcQueryTotal>,
     last_query_ids: Option<SteamworksUgcQueryIds>,
@@ -88,6 +89,21 @@ pub(super) fn upsert_item_install_info(
     }
 }
 
+pub(super) fn upsert_download_item_result(
+    results: &mut Vec<SteamworksUgcDownloadItemResult>,
+    result: SteamworksUgcDownloadItemResult,
+) {
+    if let Some(existing) = results
+        .iter_mut()
+        .find(|existing| existing.item == result.item)
+    {
+        *existing = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
+    }
+}
+
 pub(super) fn remove_item_cache(state: &mut SteamworksUgcState, item: steamworks::PublishedFileId) {
     state
         .item_details
@@ -95,4 +111,7 @@ pub(super) fn remove_item_cache(state: &mut SteamworksUgcState, item: steamworks
     state.item_states.retain(|info| info.item != item);
     state.item_download_infos.retain(|info| info.item != item);
     state.item_install_infos.retain(|info| info.item != item);
+    state
+        .download_item_results
+        .retain(|result| result.item != item);
 }

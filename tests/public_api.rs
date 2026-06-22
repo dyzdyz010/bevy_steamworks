@@ -121,6 +121,7 @@ use bevy_steamworks::{
         SteamworksTimelineResult as PreludeTimelineResult,
         SteamworksUgcCommand as PreludeUgcCommand,
         SteamworksUgcContentDescriptor as PreludeUgcContentDescriptor,
+        SteamworksUgcDownloadItemResult as PreludeUgcDownloadItemResult,
         SteamworksUgcError as PreludeUgcError,
         SteamworksUgcGameServerWorkshopInit as PreludeUgcGameServerWorkshopInit,
         SteamworksUgcItemDetails as PreludeUgcItemDetails,
@@ -192,8 +193,8 @@ use bevy_steamworks::{
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
     SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
-    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
-    SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+    SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
+    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
     SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult, SteamworksUgcState,
@@ -2270,6 +2271,14 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.item_state(item), None);
     assert_eq!(root_state.item_download_info(item), None);
     assert_eq!(root_state.item_install_info(item), None);
+    assert!(root_state.download_item_results().is_empty());
+    assert_eq!(root_state.download_item_result(item), None);
+    assert_eq!(root_state.download_item_failed(item), None);
+    let _download_result = SteamworksUgcDownloadItemResult {
+        app_id: steamworks::AppId(480),
+        item,
+        error: None,
+    };
     let _item_state = SteamworksUgcItemStateInfo {
         item,
         state: steamworks::ItemState::SUBSCRIBED,
@@ -2386,6 +2395,14 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.item_state(item), None);
     assert_eq!(prelude_state.item_download_info(item), None);
     assert_eq!(prelude_state.item_install_info(item), None);
+    assert!(prelude_state.download_item_results().is_empty());
+    assert_eq!(prelude_state.download_item_result(item), None);
+    assert_eq!(prelude_state.download_item_failed(item), None);
+    let _prelude_download_result = PreludeUgcDownloadItemResult {
+        app_id: steamworks::AppId(480),
+        item,
+        error: None,
+    };
     let _prelude_item_state = PreludeUgcItemStateInfo {
         item,
         state: steamworks::ItemState::SUBSCRIBED,
