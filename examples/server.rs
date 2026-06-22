@@ -29,6 +29,7 @@ fn log_server_state(
         commands.write(SteamworksServerCommand::set_bot_player_count(0));
         commands.write(SteamworksServerCommand::log_on_anonymous());
         commands.write(SteamworksServerCommand::set_advertise_server_active(true));
+        commands.write(SteamworksServerCommand::enable_heartbeats(true));
     }
 }
 

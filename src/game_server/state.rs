@@ -42,6 +42,7 @@ pub struct SteamworksServerState {
     anonymous_logon_submitted: bool,
     token_logon_submitted: bool,
     advertise_server_active: Option<bool>,
+    heartbeats_active: Option<bool>,
     mod_dir: Option<String>,
     map_name: Option<String>,
     server_name: Option<String>,

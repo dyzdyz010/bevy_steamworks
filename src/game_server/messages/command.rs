@@ -75,6 +75,11 @@ pub enum SteamworksServerCommand {
         /// Whether this server should be advertised.
         active: bool,
     },
+    /// Enable or disable Steam master-server heartbeats.
+    EnableHeartbeats {
+        /// Whether Steam should send server heartbeats.
+        active: bool,
+    },
     /// Set the mod directory string.
     SetModDir {
         /// Mod directory submitted to Steam.
@@ -176,6 +181,10 @@ impl fmt::Debug for SteamworksServerCommand {
                 .finish(),
             Self::SetAdvertiseServerActive { active } => formatter
                 .debug_struct("SetAdvertiseServerActive")
+                .field("active", active)
+                .finish(),
+            Self::EnableHeartbeats { active } => formatter
+                .debug_struct("EnableHeartbeats")
                 .field("active", active)
                 .finish(),
             Self::SetModDir { mod_dir } => formatter
@@ -305,6 +314,11 @@ impl SteamworksServerCommand {
     /// Creates a [`SteamworksServerCommand::SetAdvertiseServerActive`] command.
     pub fn set_advertise_server_active(active: bool) -> Self {
         Self::SetAdvertiseServerActive { active }
+    }
+
+    /// Creates a [`SteamworksServerCommand::EnableHeartbeats`] command.
+    pub fn enable_heartbeats(active: bool) -> Self {
+        Self::EnableHeartbeats { active }
     }
 
     /// Creates a [`SteamworksServerCommand::SetModDir`] command.

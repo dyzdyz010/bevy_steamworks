@@ -411,6 +411,10 @@ fn constructors_preserve_inputs() {
         SteamworksServerCommand::SetAdvertiseServerActive { active: true }
     );
     assert_eq!(
+        SteamworksServerCommand::enable_heartbeats(true),
+        SteamworksServerCommand::EnableHeartbeats { active: true }
+    );
+    assert_eq!(
         SteamworksServerCommand::set_mod_dir("spacewar"),
         SteamworksServerCommand::SetModDir {
             mod_dir: "spacewar".to_string(),
@@ -623,6 +627,7 @@ fn state_records_server_operations() {
     state.record_operation(&SteamworksServerOperation::AnonymousLogonSubmitted);
     state.record_operation(&SteamworksServerOperation::TokenLogonSubmitted);
     state.record_operation(&SteamworksServerOperation::AdvertiseServerActiveSet { active: true });
+    state.record_operation(&SteamworksServerOperation::HeartbeatsEnabled { active: true });
     state.record_operation(&SteamworksServerOperation::ModDirSet {
         mod_dir: "spacewar".to_string(),
     });
@@ -673,6 +678,7 @@ fn state_records_server_operations() {
     assert!(state.token_logon_submitted());
     assert!(state.logon_submitted());
     assert_eq!(state.advertise_server_active(), Some(true));
+    assert_eq!(state.heartbeats_active(), Some(true));
     assert_eq!(state.mod_dir(), Some("spacewar"));
     assert_eq!(state.map_name(), Some("arena"));
     assert_eq!(state.server_name(), Some("Test Server"));

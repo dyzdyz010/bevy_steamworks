@@ -147,6 +147,10 @@ fn handle_server_command(
             server.set_advertise_server_active(*active);
             SteamworksServerOperation::AdvertiseServerActiveSet { active: *active }
         }
+        SteamworksServerCommand::EnableHeartbeats { active } => {
+            server.enable_heartbeats(*active);
+            SteamworksServerOperation::HeartbeatsEnabled { active: *active }
+        }
         SteamworksServerCommand::SetModDir { mod_dir } => {
             server.set_mod_dir(mod_dir);
             SteamworksServerOperation::ModDirSet {

@@ -124,6 +124,11 @@ pub enum SteamworksServerOperation {
         /// Whether this server should be advertised.
         active: bool,
     },
+    /// Steam master-server heartbeat flag was submitted.
+    HeartbeatsEnabled {
+        /// Whether Steam should send server heartbeats.
+        active: bool,
+    },
     /// Mod directory was submitted.
     ModDirSet {
         /// Mod directory submitted to Steam.
@@ -272,6 +277,10 @@ impl fmt::Debug for SteamworksServerOperation {
             Self::TokenLogonSubmitted => formatter.write_str("TokenLogonSubmitted"),
             Self::AdvertiseServerActiveSet { active } => formatter
                 .debug_struct("AdvertiseServerActiveSet")
+                .field("active", active)
+                .finish(),
+            Self::HeartbeatsEnabled { active } => formatter
+                .debug_struct("HeartbeatsEnabled")
                 .field("active", active)
                 .finish(),
             Self::ModDirSet { mod_dir } => formatter

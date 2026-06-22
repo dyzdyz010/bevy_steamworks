@@ -131,6 +131,9 @@ impl SteamworksServerState {
             SteamworksServerOperation::AdvertiseServerActiveSet { active } => {
                 self.advertise_server_active = Some(*active);
             }
+            SteamworksServerOperation::HeartbeatsEnabled { active } => {
+                self.heartbeats_active = Some(*active);
+            }
             SteamworksServerOperation::ModDirSet { mod_dir } => {
                 self.mod_dir = Some(mod_dir.clone());
             }

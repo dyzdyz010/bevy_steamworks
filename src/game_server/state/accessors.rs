@@ -171,6 +171,11 @@ impl SteamworksServerState {
         self.advertise_server_active
     }
 
+    /// Returns the most recent heartbeat-active flag submitted through this command layer.
+    pub fn heartbeats_active(&self) -> Option<bool> {
+        self.heartbeats_active
+    }
+
     /// Returns the most recent mod dir submitted through this command layer.
     pub fn mod_dir(&self) -> Option<&str> {
         self.mod_dir.as_deref()

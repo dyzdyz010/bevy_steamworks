@@ -566,8 +566,8 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksServerCommand::get_steam_id();
-    let operation = SteamworksServerOperation::AnonymousLogonSubmitted;
+    let command = SteamworksServerCommand::enable_heartbeats(true);
+    let operation = SteamworksServerOperation::HeartbeatsEnabled { active: true };
     let error = SteamworksServerError::ServerUnavailable;
     let result = SteamworksServerResult::Err {
         command: command.clone(),
@@ -624,8 +624,8 @@ fn game_server_api_is_exported_from_root_and_prelude() {
 
     accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
-    let command = PreludeServerCommand::get_steam_id();
-    let operation = PreludeServerOperation::AnonymousLogonSubmitted;
+    let command = PreludeServerCommand::enable_heartbeats(true);
+    let operation = PreludeServerOperation::HeartbeatsEnabled { active: true };
     let error = PreludeServerError::ServerUnavailable;
     let result = PreludeServerResult::Err {
         command: command.clone(),
