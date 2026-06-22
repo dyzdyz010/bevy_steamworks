@@ -33,6 +33,15 @@ pub struct SteamworksRemoteStorageFileInfo {
     pub sync_platforms: steamworks::RemoteStoragePlatforms,
 }
 
+/// Submitted Steam Remote Storage file read request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileReadRequest {
+    /// Plugin-assigned request ID.
+    pub request_id: u64,
+    /// File name submitted to Steam Remote Storage.
+    pub name: String,
+}
+
 /// Owned Steam Remote Storage file payload to write.
 #[derive(Clone, PartialEq, Eq)]
 pub struct SteamworksRemoteStorageFileWrite {
@@ -65,6 +74,17 @@ impl fmt::Debug for SteamworksRemoteStorageFileWrite {
             .field("data_len", &self.data.len())
             .finish()
     }
+}
+
+/// Submitted Steam Remote Storage file write request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileWriteRequest {
+    /// Plugin-assigned request ID.
+    pub request_id: u64,
+    /// File name submitted to Steam Remote Storage.
+    pub name: String,
+    /// Number of bytes submitted to the worker.
+    pub bytes: usize,
 }
 
 /// Owned Steam Remote Storage file payload read by the plugin.
@@ -105,6 +125,15 @@ pub struct SteamworksRemoteStorageFileWritten {
     pub name: String,
     /// Number of bytes accepted by the upstream writer before stream close.
     pub bytes: usize,
+}
+
+/// Submitted Steam Remote Storage file share request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksRemoteStorageFileShareRequest {
+    /// Plugin-assigned request ID.
+    pub request_id: u64,
+    /// File name submitted to Steam Remote Storage.
+    pub name: String,
 }
 
 /// Opaque handle returned by Steam after a successful file share.

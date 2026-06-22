@@ -1,7 +1,13 @@
-use super::{update_file_info, upsert_file_info, SteamworksRemoteStorageState};
+use super::{
+    update_file_info, upsert_file_contents, upsert_file_info, upsert_file_read_request,
+    upsert_file_share_request, upsert_file_write_request, upsert_file_written, upsert_shared_file,
+    SteamworksRemoteStorageState, STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT,
+};
+use crate::cache::trim_oldest;
 use crate::remote_storage::{
-    SteamworksRemoteStorageError, SteamworksRemoteStorageFileSummary,
-    SteamworksRemoteStorageOperation,
+    SteamworksRemoteStorageError, SteamworksRemoteStorageFileReadRequest,
+    SteamworksRemoteStorageFileShareRequest, SteamworksRemoteStorageFileSummary,
+    SteamworksRemoteStorageFileWriteRequest, SteamworksRemoteStorageOperation,
 };
 
 impl SteamworksRemoteStorageState {
@@ -62,10 +68,27 @@ impl SteamworksRemoteStorageState {
                 self.last_file_timestamp = Some((name.clone(), *timestamp));
             }
             SteamworksRemoteStorageOperation::FileRead { contents } => {
+                upsert_file_read_request(
+                    &mut self.file_read_requests,
+                    SteamworksRemoteStorageFileReadRequest {
+                        request_id: contents.request_id,
+                        name: contents.name.clone(),
+                    },
+                );
+                upsert_file_contents(&mut self.file_contents, contents.clone());
                 self.last_file_contents = Some(contents.clone());
                 self.read_count = self.read_count.saturating_add(1);
             }
             SteamworksRemoteStorageOperation::FileWritten { written } => {
+                upsert_file_write_request(
+                    &mut self.file_write_requests,
+                    SteamworksRemoteStorageFileWriteRequest {
+                        request_id: written.request_id,
+                        name: written.name.clone(),
+                        bytes: written.bytes,
+                    },
+                );
+                upsert_file_written(&mut self.file_writes, written.clone());
                 upsert_file_summary(&mut self.files, &written.name, written.bytes as u64);
                 self.file_infos.retain(|info| info.name != written.name);
                 if self
@@ -124,13 +147,50 @@ impl SteamworksRemoteStorageState {
                     info.sync_platforms = *platforms;
                 }
             }
+            SteamworksRemoteStorageOperation::FileReadRequested { request_id, name } => {
+                upsert_file_read_request(
+                    &mut self.file_read_requests,
+                    SteamworksRemoteStorageFileReadRequest {
+                        request_id: *request_id,
+                        name: name.clone(),
+                    },
+                );
+            }
+            SteamworksRemoteStorageOperation::FileWriteRequested {
+                request_id,
+                name,
+                bytes,
+            } => {
+                upsert_file_write_request(
+                    &mut self.file_write_requests,
+                    SteamworksRemoteStorageFileWriteRequest {
+                        request_id: *request_id,
+                        name: name.clone(),
+                        bytes: *bytes,
+                    },
+                );
+            }
+            SteamworksRemoteStorageOperation::FileShareRequested { request_id, name } => {
+                upsert_file_share_request(
+                    &mut self.file_share_requests,
+                    SteamworksRemoteStorageFileShareRequest {
+                        request_id: *request_id,
+                        name: name.clone(),
+                    },
+                );
+            }
             SteamworksRemoteStorageOperation::FileShared { shared_file } => {
+                upsert_file_share_request(
+                    &mut self.file_share_requests,
+                    SteamworksRemoteStorageFileShareRequest {
+                        request_id: shared_file.request_id,
+                        name: shared_file.name.clone(),
+                    },
+                );
+                upsert_shared_file(&mut self.shared_files, shared_file.clone());
                 self.last_shared_file = Some(shared_file.clone());
                 self.share_count = self.share_count.saturating_add(1);
             }
-            SteamworksRemoteStorageOperation::FileReadRequested { .. }
-            | SteamworksRemoteStorageOperation::FileWriteRequested { .. }
-            | SteamworksRemoteStorageOperation::FileShareRequested { .. } => {}
         }
     }
 
@@ -153,6 +213,7 @@ fn upsert_file_summary(
             name: name.to_owned(),
             size_bytes,
         });
+        trim_oldest(files, STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT);
     }
 }
 

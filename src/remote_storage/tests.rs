@@ -199,6 +199,10 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         name: "save.dat".to_owned(),
         platforms,
     });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileReadRequested {
+        request_id: 2,
+        name: "save.dat".to_owned(),
+    });
     state.record_operation(&SteamworksRemoteStorageOperation::FileRead {
         contents: SteamworksRemoteStorageFileContents {
             request_id: 2,
@@ -206,12 +210,21 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             data: b"payload".to_vec(),
         },
     });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileWriteRequested {
+        request_id: 3,
+        name: "save2.dat".to_owned(),
+        bytes: 7,
+    });
     state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
         written: SteamworksRemoteStorageFileWritten {
             request_id: 3,
             name: "save2.dat".to_owned(),
             bytes: 7,
         },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileShareRequested {
+        request_id: 0,
+        name: "save.dat".to_owned(),
     });
     state.record_operation(&SteamworksRemoteStorageOperation::FileShared {
         shared_file: SteamworksRemoteStorageSharedFile {
@@ -291,6 +304,13 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         Some((true, true, 7))
     );
     assert_eq!(
+        state.file_read_request(2),
+        Some(&SteamworksRemoteStorageFileReadRequest {
+            request_id: 2,
+            name: "save.dat".to_owned(),
+        })
+    );
+    assert_eq!(
         state.last_file_contents(),
         Some(&SteamworksRemoteStorageFileContents {
             request_id: 2,
@@ -299,7 +319,31 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         })
     );
     assert_eq!(
+        state.file_contents_by_request(2),
+        Some(&SteamworksRemoteStorageFileContents {
+            request_id: 2,
+            name: "save.dat".to_owned(),
+            data: b"payload".to_vec(),
+        })
+    );
+    assert_eq!(
+        state.file_write_request(3),
+        Some(&SteamworksRemoteStorageFileWriteRequest {
+            request_id: 3,
+            name: "save2.dat".to_owned(),
+            bytes: 7,
+        })
+    );
+    assert_eq!(
         state.last_file_written(),
+        Some(&SteamworksRemoteStorageFileWritten {
+            request_id: 3,
+            name: "save2.dat".to_owned(),
+            bytes: 7,
+        })
+    );
+    assert_eq!(
+        state.file_write(3),
         Some(&SteamworksRemoteStorageFileWritten {
             request_id: 3,
             name: "save2.dat".to_owned(),
@@ -337,7 +381,22 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
     assert_eq!(state.last_file_persisted(), Some(("save.dat", false)));
     assert_eq!(state.share_count(), 2);
     assert_eq!(
+        state.file_share_request(0),
+        Some(&SteamworksRemoteStorageFileShareRequest {
+            request_id: 0,
+            name: "save.dat".to_owned(),
+        })
+    );
+    assert_eq!(
         state.last_shared_file(),
+        Some(&SteamworksRemoteStorageSharedFile {
+            request_id: 1,
+            name: "save2.dat".to_owned(),
+            handle: SteamworksRemoteStorageFileShareHandle::from_raw(12),
+        })
+    );
+    assert_eq!(
+        state.shared_file(1),
         Some(&SteamworksRemoteStorageSharedFile {
             request_id: 1,
             name: "save2.dat".to_owned(),
@@ -449,4 +508,92 @@ fn debug_redacts_remote_storage_file_payloads() {
         assert!(debug.contains("data_len: 6"));
         assert!(!debug.contains("secret"));
     }
+}
+
+#[test]
+fn request_result_caches_are_bounded() {
+    let mut state = SteamworksRemoteStorageState::default();
+
+    for request_id in 1..=(super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT as u64 + 1) {
+        let name = format!("save-{request_id}.dat");
+        state.record_operation(&SteamworksRemoteStorageOperation::FileReadRequested {
+            request_id,
+            name: name.clone(),
+        });
+        state.record_operation(&SteamworksRemoteStorageOperation::FileRead {
+            contents: SteamworksRemoteStorageFileContents {
+                request_id,
+                name: name.clone(),
+                data: vec![request_id as u8],
+            },
+        });
+        state.record_operation(&SteamworksRemoteStorageOperation::FileWriteRequested {
+            request_id,
+            name: name.clone(),
+            bytes: request_id as usize,
+        });
+        state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
+            written: SteamworksRemoteStorageFileWritten {
+                request_id,
+                name: name.clone(),
+                bytes: request_id as usize,
+            },
+        });
+        state.record_operation(&SteamworksRemoteStorageOperation::FileShareRequested {
+            request_id,
+            name: name.clone(),
+        });
+        state.record_operation(&SteamworksRemoteStorageOperation::FileShared {
+            shared_file: SteamworksRemoteStorageSharedFile {
+                request_id,
+                name,
+                handle: SteamworksRemoteStorageFileShareHandle::from_raw(request_id),
+            },
+        });
+    }
+
+    assert_eq!(
+        state.file_read_requests().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.file_contents().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.file_write_requests().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.file_writes().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.file_share_requests().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.shared_files().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.files().len(),
+        super::state::STEAMWORKS_REMOTE_STORAGE_STATE_CACHE_LIMIT
+    );
+
+    assert_eq!(state.file_read_request(1), None);
+    assert_eq!(state.file_contents_by_request(1), None);
+    assert_eq!(state.file_write_request(1), None);
+    assert_eq!(state.file_write(1), None);
+    assert_eq!(state.file_share_request(1), None);
+    assert_eq!(state.shared_file(1), None);
+    assert_eq!(state.file_summary("save-1.dat"), None);
+
+    assert!(state.file_read_request(2).is_some());
+    assert!(state.file_contents_by_request(2).is_some());
+    assert!(state.file_write_request(2).is_some());
+    assert!(state.file_write(2).is_some());
+    assert!(state.file_share_request(2).is_some());
+    assert!(state.shared_file(2).is_some());
+    assert!(state.file_summary("save-2.dat").is_some());
 }

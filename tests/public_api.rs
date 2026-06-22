@@ -84,11 +84,17 @@ use bevy_steamworks::{
         SteamworksRemoteStorageCommand as PreludeRemoteStorageCommand,
         SteamworksRemoteStorageError as PreludeRemoteStorageError,
         SteamworksRemoteStorageFileContents as PreludeRemoteStorageFileContents,
+        SteamworksRemoteStorageFileReadRequest as PreludeRemoteStorageFileReadRequest,
+        SteamworksRemoteStorageFileShareHandle as PreludeRemoteStorageFileShareHandle,
+        SteamworksRemoteStorageFileShareRequest as PreludeRemoteStorageFileShareRequest,
         SteamworksRemoteStorageFileWrite as PreludeRemoteStorageFileWrite,
+        SteamworksRemoteStorageFileWriteRequest as PreludeRemoteStorageFileWriteRequest,
         SteamworksRemoteStorageFileWritten as PreludeRemoteStorageFileWritten,
         SteamworksRemoteStorageOperation as PreludeRemoteStorageOperation,
         SteamworksRemoteStoragePlugin as PreludeRemoteStoragePlugin,
         SteamworksRemoteStorageResult as PreludeRemoteStorageResult,
+        SteamworksRemoteStorageSharedFile as PreludeRemoteStorageSharedFile,
+        SteamworksRemoteStorageState as PreludeRemoteStorageState,
         SteamworksScreenshotsCommand as PreludeScreenshotsCommand,
         SteamworksScreenshotsError as PreludeScreenshotsError,
         SteamworksScreenshotsOperation as PreludeScreenshotsOperation,
@@ -185,11 +191,14 @@ use bevy_steamworks::{
     SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
     SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
     SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
-    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
+    SteamworksRemoteStorageFileReadRequest, SteamworksRemoteStorageFileShareHandle,
+    SteamworksRemoteStorageFileShareRequest, SteamworksRemoteStorageFileWrite,
+    SteamworksRemoteStorageFileWriteRequest, SteamworksRemoteStorageFileWritten,
     SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
-    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
+    SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
@@ -1809,6 +1818,32 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
     );
 
     let write = SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
+    let root_state = SteamworksRemoteStorageState::default();
+    assert!(root_state.file_read_requests().is_empty());
+    assert_eq!(root_state.file_read_request(0), None);
+    assert!(root_state.file_contents().is_empty());
+    assert_eq!(root_state.file_contents_by_request(0), None);
+    assert!(root_state.file_write_requests().is_empty());
+    assert_eq!(root_state.file_write_request(0), None);
+    assert!(root_state.file_writes().is_empty());
+    assert_eq!(root_state.file_write(0), None);
+    assert!(root_state.file_share_requests().is_empty());
+    assert_eq!(root_state.file_share_request(0), None);
+    assert!(root_state.shared_files().is_empty());
+    assert_eq!(root_state.shared_file(0), None);
+    let _read_request = SteamworksRemoteStorageFileReadRequest {
+        request_id: 0,
+        name: "save.dat".to_owned(),
+    };
+    let _write_request = SteamworksRemoteStorageFileWriteRequest {
+        request_id: 1,
+        name: "save.dat".to_owned(),
+        bytes: 7,
+    };
+    let _share_request = SteamworksRemoteStorageFileShareRequest {
+        request_id: 2,
+        name: "save.dat".to_owned(),
+    };
     accepts_root_exports(
         SteamworksRemoteStoragePlugin::new(),
         SteamworksRemoteStorageCommand::write_file("save.dat", b"payload".to_vec()),
@@ -1840,6 +1875,11 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         request_id: 2,
         name: "save.dat".to_owned(),
         bytes: 7,
+    };
+    let _shared_file = SteamworksRemoteStorageSharedFile {
+        request_id: 4,
+        name: "save.dat".to_owned(),
+        handle: SteamworksRemoteStorageFileShareHandle::from_raw(11),
     };
 
     let command = PreludeRemoteStorageCommand::get_cloud_info();
@@ -1881,6 +1921,32 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
     );
 
     let write = PreludeRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
+    let prelude_state = PreludeRemoteStorageState::default();
+    assert!(prelude_state.file_read_requests().is_empty());
+    assert_eq!(prelude_state.file_read_request(0), None);
+    assert!(prelude_state.file_contents().is_empty());
+    assert_eq!(prelude_state.file_contents_by_request(0), None);
+    assert!(prelude_state.file_write_requests().is_empty());
+    assert_eq!(prelude_state.file_write_request(0), None);
+    assert!(prelude_state.file_writes().is_empty());
+    assert_eq!(prelude_state.file_write(0), None);
+    assert!(prelude_state.file_share_requests().is_empty());
+    assert_eq!(prelude_state.file_share_request(0), None);
+    assert!(prelude_state.shared_files().is_empty());
+    assert_eq!(prelude_state.shared_file(0), None);
+    let _prelude_read_request = PreludeRemoteStorageFileReadRequest {
+        request_id: 0,
+        name: "save.dat".to_owned(),
+    };
+    let _prelude_write_request = PreludeRemoteStorageFileWriteRequest {
+        request_id: 1,
+        name: "save.dat".to_owned(),
+        bytes: 7,
+    };
+    let _prelude_share_request = PreludeRemoteStorageFileShareRequest {
+        request_id: 2,
+        name: "save.dat".to_owned(),
+    };
     accepts_prelude_exports(
         PreludeRemoteStoragePlugin::new(),
         PreludeRemoteStorageCommand::read_file("save.dat"),
@@ -1907,6 +1973,11 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         request_id: 2,
         name: "save.dat".to_owned(),
         data: b"payload".to_vec(),
+    };
+    let _prelude_shared_file = PreludeRemoteStorageSharedFile {
+        request_id: 4,
+        name: "save.dat".to_owned(),
+        handle: PreludeRemoteStorageFileShareHandle::from_raw(11),
     };
 }
 
