@@ -228,8 +228,21 @@ fn validation_rejects_invalid_inputs() {
         Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
     );
     assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::receive_all_messages(0,)),
+        Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
+    );
+    assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::receive_messages(
             connection_id(),
+            STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+        )),
+        Err(SteamworksNetworkingSocketsError::BatchSizeTooLarge {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::receive_all_messages(
             STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
         )),
         Err(SteamworksNetworkingSocketsError::BatchSizeTooLarge {
@@ -242,6 +255,21 @@ fn validation_rejects_invalid_inputs() {
             &SteamworksNetworkingSocketsCommand::receive_poll_group_messages(poll_group_id(), 0,),
         ),
         Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::receive_all_poll_group_messages(0,)),
+        Err(SteamworksNetworkingSocketsError::InvalidBatchSize)
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::receive_all_poll_group_messages(
+                STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+            )
+        ),
+        Err(SteamworksNetworkingSocketsError::BatchSizeTooLarge {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_MESSAGES_PER_COMMAND,
+        })
     );
     assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::send_message(
@@ -572,6 +600,18 @@ fn constructors_preserve_inputs() {
             batch_size: 16,
         }
     );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::receive_all_messages(24),
+        SteamworksNetworkingSocketsCommand::ReceiveAllMessages {
+            batch_size_per_connection: 24,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::receive_all_poll_group_messages(12),
+        SteamworksNetworkingSocketsCommand::ReceiveAllPollGroupMessages {
+            batch_size_per_poll_group: 12,
+        }
+    );
     let outbound = SteamworksNetworkingSocketsOutboundMessage::new(
         connection_id(),
         steamworks::networking_types::SendFlags::RELIABLE,
@@ -659,7 +699,7 @@ fn constructors_preserve_inputs() {
 }
 
 #[test]
-fn poll_all_commands_return_empty_batches_without_handles() {
+fn bulk_commands_return_empty_batches_without_handles() {
     let mut handles = SteamworksNetworkingSocketsHandleStorage::default();
 
     assert_eq!(
@@ -688,6 +728,30 @@ fn poll_all_commands_return_empty_batches_without_handles() {
         Ok(
             SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
                 connections: Vec::new(),
+            },
+        )
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::receive_all_messages(4),
+        ),
+        Ok(SteamworksNetworkingSocketsOperation::AllMessagesReceived {
+            connections: Vec::new(),
+        },)
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::receive_all_poll_group_messages(4),
+        ),
+        Ok(
+            SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+                poll_groups: Vec::new(),
             },
         )
     );
@@ -833,6 +897,49 @@ fn state_records_bulk_poll_operations() {
         Some(&listen_socket_events)
     );
     assert_eq!(state.last_connection_events(), Some(&connection_events));
+}
+
+#[test]
+fn state_records_bulk_receive_operations() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+    let peer = steamworks::networking_types::NetworkingIdentity::new_ip(localhost());
+    let message = SteamworksNetworkingSocketsMessage {
+        connection: connection_id(),
+        peer: peer.clone(),
+        data: vec![1, 2, 3],
+        channel: 0,
+        send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+        message_number: 1,
+        connection_user_data: 10,
+    };
+    let poll_group_message = SteamworksNetworkingSocketsPollGroupMessage {
+        poll_group: poll_group_id(),
+        peer,
+        data: vec![4, 5],
+        channel: 1,
+        send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
+        message_number: 2,
+        connection_user_data: 11,
+    };
+
+    state.record_operation(&SteamworksNetworkingSocketsOperation::AllMessagesReceived {
+        connections: vec![SteamworksNetworkingSocketsConnectionMessages {
+            connection: connection_id(),
+            messages: vec![message.clone()],
+        }],
+    });
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+            poll_groups: vec![SteamworksNetworkingSocketsPollGroupMessages {
+                poll_group: poll_group_id(),
+                messages: vec![poll_group_message.clone()],
+            }],
+        },
+    );
+
+    assert_eq!(state.received_count(), 2);
+    assert_eq!(state.last_received_messages(), &[message]);
+    assert_eq!(state.last_poll_group_messages(), &[poll_group_message]);
 }
 
 #[test]

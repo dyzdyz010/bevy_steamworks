@@ -113,6 +113,12 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("connection", connection)
                 .field("batch_size", batch_size)
                 .finish(),
+            Self::ReceiveAllMessages {
+                batch_size_per_connection,
+            } => f
+                .debug_struct("ReceiveAllMessages")
+                .field("batch_size_per_connection", batch_size_per_connection)
+                .finish(),
             Self::ReceivePollGroupMessages {
                 poll_group,
                 batch_size,
@@ -120,6 +126,12 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .debug_struct("ReceivePollGroupMessages")
                 .field("poll_group", poll_group)
                 .field("batch_size", batch_size)
+                .finish(),
+            Self::ReceiveAllPollGroupMessages {
+                batch_size_per_poll_group,
+            } => f
+                .debug_struct("ReceiveAllPollGroupMessages")
+                .field("batch_size_per_poll_group", batch_size_per_poll_group)
                 .finish(),
             Self::FlushMessages { connection } => f
                 .debug_struct("FlushMessages")

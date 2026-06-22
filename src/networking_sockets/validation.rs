@@ -62,9 +62,15 @@ pub(super) fn validate_command(
         SteamworksNetworkingSocketsCommand::ReceiveMessages { batch_size, .. } => {
             validate_message_batch_size(*batch_size)
         }
+        SteamworksNetworkingSocketsCommand::ReceiveAllMessages {
+            batch_size_per_connection,
+        } => validate_message_batch_size(*batch_size_per_connection),
         SteamworksNetworkingSocketsCommand::ReceivePollGroupMessages { batch_size, .. } => {
             validate_message_batch_size(*batch_size)
         }
+        SteamworksNetworkingSocketsCommand::ReceiveAllPollGroupMessages {
+            batch_size_per_poll_group,
+        } => validate_message_batch_size(*batch_size_per_poll_group),
         SteamworksNetworkingSocketsCommand::SendMessage { data, .. } => {
             validate_message_payload_len(data.len())
         }

@@ -118,6 +118,16 @@ impl SteamworksNetworkingSocketsState {
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
                 self.last_received_messages.clone_from(messages);
             }
+            SteamworksNetworkingSocketsOperation::AllMessagesReceived { connections } => {
+                let messages = connections
+                    .iter()
+                    .flat_map(|batch| batch.messages.iter().cloned())
+                    .collect::<Vec<_>>();
+                self.received_count = self
+                    .received_count
+                    .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                self.last_received_messages = messages;
+            }
             SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
                 messages, ..
             } => {
@@ -125,6 +135,16 @@ impl SteamworksNetworkingSocketsState {
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
                 self.last_poll_group_messages.clone_from(messages);
+            }
+            SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived { poll_groups } => {
+                let messages = poll_groups
+                    .iter()
+                    .flat_map(|batch| batch.messages.iter().cloned())
+                    .collect::<Vec<_>>();
+                self.received_count = self
+                    .received_count
+                    .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                self.last_poll_group_messages = messages;
             }
             SteamworksNetworkingSocketsOperation::MessagesFlushed { connection } => {
                 self.last_flushed_connection = Some(*connection);

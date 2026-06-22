@@ -192,10 +192,19 @@ pub(super) fn handle_networking_sockets_command(
             connection,
             batch_size,
         } => message_commands::receive_messages(handles, *connection, *batch_size)?,
+        SteamworksNetworkingSocketsCommand::ReceiveAllMessages {
+            batch_size_per_connection,
+        } => message_commands::receive_all_messages(handles, *batch_size_per_connection)?,
         SteamworksNetworkingSocketsCommand::ReceivePollGroupMessages {
             poll_group,
             batch_size,
         } => poll_group_commands::receive_poll_group_messages(handles, *poll_group, *batch_size)?,
+        SteamworksNetworkingSocketsCommand::ReceiveAllPollGroupMessages {
+            batch_size_per_poll_group,
+        } => poll_group_commands::receive_all_poll_group_messages(
+            handles,
+            *batch_size_per_poll_group,
+        )?,
         SteamworksNetworkingSocketsCommand::FlushMessages { connection } => {
             message_commands::flush_messages(handles, *connection)?
         }

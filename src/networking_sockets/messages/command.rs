@@ -125,12 +125,22 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Maximum number of messages to receive.
         batch_size: usize,
     },
+    /// Receive messages from every plugin-owned connection.
+    ReceiveAllMessages {
+        /// Maximum number of messages to receive per connection.
+        batch_size_per_connection: usize,
+    },
     /// Receive messages from one poll group.
     ReceivePollGroupMessages {
         /// Poll group to receive from.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
         /// Maximum number of messages to receive.
         batch_size: usize,
+    },
+    /// Receive messages from every plugin-owned poll group.
+    ReceiveAllPollGroupMessages {
+        /// Maximum number of messages to receive per poll group.
+        batch_size_per_poll_group: usize,
     },
     /// Flush pending messages on one connection.
     FlushMessages {

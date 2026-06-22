@@ -3,7 +3,7 @@ use crate::{SteamworksClient, SteamworksServer};
 use super::super::{
     handles::SteamworksNetworkingSocketsHandleStorage, snapshots::snapshot_poll_group_message,
     SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsPollGroupMessages,
 };
 use super::helpers::{networking_sockets, server_networking_sockets};
 
@@ -44,6 +44,38 @@ pub(super) fn receive_poll_group_messages(
         SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
             poll_group,
             messages,
+        },
+    )
+}
+
+pub(super) fn receive_all_poll_group_messages(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+    batch_size_per_poll_group: usize,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut poll_groups = handles.poll_groups.keys().copied().collect::<Vec<_>>();
+    poll_groups.sort_by_key(|poll_group| poll_group.raw());
+
+    let mut batches = Vec::with_capacity(poll_groups.len());
+    for poll_group in poll_groups {
+        if !handles.poll_groups.contains_key(&poll_group) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
+            poll_group,
+            messages,
+        } = receive_poll_group_messages(handles, poll_group, batch_size_per_poll_group)?
+        else {
+            unreachable!("receive_poll_group_messages returns PollGroupMessagesReceived");
+        };
+        batches.push(SteamworksNetworkingSocketsPollGroupMessages {
+            poll_group,
+            messages,
+        });
+    }
+
+    Ok(
+        SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+            poll_groups: batches,
         },
     )
 }

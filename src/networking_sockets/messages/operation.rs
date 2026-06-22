@@ -2,10 +2,11 @@ use super::super::{
     SteamworksListenSocketEventInfo, SteamworksListenSocketId,
     SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionEvents,
     SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionInfo,
-    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsListenSocketEvents, SteamworksNetworkingSocketsMessage,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsPollGroupId,
-    SteamworksNetworkingSocketsPollGroupMessage, SteamworksNetworkingSocketsRealtimeStatus,
+    SteamworksNetworkingSocketsConnectionMessages, SteamworksNetworkingSocketsConnectionTarget,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsListenSocketEvents,
+    SteamworksNetworkingSocketsMessage, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsPollGroupMessage,
+    SteamworksNetworkingSocketsPollGroupMessages, SteamworksNetworkingSocketsRealtimeStatus,
 };
 
 /// A successfully submitted Networking Sockets operation, read, or event.
@@ -104,12 +105,22 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Owned message snapshots.
         messages: Vec<SteamworksNetworkingSocketsMessage>,
     },
+    /// Messages were received from every plugin-owned connection.
+    AllMessagesReceived {
+        /// Per-connection message batches.
+        connections: Vec<SteamworksNetworkingSocketsConnectionMessages>,
+    },
     /// Messages were received from a poll group.
     PollGroupMessagesReceived {
         /// Poll group received from.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
         /// Owned message snapshots.
         messages: Vec<SteamworksNetworkingSocketsPollGroupMessage>,
+    },
+    /// Messages were received from every plugin-owned poll group.
+    AllPollGroupMessagesReceived {
+        /// Per-poll-group message batches.
+        poll_groups: Vec<SteamworksNetworkingSocketsPollGroupMessages>,
     },
     /// Pending messages were flushed.
     MessagesFlushed {
@@ -262,6 +273,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .field("connection", connection)
                 .field("messages", messages)
                 .finish(),
+            Self::AllMessagesReceived { connections } => f
+                .debug_struct("AllMessagesReceived")
+                .field("connections", connections)
+                .finish(),
             Self::PollGroupMessagesReceived {
                 poll_group,
                 messages,
@@ -269,6 +284,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .debug_struct("PollGroupMessagesReceived")
                 .field("poll_group", poll_group)
                 .field("messages", messages)
+                .finish(),
+            Self::AllPollGroupMessagesReceived { poll_groups } => f
+                .debug_struct("AllPollGroupMessagesReceived")
+                .field("poll_groups", poll_groups)
                 .finish(),
             Self::MessagesFlushed { connection } => f
                 .debug_struct("MessagesFlushed")

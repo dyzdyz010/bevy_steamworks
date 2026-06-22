@@ -3,9 +3,9 @@ use crate::{SteamworksClient, SteamworksServer};
 use super::super::{
     handles::{SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsHandleStorage},
     snapshots::snapshot_message,
-    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionMessages,
+    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
 };
 use super::helpers::{allocate_outbound_message, networking_sockets_for_owner};
 
@@ -153,6 +153,36 @@ pub(super) fn receive_messages(
     Ok(SteamworksNetworkingSocketsOperation::MessagesReceived {
         connection,
         messages,
+    })
+}
+
+pub(super) fn receive_all_messages(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+    batch_size_per_connection: usize,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut connections = handles.connections.keys().copied().collect::<Vec<_>>();
+    connections.sort_by_key(|connection| connection.raw());
+
+    let mut batches = Vec::with_capacity(connections.len());
+    for connection in connections {
+        if !handles.connections.contains_key(&connection) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::MessagesReceived {
+            connection,
+            messages,
+        } = receive_messages(handles, connection, batch_size_per_connection)?
+        else {
+            unreachable!("receive_messages returns MessagesReceived");
+        };
+        batches.push(SteamworksNetworkingSocketsConnectionMessages {
+            connection,
+            messages,
+        });
+    }
+
+    Ok(SteamworksNetworkingSocketsOperation::AllMessagesReceived {
+        connections: batches,
     })
 }
 

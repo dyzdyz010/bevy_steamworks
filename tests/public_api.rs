@@ -54,6 +54,7 @@ use bevy_steamworks::{
         SteamworksNetworkingSocketsCommand as PreludeNetworkingSocketsCommand,
         SteamworksNetworkingSocketsConfigEntry as PreludeNetworkingSocketsConfigEntry,
         SteamworksNetworkingSocketsConnectionId as PreludeNetworkingSocketsConnectionId,
+        SteamworksNetworkingSocketsConnectionMessages as PreludeNetworkingSocketsConnectionMessages,
         SteamworksNetworkingSocketsConnectionName as PreludeNetworkingSocketsConnectionName,
         SteamworksNetworkingSocketsConnectionUserData as PreludeNetworkingSocketsConnectionUserData,
         SteamworksNetworkingSocketsError as PreludeNetworkingSocketsError,
@@ -62,6 +63,7 @@ use bevy_steamworks::{
         SteamworksNetworkingSocketsOperation as PreludeNetworkingSocketsOperation,
         SteamworksNetworkingSocketsOutboundMessage as PreludeNetworkingSocketsOutboundMessage,
         SteamworksNetworkingSocketsPlugin as PreludeNetworkingSocketsPlugin,
+        SteamworksNetworkingSocketsPollGroupMessages as PreludeNetworkingSocketsPollGroupMessages,
         SteamworksNetworkingSocketsResult as PreludeNetworkingSocketsResult,
         SteamworksNetworkingUtilsCommand as PreludeNetworkingUtilsCommand,
         SteamworksNetworkingUtilsError as PreludeNetworkingUtilsError,
@@ -156,10 +158,11 @@ use bevy_steamworks::{
     SteamworksNetworkingOperation, SteamworksNetworkingPeer, SteamworksNetworkingPlugin,
     SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsConnectionUserData,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
-    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
-    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
+    SteamworksNetworkingSocketsConnectionMessages, SteamworksNetworkingSocketsConnectionName,
+    SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
+    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
+    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsPollGroupMessages,
     SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
     SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
     SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
@@ -1005,6 +1008,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         _user_data: SteamworksNetworkingSocketsConnectionUserData,
         _outbound: SteamworksNetworkingSocketsOutboundMessage,
         _send_result: SteamworksNetworkingSocketsMessageSendResult,
+        _connection_messages: SteamworksNetworkingSocketsConnectionMessages,
+        _poll_group_messages: SteamworksNetworkingSocketsPollGroupMessages,
     ) {
     }
 
@@ -1023,6 +1028,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         _user_data: PreludeNetworkingSocketsConnectionUserData,
         _outbound: PreludeNetworkingSocketsOutboundMessage,
         _send_result: PreludeNetworkingSocketsMessageSendResult,
+        _connection_messages: PreludeNetworkingSocketsConnectionMessages,
+        _poll_group_messages: PreludeNetworkingSocketsPollGroupMessages,
     ) {
     }
 
@@ -1068,6 +1075,14 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         user_data: 7,
         result: Ok(42),
     };
+    let connection_messages = SteamworksNetworkingSocketsConnectionMessages {
+        connection,
+        messages: Vec::new(),
+    };
+    let poll_group_messages = SteamworksNetworkingSocketsPollGroupMessages {
+        poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        messages: Vec::new(),
+    };
 
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
@@ -1082,6 +1097,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         connection_user_data,
         outbound,
         send_result,
+        connection_messages,
+        poll_group_messages,
     );
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
@@ -1126,6 +1143,32 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
             },
         ),
         SteamworksNetworkingSocketsError::InvalidEventLimit,
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::receive_all_messages(16),
+        SteamworksNetworkingSocketsOperation::AllMessagesReceived {
+            connections: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+                poll_groups: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidBatchSize,
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::receive_all_poll_group_messages(16),
+        SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+            poll_groups: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllMessagesReceived {
+                connections: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidBatchSize,
     );
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
@@ -1209,6 +1252,14 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         user_data: 7,
         result: Ok(42),
     };
+    let connection_messages = PreludeNetworkingSocketsConnectionMessages {
+        connection,
+        messages: Vec::new(),
+    };
+    let poll_group_messages = PreludeNetworkingSocketsPollGroupMessages {
+        poll_group: bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        messages: Vec::new(),
+    };
 
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),
@@ -1223,6 +1274,8 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         connection_user_data,
         outbound,
         send_result,
+        connection_messages,
+        poll_group_messages,
     );
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),
@@ -1267,6 +1320,32 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
             },
         ),
         PreludeNetworkingSocketsError::InvalidEventLimit,
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::receive_all_messages(16),
+        PreludeNetworkingSocketsOperation::AllMessagesReceived {
+            connections: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+                poll_groups: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::InvalidBatchSize,
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::receive_all_poll_group_messages(16),
+        PreludeNetworkingSocketsOperation::AllPollGroupMessagesReceived {
+            poll_groups: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllMessagesReceived {
+                connections: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::InvalidBatchSize,
     );
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),

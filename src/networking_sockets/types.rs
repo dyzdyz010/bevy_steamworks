@@ -463,6 +463,15 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsMessage {
     }
 }
 
+/// Message batch received from one connection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksNetworkingSocketsConnectionMessages {
+    /// Connection that was received from.
+    pub connection: SteamworksNetworkingSocketsConnectionId,
+    /// Owned message snapshots.
+    pub messages: Vec<SteamworksNetworkingSocketsMessage>,
+}
+
 /// Owned snapshot of one message received through a poll group.
 ///
 /// The upstream safe wrapper does not expose the raw connection handle carried
@@ -499,6 +508,15 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsPollGroupMessage {
             .field("connection_user_data", &self.connection_user_data)
             .finish()
     }
+}
+
+/// Message batch received from one poll group.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksNetworkingSocketsPollGroupMessages {
+    /// Poll group that was received from.
+    pub poll_group: SteamworksNetworkingSocketsPollGroupId,
+    /// Owned message snapshots.
+    pub messages: Vec<SteamworksNetworkingSocketsPollGroupMessage>,
 }
 
 /// Snapshot of one listen socket event.

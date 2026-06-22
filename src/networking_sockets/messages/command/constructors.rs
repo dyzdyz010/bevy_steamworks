@@ -230,6 +230,13 @@ impl SteamworksNetworkingSocketsCommand {
         }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::ReceiveAllMessages`] command.
+    pub fn receive_all_messages(batch_size_per_connection: usize) -> Self {
+        Self::ReceiveAllMessages {
+            batch_size_per_connection,
+        }
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::ReceivePollGroupMessages`] command.
     pub fn receive_poll_group_messages(
         poll_group: SteamworksNetworkingSocketsPollGroupId,
@@ -238,6 +245,13 @@ impl SteamworksNetworkingSocketsCommand {
         Self::ReceivePollGroupMessages {
             poll_group,
             batch_size,
+        }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::ReceiveAllPollGroupMessages`] command.
+    pub fn receive_all_poll_group_messages(batch_size_per_poll_group: usize) -> Self {
+        Self::ReceiveAllPollGroupMessages {
+            batch_size_per_poll_group,
         }
     }
 
