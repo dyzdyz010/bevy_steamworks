@@ -16,6 +16,8 @@ mod accessors;
 mod helpers;
 mod operations;
 
+pub(in crate::user_stats) const STEAMWORKS_STATS_STATE_CACHE_LIMIT: usize = 1_024;
+
 /// Settings used by [`crate::SteamworksStatsPlugin`].
 #[derive(Clone, Debug, PartialEq, Eq, Resource)]
 pub struct SteamworksStatsSettings {

@@ -1,6 +1,7 @@
 use super::{
     SteamworksAchievementDisplayAttribute, SteamworksAchievementGlobalPercentage,
     SteamworksAchievementInfo, SteamworksLeaderboardId, SteamworksLeaderboardInfo,
+    STEAMWORKS_STATS_STATE_CACHE_LIMIT,
 };
 
 pub(super) fn named_value<'a, T>(values: &'a [(String, T)], name: &str) -> Option<&'a T> {
@@ -17,6 +18,7 @@ pub(super) fn upsert_named_value<T>(values: &mut Vec<(String, T)>, name: String,
         *known_value = value;
     } else {
         values.push((name, value));
+        trim_cache(values);
     }
 }
 
@@ -142,6 +144,7 @@ pub(super) fn upsert_leaderboard_id(
         *known_leaderboard = leaderboard;
     } else {
         leaderboards.push((name, leaderboard));
+        trim_cache(leaderboards);
     }
 }
 
@@ -156,6 +159,7 @@ pub(super) fn upsert_leaderboard_info(
         *known_info = info;
     } else {
         leaderboards.push(info);
+        trim_cache(leaderboards);
     }
 }
 
@@ -171,4 +175,11 @@ pub(super) fn remove_leaderboard_info(
     leaderboard: SteamworksLeaderboardId,
 ) {
     leaderboards.retain(|info| info.leaderboard != leaderboard);
+}
+
+fn trim_cache<T>(items: &mut Vec<T>) {
+    if items.len() > STEAMWORKS_STATS_STATE_CACHE_LIMIT {
+        let overflow = items.len() - STEAMWORKS_STATS_STATE_CACHE_LIMIT;
+        items.drain(0..overflow);
+    }
 }

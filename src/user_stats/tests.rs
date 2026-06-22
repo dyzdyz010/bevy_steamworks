@@ -772,6 +772,63 @@ fn leaderboard_state_records_latest_info_and_entries() {
 }
 
 #[test]
+fn stats_lookup_caches_are_bounded() {
+    let mut state = SteamworksStatsState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT as u64 + 1) {
+        let name = format!("stat-{raw}");
+        let leaderboard_name = format!("leaderboard-{raw}");
+        let leaderboard = SteamworksLeaderboardId::from_raw(raw);
+
+        state.record_operation(&SteamworksStatsOperation::StatI32Read {
+            name: name.clone(),
+            value: raw as i32,
+        });
+        state.record_operation(&SteamworksStatsOperation::StatF32Read {
+            name: name.clone(),
+            value: raw as f32,
+        });
+        state.record_operation(&SteamworksStatsOperation::LeaderboardInfoRead {
+            info: SteamworksLeaderboardInfo {
+                leaderboard,
+                name: leaderboard_name,
+                display_type: Some(SteamworksLeaderboardDisplayType::Numeric),
+                sort_method: Some(SteamworksLeaderboardSortMethod::Descending),
+                entry_count: raw as i32,
+            },
+        });
+    }
+
+    assert_eq!(state.stat_i32("stat-1"), None);
+    assert_eq!(state.stat_f32("stat-1"), None);
+    assert_eq!(state.leaderboard_id("leaderboard-1"), None);
+    assert_eq!(
+        state.leaderboard_info(SteamworksLeaderboardId::from_raw(1)),
+        None
+    );
+    assert_eq!(state.stat_i32("stat-2"), Some(2));
+    assert_eq!(state.stat_f32("stat-2"), Some(2.0));
+    assert_eq!(
+        state.leaderboard_id("leaderboard-2"),
+        Some(SteamworksLeaderboardId::from_raw(2))
+    );
+    assert_eq!(
+        state.leaderboard_info_by_name("leaderboard-2"),
+        Some(&SteamworksLeaderboardInfo {
+            leaderboard: SteamworksLeaderboardId::from_raw(2),
+            name: "leaderboard-2".to_owned(),
+            display_type: Some(SteamworksLeaderboardDisplayType::Numeric),
+            sort_method: Some(SteamworksLeaderboardSortMethod::Descending),
+            entry_count: 2,
+        })
+    );
+    assert_eq!(
+        state.leaderboards().len(),
+        super::state::STEAMWORKS_STATS_STATE_CACHE_LIMIT
+    );
+}
+
+#[test]
 fn achievement_state_records_catalog_and_icons() {
     let mut state = SteamworksStatsState::default();
     let achievement = SteamworksAchievementInfo {
