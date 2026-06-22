@@ -345,13 +345,47 @@ impl SteamworksNetworkingSocketsCommand {
         }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CloseAllConnections`] command.
+    pub fn close_all_connections() -> Self {
+        Self::close_all_connections_with_reason(
+            steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            None,
+            false,
+        )
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CloseAllConnections`] command with options.
+    pub fn close_all_connections_with_reason(
+        reason: steamworks::networking_types::NetConnectionEnd,
+        debug: Option<String>,
+        enable_linger: bool,
+    ) -> Self {
+        Self::CloseAllConnections {
+            reason,
+            debug,
+            enable_linger,
+        }
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::CloseListenSocket`] command.
     pub fn close_listen_socket(listen_socket: SteamworksListenSocketId) -> Self {
         Self::CloseListenSocket { listen_socket }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CloseAllListenSockets`] command.
+    pub fn close_all_listen_sockets() -> Self {
+        Self::CloseAllListenSockets
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::ClosePollGroup`] command.
     pub fn close_poll_group(poll_group: SteamworksNetworkingSocketsPollGroupId) -> Self {
         Self::ClosePollGroup { poll_group }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::CloseAllPollGroups`] command.
+    pub fn close_all_poll_groups() -> Self {
+        Self::CloseAllPollGroups
     }
 }

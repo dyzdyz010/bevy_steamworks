@@ -249,11 +249,27 @@ pub(super) fn handle_networking_sockets_command(
             debug.as_deref(),
             *enable_linger,
         )?,
+        SteamworksNetworkingSocketsCommand::CloseAllConnections {
+            reason,
+            debug,
+            enable_linger,
+        } => connection_commands::close_all_connections(
+            handles,
+            *reason,
+            debug.as_deref(),
+            *enable_linger,
+        )?,
         SteamworksNetworkingSocketsCommand::CloseListenSocket { listen_socket } => {
             listen_socket_commands::close_listen_socket(handles, *listen_socket)?
         }
+        SteamworksNetworkingSocketsCommand::CloseAllListenSockets => {
+            listen_socket_commands::close_all_listen_sockets(handles)?
+        }
         SteamworksNetworkingSocketsCommand::ClosePollGroup { poll_group } => {
             poll_group_commands::close_poll_group(handles, *poll_group)?
+        }
+        SteamworksNetworkingSocketsCommand::CloseAllPollGroups => {
+            poll_group_commands::close_all_poll_groups(handles)?
         }
     })
 }

@@ -204,6 +204,9 @@ impl SteamworksNetworkingSocketsState {
                     close_succeeded: *close_succeeded,
                 });
             }
+            SteamworksNetworkingSocketsOperation::AllConnectionsClosed { connections } => {
+                self.last_closed_connection = connections.last().cloned();
+            }
             SteamworksNetworkingSocketsOperation::ListenSocketClosed {
                 listen_socket,
                 closed_connections,
@@ -214,8 +217,14 @@ impl SteamworksNetworkingSocketsState {
                         closed_connections: closed_connections.clone(),
                     });
             }
+            SteamworksNetworkingSocketsOperation::AllListenSocketsClosed { listen_sockets } => {
+                self.last_closed_listen_socket = listen_sockets.last().cloned();
+            }
             SteamworksNetworkingSocketsOperation::PollGroupClosed { poll_group } => {
                 self.last_closed_poll_group = Some(*poll_group);
+            }
+            SteamworksNetworkingSocketsOperation::AllPollGroupsClosed { poll_groups } => {
+                self.last_closed_poll_group = poll_groups.last().copied();
             }
         }
     }

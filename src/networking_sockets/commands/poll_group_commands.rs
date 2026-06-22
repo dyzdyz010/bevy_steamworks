@@ -89,3 +89,27 @@ pub(super) fn close_poll_group(
         .ok_or(SteamworksNetworkingSocketsError::PollGroupNotFound { id: poll_group })?;
     Ok(SteamworksNetworkingSocketsOperation::PollGroupClosed { poll_group })
 }
+
+pub(super) fn close_all_poll_groups(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut poll_groups = handles.poll_groups.keys().copied().collect::<Vec<_>>();
+    poll_groups.sort_by_key(|poll_group| poll_group.raw());
+
+    let mut closed = Vec::with_capacity(poll_groups.len());
+    for poll_group in poll_groups {
+        if !handles.poll_groups.contains_key(&poll_group) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::PollGroupClosed { poll_group } =
+            close_poll_group(handles, poll_group)?
+        else {
+            unreachable!("close_poll_group returns PollGroupClosed");
+        };
+        closed.push(poll_group);
+    }
+
+    Ok(SteamworksNetworkingSocketsOperation::AllPollGroupsClosed {
+        poll_groups: closed,
+    })
+}

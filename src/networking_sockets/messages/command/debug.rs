@@ -185,14 +185,26 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("debug", debug)
                 .field("enable_linger", enable_linger)
                 .finish(),
+            Self::CloseAllConnections {
+                reason,
+                debug,
+                enable_linger,
+            } => f
+                .debug_struct("CloseAllConnections")
+                .field("reason", reason)
+                .field("debug", debug)
+                .field("enable_linger", enable_linger)
+                .finish(),
             Self::CloseListenSocket { listen_socket } => f
                 .debug_struct("CloseListenSocket")
                 .field("listen_socket", listen_socket)
                 .finish(),
+            Self::CloseAllListenSockets => f.write_str("CloseAllListenSockets"),
             Self::ClosePollGroup { poll_group } => f
                 .debug_struct("ClosePollGroup")
                 .field("poll_group", poll_group)
                 .finish(),
+            Self::CloseAllPollGroups => f.write_str("CloseAllPollGroups"),
         }
     }
 }

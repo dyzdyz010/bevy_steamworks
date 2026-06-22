@@ -5,7 +5,8 @@ use crate::{SteamworksClient, SteamworksServer};
 use super::super::{
     handles::SteamworksNetworkingSocketsHandleStorage, SteamworksListenSocketId,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsListenSocketClosed,
+    SteamworksNetworkingSocketsOperation,
 };
 use super::helpers::{networking_sockets, server_networking_sockets, steam_config_entries};
 
@@ -92,4 +93,35 @@ pub(super) fn close_listen_socket(
         listen_socket,
         closed_connections,
     })
+}
+
+pub(super) fn close_all_listen_sockets(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut listen_sockets = handles.listen_sockets.keys().copied().collect::<Vec<_>>();
+    listen_sockets.sort_by_key(|listen_socket| listen_socket.raw());
+
+    let mut closed = Vec::with_capacity(listen_sockets.len());
+    for listen_socket in listen_sockets {
+        if !handles.listen_sockets.contains_key(&listen_socket) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::ListenSocketClosed {
+            listen_socket,
+            closed_connections,
+        } = close_listen_socket(handles, listen_socket)?
+        else {
+            unreachable!("close_listen_socket returns ListenSocketClosed");
+        };
+        closed.push(SteamworksNetworkingSocketsListenSocketClosed {
+            listen_socket,
+            closed_connections,
+        });
+    }
+
+    Ok(
+        SteamworksNetworkingSocketsOperation::AllListenSocketsClosed {
+            listen_sockets: closed,
+        },
+    )
 }

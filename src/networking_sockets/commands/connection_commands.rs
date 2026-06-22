@@ -7,9 +7,10 @@ use super::super::{
         SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleStorage,
     },
     snapshots::{snapshot_connection_info, snapshot_realtime_status},
-    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsPollGroupId,
+    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionClosed,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionTarget,
+    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsPollGroupId,
 };
 use super::helpers::{
     connection_owner, connection_user_data_from_info_result, networking_sockets,
@@ -271,5 +272,37 @@ pub(super) fn close_connection(
     Ok(SteamworksNetworkingSocketsOperation::ConnectionClosed {
         connection,
         close_succeeded,
+    })
+}
+
+pub(super) fn close_all_connections(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+    reason: steamworks::networking_types::NetConnectionEnd,
+    debug: Option<&str>,
+    enable_linger: bool,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut connections = handles.connections.keys().copied().collect::<Vec<_>>();
+    connections.sort_by_key(|connection| connection.raw());
+
+    let mut closed = Vec::with_capacity(connections.len());
+    for connection in connections {
+        if !handles.connections.contains_key(&connection) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::ConnectionClosed {
+            connection,
+            close_succeeded,
+        } = close_connection(handles, connection, reason, debug, enable_linger)?
+        else {
+            unreachable!("close_connection returns ConnectionClosed");
+        };
+        closed.push(SteamworksNetworkingSocketsConnectionClosed {
+            connection,
+            close_succeeded,
+        });
+    }
+
+    Ok(SteamworksNetworkingSocketsOperation::AllConnectionsClosed {
+        connections: closed,
     })
 }

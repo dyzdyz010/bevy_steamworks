@@ -96,7 +96,8 @@ pub(super) fn validate_command(
             lane_weights,
             ..
         } => validate_lane_configuration(lane_priorities, lane_weights),
-        SteamworksNetworkingSocketsCommand::CloseConnection { debug, .. } => {
+        SteamworksNetworkingSocketsCommand::CloseConnection { debug, .. }
+        | SteamworksNetworkingSocketsCommand::CloseAllConnections { debug, .. } => {
             if debug
                 .as_ref()
                 .is_some_and(|value| value.as_bytes().contains(&0))

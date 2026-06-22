@@ -1,9 +1,10 @@
 use super::super::{
     SteamworksListenSocketEventInfo, SteamworksListenSocketId,
-    SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionEvents,
-    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionInfo,
-    SteamworksNetworkingSocketsConnectionMessages, SteamworksNetworkingSocketsConnectionTarget,
-    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsListenSocketEvents,
+    SteamworksNetworkingSocketsConnectionClosed, SteamworksNetworkingSocketsConnectionEventInfo,
+    SteamworksNetworkingSocketsConnectionEvents, SteamworksNetworkingSocketsConnectionId,
+    SteamworksNetworkingSocketsConnectionInfo, SteamworksNetworkingSocketsConnectionMessages,
+    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsListenEndpoint,
+    SteamworksNetworkingSocketsListenSocketClosed, SteamworksNetworkingSocketsListenSocketEvents,
     SteamworksNetworkingSocketsMessage, SteamworksNetworkingSocketsMessageSendResult,
     SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsPollGroupMessage,
     SteamworksNetworkingSocketsPollGroupMessages, SteamworksNetworkingSocketsRealtimeStatus,
@@ -172,6 +173,11 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Return value from Steam's close call.
         close_succeeded: bool,
     },
+    /// Every plugin-owned connection was closed and removed.
+    AllConnectionsClosed {
+        /// Per-connection close results.
+        connections: Vec<SteamworksNetworkingSocketsConnectionClosed>,
+    },
     /// A listen socket was closed and removed.
     ListenSocketClosed {
         /// Listen socket removed.
@@ -179,10 +185,20 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Accepted child connections removed with the listen socket.
         closed_connections: Vec<SteamworksNetworkingSocketsConnectionId>,
     },
+    /// Every plugin-owned listen socket was closed and removed.
+    AllListenSocketsClosed {
+        /// Per-listen-socket close results.
+        listen_sockets: Vec<SteamworksNetworkingSocketsListenSocketClosed>,
+    },
     /// A poll group was closed and removed.
     PollGroupClosed {
         /// Poll group removed.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
+    },
+    /// Every plugin-owned poll group was closed and removed.
+    AllPollGroupsClosed {
+        /// Poll groups removed in plugin ID order.
+        poll_groups: Vec<SteamworksNetworkingSocketsPollGroupId>,
     },
 }
 
@@ -340,6 +356,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .field("connection", connection)
                 .field("close_succeeded", close_succeeded)
                 .finish(),
+            Self::AllConnectionsClosed { connections } => f
+                .debug_struct("AllConnectionsClosed")
+                .field("connections", connections)
+                .finish(),
             Self::ListenSocketClosed {
                 listen_socket,
                 closed_connections,
@@ -348,9 +368,17 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .field("listen_socket", listen_socket)
                 .field("closed_connections", closed_connections)
                 .finish(),
+            Self::AllListenSocketsClosed { listen_sockets } => f
+                .debug_struct("AllListenSocketsClosed")
+                .field("listen_sockets", listen_sockets)
+                .finish(),
             Self::PollGroupClosed { poll_group } => f
                 .debug_struct("PollGroupClosed")
                 .field("poll_group", poll_group)
+                .finish(),
+            Self::AllPollGroupsClosed { poll_groups } => f
+                .debug_struct("AllPollGroupsClosed")
+                .field("poll_groups", poll_groups)
                 .finish(),
         }
     }

@@ -1187,6 +1187,49 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
     );
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::close_all_connections(),
+        SteamworksNetworkingSocketsOperation::AllConnectionsClosed {
+            connections: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllListenSocketsClosed {
+                listen_sockets: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidString { field: "debug" },
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::close_all_listen_sockets(),
+        SteamworksNetworkingSocketsOperation::AllListenSocketsClosed {
+            listen_sockets: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllPollGroupsClosed {
+                poll_groups: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::ListenSocketNotFound {
+            id: bevy_steamworks::SteamworksListenSocketId::from_raw(1),
+        },
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::close_all_poll_groups(),
+        SteamworksNetworkingSocketsOperation::AllPollGroupsClosed {
+            poll_groups: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllConnectionsClosed {
+                connections: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::PollGroupNotFound {
+            id: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        },
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
         server_poll_group_command,
         SteamworksNetworkingSocketsOperation::PollGroupCreated {
             poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
@@ -1373,6 +1416,49 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         }),
         PreludeNetworkingSocketsError::InvalidHandle {
             operation: "net_connection.flush_messages",
+        },
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::close_all_connections(),
+        PreludeNetworkingSocketsOperation::AllConnectionsClosed {
+            connections: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllListenSocketsClosed {
+                listen_sockets: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::InvalidString { field: "debug" },
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::close_all_listen_sockets(),
+        PreludeNetworkingSocketsOperation::AllListenSocketsClosed {
+            listen_sockets: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllPollGroupsClosed {
+                poll_groups: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::ListenSocketNotFound {
+            id: bevy_steamworks::prelude::SteamworksListenSocketId::from_raw(1),
+        },
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::close_all_poll_groups(),
+        PreludeNetworkingSocketsOperation::AllPollGroupsClosed {
+            poll_groups: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllConnectionsClosed {
+                connections: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::PollGroupNotFound {
+            id: bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
         },
     );
     accepts_prelude_exports(

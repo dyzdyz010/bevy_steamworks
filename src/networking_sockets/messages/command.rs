@@ -195,14 +195,27 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Whether Steam should try to flush remaining reliable data.
         enable_linger: bool,
     },
+    /// Close and drop every plugin-owned connection.
+    CloseAllConnections {
+        /// End reason sent to Steam.
+        reason: steamworks::networking_types::NetConnectionEnd,
+        /// Optional debug string.
+        debug: Option<String>,
+        /// Whether Steam should try to flush remaining reliable data.
+        enable_linger: bool,
+    },
     /// Drop one listen socket.
     CloseListenSocket {
         /// Listen socket to drop.
         listen_socket: SteamworksListenSocketId,
     },
+    /// Drop every plugin-owned listen socket.
+    CloseAllListenSockets,
     /// Drop one poll group.
     ClosePollGroup {
         /// Poll group to drop.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
     },
+    /// Drop every plugin-owned poll group.
+    CloseAllPollGroups,
 }

@@ -458,6 +458,18 @@ fn validation_rejects_invalid_inputs() {
         Err(SteamworksNetworkingSocketsError::InvalidString { field: "debug" })
     );
     assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::close_all_connections_with_reason(
+                steamworks::networking_types::NetConnectionEnd::App(
+                    steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+                ),
+                Some("bad\0debug".to_owned()),
+                false,
+            ),
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidString { field: "debug" })
+    );
+    assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::set_connection_name(
             connection_id(),
             "bad\0name",
@@ -700,6 +712,40 @@ fn constructors_preserve_inputs() {
             enable_linger: false,
         }
     );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_all_connections(),
+        SteamworksNetworkingSocketsCommand::CloseAllConnections {
+            reason: steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            debug: None,
+            enable_linger: false,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_all_connections_with_reason(
+            steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            Some("shutdown".to_owned()),
+            true,
+        ),
+        SteamworksNetworkingSocketsCommand::CloseAllConnections {
+            reason: steamworks::networking_types::NetConnectionEnd::App(
+                steamworks::networking_types::AppNetConnectionEnd::generic_normal(),
+            ),
+            debug: Some("shutdown".to_owned()),
+            enable_linger: true,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_all_listen_sockets(),
+        SteamworksNetworkingSocketsCommand::CloseAllListenSockets
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::close_all_poll_groups(),
+        SteamworksNetworkingSocketsCommand::CloseAllPollGroups
+    );
 }
 
 #[test]
@@ -768,6 +814,41 @@ fn bulk_commands_return_empty_batches_without_handles() {
         ),
         Ok(SteamworksNetworkingSocketsOperation::AllMessagesFlushed {
             connections: Vec::new(),
+        },)
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::close_all_connections(),
+        ),
+        Ok(SteamworksNetworkingSocketsOperation::AllConnectionsClosed {
+            connections: Vec::new(),
+        },)
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::close_all_listen_sockets(),
+        ),
+        Ok(
+            SteamworksNetworkingSocketsOperation::AllListenSocketsClosed {
+                listen_sockets: Vec::new(),
+            },
+        )
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::close_all_poll_groups(),
+        ),
+        Ok(SteamworksNetworkingSocketsOperation::AllPollGroupsClosed {
+            poll_groups: Vec::new(),
         },)
     );
 }
@@ -968,6 +1049,65 @@ fn state_records_bulk_flush_operation() {
     });
 
     assert_eq!(state.last_flushed_connection(), Some(second));
+}
+
+#[test]
+fn state_records_bulk_close_operations() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+    let first = SteamworksNetworkingSocketsConnectionId::from_raw(1);
+    let second = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+    let first_listen = SteamworksListenSocketId::from_raw(3);
+    let second_listen = SteamworksListenSocketId::from_raw(4);
+    let first_poll_group = SteamworksNetworkingSocketsPollGroupId::from_raw(5);
+    let second_poll_group = SteamworksNetworkingSocketsPollGroupId::from_raw(6);
+
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AllConnectionsClosed {
+            connections: vec![
+                SteamworksNetworkingSocketsConnectionClosed {
+                    connection: first,
+                    close_succeeded: true,
+                },
+                SteamworksNetworkingSocketsConnectionClosed {
+                    connection: second,
+                    close_succeeded: false,
+                },
+            ],
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AllListenSocketsClosed {
+            listen_sockets: vec![
+                SteamworksNetworkingSocketsListenSocketClosed {
+                    listen_socket: first_listen,
+                    closed_connections: vec![first],
+                },
+                SteamworksNetworkingSocketsListenSocketClosed {
+                    listen_socket: second_listen,
+                    closed_connections: vec![second],
+                },
+            ],
+        },
+    );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::AllPollGroupsClosed {
+        poll_groups: vec![first_poll_group, second_poll_group],
+    });
+
+    assert_eq!(
+        state.last_closed_connection(),
+        Some(&SteamworksNetworkingSocketsConnectionClosed {
+            connection: second,
+            close_succeeded: false,
+        })
+    );
+    assert_eq!(
+        state.last_closed_listen_socket(),
+        Some(&SteamworksNetworkingSocketsListenSocketClosed {
+            listen_socket: second_listen,
+            closed_connections: vec![second],
+        })
+    );
+    assert_eq!(state.last_closed_poll_group(), Some(second_poll_group));
 }
 
 #[test]
