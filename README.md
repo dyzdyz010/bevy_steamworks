@@ -51,6 +51,8 @@ For lower-level control, use `SteamworksPlugin` for the client lifecycle and add
 
 Engine layers and diagnostics can inspect lifecycle configuration without initializing Steam by reading `init_mode()`, `failure_policy_setting()`, and `runs_callbacks()` from either `SteamworksPlugin` or the full `SteamworksPlugins` group. `SteamworksPlugins::core_plugin()` returns the configured core plugin when a wrapper needs to pass through or audit lifecycle settings.
 
+For a module-by-module support map and known upstream-safe API limits, see [Feature Coverage](docs/feature_coverage.md).
+
 Most upstream `steamworks` types are re-exported at the crate root, so app code can use common items directly:
 
 ```rust,no_run
