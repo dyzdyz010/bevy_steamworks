@@ -5,6 +5,8 @@ use super::*;
 mod accessors;
 mod operations;
 
+pub(in crate::input) const STEAMWORKS_INPUT_STATE_CACHE_LIMIT: usize = 1_024;
+
 /// Runtime state for [`crate::SteamworksInputPlugin`].
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksInputState {
@@ -38,6 +40,7 @@ pub(super) fn upsert_controller(
         *existing = controller;
     } else {
         controllers.push(controller);
+        trim_cache(controllers);
     }
 }
 
@@ -50,6 +53,7 @@ pub(super) fn upsert_named_action_set(
         existing.handle = handle;
     } else {
         handles.push(SteamworksInputNamedActionSetHandle { name, handle });
+        trim_cache(handles);
     }
 }
 
@@ -62,6 +66,7 @@ pub(super) fn upsert_named_digital_action(
         existing.handle = handle;
     } else {
         handles.push(SteamworksInputNamedDigitalActionHandle { name, handle });
+        trim_cache(handles);
     }
 }
 
@@ -74,6 +79,7 @@ pub(super) fn upsert_named_analog_action(
         existing.handle = handle;
     } else {
         handles.push(SteamworksInputNamedAnalogActionHandle { name, handle });
+        trim_cache(handles);
     }
 }
 
@@ -88,5 +94,13 @@ pub(super) fn upsert_action_origin_info(
         *existing = info;
     } else {
         infos.push(info);
+        trim_cache(infos);
+    }
+}
+
+fn trim_cache<T>(items: &mut Vec<T>) {
+    if items.len() > STEAMWORKS_INPUT_STATE_CACHE_LIMIT {
+        let overflow = items.len() - STEAMWORKS_INPUT_STATE_CACHE_LIMIT;
+        items.drain(0..overflow);
     }
 }

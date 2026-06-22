@@ -458,3 +458,94 @@ fn state_records_input_operations() {
     assert_eq!(state.last_motion(), Some(&motion));
     assert_eq!(state.last_binding_panel_controller(), Some(controller));
 }
+
+#[test]
+fn input_state_caches_are_bounded() {
+    let mut state = SteamworksInputState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT as u64 + 1) {
+        let controller = SteamworksInputHandle::from_raw(raw);
+        let action_set = SteamworksInputActionSetHandle::from_raw(raw);
+        let digital_action = SteamworksInputDigitalActionHandle::from_raw(raw);
+        let analog_action = SteamworksInputAnalogActionHandle::from_raw(raw);
+        let origin = SteamworksInputActionOrigin::from_code(raw as i32);
+
+        state.record_operation(&SteamworksInputOperation::ControllerInfoRead {
+            controller: SteamworksInputControllerInfo {
+                handle: controller,
+                input_type: SteamworksInputType::GenericGamepad,
+            },
+        });
+        state.record_operation(&SteamworksInputOperation::ActionSetHandleRead {
+            name: format!("set-{raw}"),
+            handle: action_set,
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionHandleRead {
+            name: format!("digital-{raw}"),
+            handle: digital_action,
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionHandleRead {
+            name: format!("analog-{raw}"),
+            handle: analog_action,
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionOriginsRead {
+            controller,
+            action_set,
+            action: digital_action,
+            origins: vec![SteamworksInputActionOriginInfo {
+                origin,
+                glyph_path: format!("glyph-{raw}.svg"),
+                name: format!("Origin {raw}"),
+            }],
+        });
+    }
+
+    assert_eq!(
+        state.controllers().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.action_sets().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.digital_actions().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.analog_actions().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.action_origin_infos().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+
+    assert_eq!(state.controller(SteamworksInputHandle::from_raw(1)), None);
+    assert_eq!(state.action_set_handle("set-1"), None);
+    assert_eq!(state.digital_action_handle("digital-1"), None);
+    assert_eq!(state.analog_action_handle("analog-1"), None);
+    assert_eq!(
+        state.action_origin_info(SteamworksInputActionOrigin::from_code(1)),
+        None
+    );
+
+    assert!(state
+        .controller(SteamworksInputHandle::from_raw(2))
+        .is_some());
+    assert_eq!(
+        state.action_set_handle("set-2"),
+        Some(SteamworksInputActionSetHandle::from_raw(2))
+    );
+    assert_eq!(
+        state.digital_action_handle("digital-2"),
+        Some(SteamworksInputDigitalActionHandle::from_raw(2))
+    );
+    assert_eq!(
+        state.analog_action_handle("analog-2"),
+        Some(SteamworksInputAnalogActionHandle::from_raw(2))
+    );
+    assert!(state
+        .action_origin_info(SteamworksInputActionOrigin::from_code(2))
+        .is_some());
+}
