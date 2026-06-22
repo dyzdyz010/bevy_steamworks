@@ -219,6 +219,45 @@ fn state_records_screenshot_operations() {
 }
 
 #[test]
+fn screenshot_submission_caches_are_bounded() {
+    let mut state = SteamworksScreenshotsState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT as u32 + 1) {
+        state.record_operation(
+            &SteamworksScreenshotsOperation::ScreenshotLibraryAddSubmitted {
+                handle: raw,
+                filename: PathBuf::from(format!("shot-{raw}.png")),
+                thumbnail_filename: None,
+                width: 1920,
+                height: 1080,
+            },
+        );
+    }
+
+    assert_eq!(
+        state.added_screenshots().len(),
+        super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.submitted_screenshots().len(),
+        super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT
+    );
+    assert!(!state.added_screenshots().contains(&1));
+    assert_eq!(state.submitted_screenshot(1), None);
+    assert!(state.added_screenshots().contains(&2));
+    assert_eq!(
+        state.submitted_screenshot(2),
+        Some(&SteamworksSubmittedScreenshot {
+            handle: 2,
+            filename: PathBuf::from("shot-2.png"),
+            thumbnail_filename: None,
+            width: 1920,
+            height: 1080,
+        })
+    );
+}
+
+#[test]
 fn screenshot_callbacks_are_bridged_without_client() {
     let mut app = App::new();
     let handle = 7;

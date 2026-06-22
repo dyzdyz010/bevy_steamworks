@@ -8,6 +8,8 @@ use super::{
 mod accessors;
 mod operations;
 
+pub(in crate::screenshots) const STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT: usize = 1_024;
+
 /// Runtime state for [`super::SteamworksScreenshotsPlugin`].
 #[derive(Clone, Debug, Default, Resource)]
 pub struct SteamworksScreenshotsState {
