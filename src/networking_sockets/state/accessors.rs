@@ -1,14 +1,15 @@
 use super::{
-    SteamworksNetworkingSocketsConnectionClosed, SteamworksNetworkingSocketsConnectionCreated,
-    SteamworksNetworkingSocketsConnectionEvents, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsConnectionInfo, SteamworksNetworkingSocketsConnectionName,
-    SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsLaneConfiguration, SteamworksNetworkingSocketsListenSocketClosed,
-    SteamworksNetworkingSocketsListenSocketCreated, SteamworksNetworkingSocketsListenSocketEvents,
-    SteamworksNetworkingSocketsMessage, SteamworksNetworkingSocketsMessageSendResult,
-    SteamworksNetworkingSocketsPollGroupAssignment, SteamworksNetworkingSocketsPollGroupId,
-    SteamworksNetworkingSocketsPollGroupMessage, SteamworksNetworkingSocketsRealtimeStatus,
-    SteamworksNetworkingSocketsSentMessage, SteamworksNetworkingSocketsState,
+    SteamworksListenSocketId, SteamworksNetworkingSocketsConnectionClosed,
+    SteamworksNetworkingSocketsConnectionCreated, SteamworksNetworkingSocketsConnectionEvents,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionInfo,
+    SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsConnectionUserData,
+    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsLaneConfiguration,
+    SteamworksNetworkingSocketsListenSocketClosed, SteamworksNetworkingSocketsListenSocketCreated,
+    SteamworksNetworkingSocketsListenSocketEvents, SteamworksNetworkingSocketsMessage,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsPollGroupAssignment,
+    SteamworksNetworkingSocketsPollGroupId, SteamworksNetworkingSocketsPollGroupMessage,
+    SteamworksNetworkingSocketsRealtimeStatus, SteamworksNetworkingSocketsSentMessage,
+    SteamworksNetworkingSocketsState,
 };
 
 impl SteamworksNetworkingSocketsState {
@@ -48,9 +49,39 @@ impl SteamworksNetworkingSocketsState {
         self.last_listen_socket_events.as_ref()
     }
 
+    /// Returns bounded listen-socket event batches keyed by listen socket.
+    pub fn listen_socket_events(&self) -> &[SteamworksNetworkingSocketsListenSocketEvents] {
+        &self.listen_socket_events
+    }
+
+    /// Returns the cached event batch for one listen socket.
+    pub fn listen_socket_event_batch(
+        &self,
+        listen_socket: SteamworksListenSocketId,
+    ) -> Option<&SteamworksNetworkingSocketsListenSocketEvents> {
+        self.listen_socket_events
+            .iter()
+            .find(|events| events.listen_socket == listen_socket)
+    }
+
     /// Returns the most recent connection event batch processed through this plugin.
     pub fn last_connection_events(&self) -> Option<&SteamworksNetworkingSocketsConnectionEvents> {
         self.last_connection_events.as_ref()
+    }
+
+    /// Returns bounded connection event batches keyed by connection.
+    pub fn connection_events(&self) -> &[SteamworksNetworkingSocketsConnectionEvents] {
+        &self.connection_events
+    }
+
+    /// Returns the cached event batch for one connection.
+    pub fn connection_event_batch(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&SteamworksNetworkingSocketsConnectionEvents> {
+        self.connection_events
+            .iter()
+            .find(|events| events.connection == connection)
     }
 
     /// Returns the most recent connection info snapshot read through the plugin.
@@ -58,9 +89,39 @@ impl SteamworksNetworkingSocketsState {
         self.last_connection_info.as_ref()
     }
 
+    /// Returns bounded connection info snapshots keyed by connection.
+    pub fn connection_infos(&self) -> &[SteamworksNetworkingSocketsConnectionInfo] {
+        &self.connection_infos
+    }
+
+    /// Returns the cached connection info for one connection.
+    pub fn connection_info(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&SteamworksNetworkingSocketsConnectionInfo> {
+        self.connection_infos
+            .iter()
+            .find(|info| info.connection == connection)
+    }
+
     /// Returns the most recent realtime connection status snapshot.
     pub fn last_realtime_status(&self) -> Option<&SteamworksNetworkingSocketsRealtimeStatus> {
         self.last_realtime_status.as_ref()
+    }
+
+    /// Returns bounded realtime connection status snapshots keyed by connection.
+    pub fn realtime_statuses(&self) -> &[SteamworksNetworkingSocketsRealtimeStatus] {
+        &self.realtime_statuses
+    }
+
+    /// Returns the cached realtime status for one connection.
+    pub fn realtime_status(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&SteamworksNetworkingSocketsRealtimeStatus> {
+        self.realtime_statuses
+            .iter()
+            .find(|status| status.connection == connection)
     }
 
     /// Returns the most recent sent-message snapshot.
@@ -73,14 +134,92 @@ impl SteamworksNetworkingSocketsState {
         &self.last_sent_messages
     }
 
+    /// Returns bounded batch-send outcomes in observation order.
+    pub fn recent_sent_messages(&self) -> &[SteamworksNetworkingSocketsMessageSendResult] {
+        &self.recent_sent_messages
+    }
+
+    /// Returns bounded batch-send outcomes for one connection.
+    pub fn sent_messages_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> impl Iterator<Item = &SteamworksNetworkingSocketsMessageSendResult> + '_ {
+        self.recent_sent_messages
+            .iter()
+            .filter(move |message| message.connection == connection)
+    }
+
+    /// Returns the most recent batch-send outcome for one connection.
+    pub fn last_sent_message_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&SteamworksNetworkingSocketsMessageSendResult> {
+        self.recent_sent_messages
+            .iter()
+            .rev()
+            .find(|message| message.connection == connection)
+    }
+
     /// Returns the most recent batch of received messages.
     pub fn last_received_messages(&self) -> &[SteamworksNetworkingSocketsMessage] {
         &self.last_received_messages
     }
 
+    /// Returns bounded received message snapshots in observation order.
+    pub fn recent_received_messages(&self) -> &[SteamworksNetworkingSocketsMessage] {
+        &self.recent_received_messages
+    }
+
+    /// Returns bounded received message snapshots for one connection.
+    pub fn received_messages_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> impl Iterator<Item = &SteamworksNetworkingSocketsMessage> + '_ {
+        self.recent_received_messages
+            .iter()
+            .filter(move |message| message.connection == connection)
+    }
+
+    /// Returns the most recent received message for one connection.
+    pub fn last_received_message_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&SteamworksNetworkingSocketsMessage> {
+        self.recent_received_messages
+            .iter()
+            .rev()
+            .find(|message| message.connection == connection)
+    }
+
     /// Returns the most recent batch of messages received from a poll group.
     pub fn last_poll_group_messages(&self) -> &[SteamworksNetworkingSocketsPollGroupMessage] {
         &self.last_poll_group_messages
+    }
+
+    /// Returns bounded poll-group message snapshots in observation order.
+    pub fn recent_poll_group_messages(&self) -> &[SteamworksNetworkingSocketsPollGroupMessage] {
+        &self.recent_poll_group_messages
+    }
+
+    /// Returns bounded poll-group message snapshots for one poll group.
+    pub fn poll_group_messages(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> impl Iterator<Item = &SteamworksNetworkingSocketsPollGroupMessage> + '_ {
+        self.recent_poll_group_messages
+            .iter()
+            .filter(move |message| message.poll_group == poll_group)
+    }
+
+    /// Returns the most recent message received from one poll group.
+    pub fn last_poll_group_message(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> Option<&SteamworksNetworkingSocketsPollGroupMessage> {
+        self.recent_poll_group_messages
+            .iter()
+            .rev()
+            .find(|message| message.poll_group == poll_group)
     }
 
     /// Returns the most recent connection flushed through this plugin.

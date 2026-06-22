@@ -66,6 +66,7 @@ use bevy_steamworks::{
         SteamworksNetworkingSocketsPlugin as PreludeNetworkingSocketsPlugin,
         SteamworksNetworkingSocketsPollGroupMessages as PreludeNetworkingSocketsPollGroupMessages,
         SteamworksNetworkingSocketsResult as PreludeNetworkingSocketsResult,
+        SteamworksNetworkingSocketsState as PreludeNetworkingSocketsState,
         SteamworksNetworkingState as PreludeNetworkingState,
         SteamworksNetworkingUtilsCommand as PreludeNetworkingUtilsCommand,
         SteamworksNetworkingUtilsError as PreludeNetworkingUtilsError,
@@ -172,19 +173,19 @@ use bevy_steamworks::{
     SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
     SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
     SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsPollGroupMessages,
-    SteamworksNetworkingSocketsResult, SteamworksNetworkingState, SteamworksNetworkingUtilsCommand,
-    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
-    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksPlugin,
-    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
-    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
-    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
-    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
-    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
-    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
-    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
-    SteamworksServerError, SteamworksServerInitMode,
+    SteamworksNetworkingSocketsResult, SteamworksNetworkingSocketsState, SteamworksNetworkingState,
+    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
+    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
+    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition,
+    SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksPlugins,
+    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
+    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
+    SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
+    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
+    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
+    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
@@ -1160,6 +1161,29 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
         messages: Vec::new(),
     };
+    let state = SteamworksNetworkingSocketsState::default();
+    assert!(state.listen_socket_events().is_empty());
+    assert_eq!(
+        state.listen_socket_event_batch(bevy_steamworks::SteamworksListenSocketId::from_raw(1)),
+        None
+    );
+    assert!(state.connection_events().is_empty());
+    assert_eq!(state.connection_event_batch(connection), None);
+    assert!(state.connection_infos().is_empty());
+    assert_eq!(state.connection_info(connection), None);
+    assert!(state.realtime_statuses().is_empty());
+    assert_eq!(state.realtime_status(connection), None);
+    assert!(state.recent_sent_messages().is_empty());
+    assert_eq!(state.last_sent_message_for_connection(connection), None);
+    assert!(state.recent_received_messages().is_empty());
+    assert_eq!(state.last_received_message_for_connection(connection), None);
+    assert!(state.recent_poll_group_messages().is_empty());
+    assert_eq!(
+        state.last_poll_group_message(
+            bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1)
+        ),
+        None
+    );
 
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
@@ -1395,6 +1419,31 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
         poll_group: bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
         messages: Vec::new(),
     };
+    let state = PreludeNetworkingSocketsState::default();
+    assert!(state.listen_socket_events().is_empty());
+    assert_eq!(
+        state.listen_socket_event_batch(
+            bevy_steamworks::prelude::SteamworksListenSocketId::from_raw(1),
+        ),
+        None
+    );
+    assert!(state.connection_events().is_empty());
+    assert_eq!(state.connection_event_batch(connection), None);
+    assert!(state.connection_infos().is_empty());
+    assert_eq!(state.connection_info(connection), None);
+    assert!(state.realtime_statuses().is_empty());
+    assert_eq!(state.realtime_status(connection), None);
+    assert!(state.recent_sent_messages().is_empty());
+    assert_eq!(state.last_sent_message_for_connection(connection), None);
+    assert!(state.recent_received_messages().is_empty());
+    assert_eq!(state.last_received_message_for_connection(connection), None);
+    assert!(state.recent_poll_group_messages().is_empty());
+    assert_eq!(
+        state.last_poll_group_message(
+            bevy_steamworks::prelude::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
+        ),
+        None
+    );
 
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),

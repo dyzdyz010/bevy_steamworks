@@ -1,4 +1,7 @@
 use super::{
+    push_poll_group_messages, push_received_messages, push_sent_message_results,
+    remove_connection_state, upsert_connection_events, upsert_connection_info,
+    upsert_listen_socket_events, upsert_realtime_status,
     SteamworksNetworkingSocketsConnectionClosed, SteamworksNetworkingSocketsConnectionCreated,
     SteamworksNetworkingSocketsConnectionEvents, SteamworksNetworkingSocketsConnectionName,
     SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
@@ -59,15 +62,19 @@ impl SteamworksNetworkingSocketsState {
                 listen_socket,
                 events,
             } => {
-                self.last_listen_socket_events =
-                    Some(SteamworksNetworkingSocketsListenSocketEvents {
-                        listen_socket: *listen_socket,
-                        events: events.clone(),
-                    });
+                let batch = SteamworksNetworkingSocketsListenSocketEvents {
+                    listen_socket: *listen_socket,
+                    events: events.clone(),
+                };
+                upsert_listen_socket_events(&mut self.listen_socket_events, batch.clone());
+                self.last_listen_socket_events = Some(batch);
             }
             SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
                 listen_sockets,
             } => {
+                for batch in listen_sockets {
+                    upsert_listen_socket_events(&mut self.listen_socket_events, batch.clone());
+                }
                 self.last_listen_socket_events = listen_sockets.last().cloned();
             }
             SteamworksNetworkingSocketsOperation::ConnectionEventsPolled {
@@ -75,19 +82,32 @@ impl SteamworksNetworkingSocketsState {
                 events,
                 connection_removed,
             } => {
-                self.last_connection_events = Some(SteamworksNetworkingSocketsConnectionEvents {
+                let batch = SteamworksNetworkingSocketsConnectionEvents {
                     connection: *connection,
                     events: events.clone(),
                     connection_removed: *connection_removed,
-                });
+                };
+                upsert_connection_events(&mut self.connection_events, batch.clone());
+                if *connection_removed {
+                    remove_connection_state(self, *connection);
+                }
+                self.last_connection_events = Some(batch);
             }
             SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled { connections } => {
+                for batch in connections {
+                    upsert_connection_events(&mut self.connection_events, batch.clone());
+                    if batch.connection_removed {
+                        remove_connection_state(self, batch.connection);
+                    }
+                }
                 self.last_connection_events = connections.last().cloned();
             }
             SteamworksNetworkingSocketsOperation::ConnectionInfoRead { info } => {
+                upsert_connection_info(&mut self.connection_infos, info.clone());
                 self.last_connection_info = Some(info.clone());
             }
             SteamworksNetworkingSocketsOperation::RealtimeConnectionStatusRead { status } => {
+                upsert_realtime_status(&mut self.realtime_statuses, status.clone());
                 self.last_realtime_status = Some(status.clone());
             }
             SteamworksNetworkingSocketsOperation::MessageSent {
@@ -110,12 +130,14 @@ impl SteamworksNetworkingSocketsState {
                 self.sent_count = self
                     .sent_count
                     .saturating_add(successful.try_into().unwrap_or(u64::MAX));
+                push_sent_message_results(&mut self.recent_sent_messages, messages);
                 self.last_sent_messages.clone_from(messages);
             }
             SteamworksNetworkingSocketsOperation::MessagesReceived { messages, .. } => {
                 self.received_count = self
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                push_received_messages(&mut self.recent_received_messages, messages);
                 self.last_received_messages.clone_from(messages);
             }
             SteamworksNetworkingSocketsOperation::AllMessagesReceived { connections } => {
@@ -126,6 +148,7 @@ impl SteamworksNetworkingSocketsState {
                 self.received_count = self
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                push_received_messages(&mut self.recent_received_messages, &messages);
                 self.last_received_messages = messages;
             }
             SteamworksNetworkingSocketsOperation::PollGroupMessagesReceived {
@@ -134,6 +157,7 @@ impl SteamworksNetworkingSocketsState {
                 self.received_count = self
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                push_poll_group_messages(&mut self.recent_poll_group_messages, messages);
                 self.last_poll_group_messages.clone_from(messages);
             }
             SteamworksNetworkingSocketsOperation::AllPollGroupMessagesReceived { poll_groups } => {
@@ -144,6 +168,7 @@ impl SteamworksNetworkingSocketsState {
                 self.received_count = self
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                push_poll_group_messages(&mut self.recent_poll_group_messages, &messages);
                 self.last_poll_group_messages = messages;
             }
             SteamworksNetworkingSocketsOperation::MessagesFlushed { connection } => {
@@ -199,18 +224,24 @@ impl SteamworksNetworkingSocketsState {
                 connection,
                 close_succeeded,
             } => {
+                remove_connection_state(self, *connection);
                 self.last_closed_connection = Some(SteamworksNetworkingSocketsConnectionClosed {
                     connection: *connection,
                     close_succeeded: *close_succeeded,
                 });
             }
             SteamworksNetworkingSocketsOperation::AllConnectionsClosed { connections } => {
+                for connection in connections {
+                    remove_connection_state(self, connection.connection);
+                }
                 self.last_closed_connection = connections.last().cloned();
             }
             SteamworksNetworkingSocketsOperation::ListenSocketClosed {
                 listen_socket,
                 closed_connections,
             } => {
+                self.listen_socket_events
+                    .retain(|events| events.listen_socket != *listen_socket);
                 self.last_closed_listen_socket =
                     Some(SteamworksNetworkingSocketsListenSocketClosed {
                         listen_socket: *listen_socket,
@@ -218,12 +249,22 @@ impl SteamworksNetworkingSocketsState {
                     });
             }
             SteamworksNetworkingSocketsOperation::AllListenSocketsClosed { listen_sockets } => {
+                for listen_socket in listen_sockets {
+                    self.listen_socket_events
+                        .retain(|events| events.listen_socket != listen_socket.listen_socket);
+                }
                 self.last_closed_listen_socket = listen_sockets.last().cloned();
             }
             SteamworksNetworkingSocketsOperation::PollGroupClosed { poll_group } => {
+                self.recent_poll_group_messages
+                    .retain(|message| message.poll_group != *poll_group);
                 self.last_closed_poll_group = Some(*poll_group);
             }
             SteamworksNetworkingSocketsOperation::AllPollGroupsClosed { poll_groups } => {
+                for poll_group in poll_groups {
+                    self.recent_poll_group_messages
+                        .retain(|message| message.poll_group != *poll_group);
+                }
                 self.last_closed_poll_group = poll_groups.last().copied();
             }
         }
