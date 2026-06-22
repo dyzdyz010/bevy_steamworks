@@ -124,10 +124,16 @@ use bevy_steamworks::{
         SteamworksUgcError as PreludeUgcError,
         SteamworksUgcGameServerWorkshopInit as PreludeUgcGameServerWorkshopInit,
         SteamworksUgcItemDetails as PreludeUgcItemDetails,
+        SteamworksUgcItemDownloadInfo as PreludeUgcItemDownloadInfo,
+        SteamworksUgcItemDownloadInfoResult as PreludeUgcItemDownloadInfoResult,
+        SteamworksUgcItemInstallInfo as PreludeUgcItemInstallInfo,
+        SteamworksUgcItemInstallInfoResult as PreludeUgcItemInstallInfoResult,
+        SteamworksUgcItemStateInfo as PreludeUgcItemStateInfo,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
         SteamworksUgcQuery as PreludeUgcQuery, SteamworksUgcQueryIds as PreludeUgcQueryIds,
         SteamworksUgcQueryOptions as PreludeUgcQueryOptions,
         SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
+        SteamworksUgcState as PreludeUgcState,
         SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
@@ -187,8 +193,10 @@ use bevy_steamworks::{
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
     SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
     SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
+    SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+    SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
-    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult,
+    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult, SteamworksUgcState,
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
     SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
     SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
@@ -2256,6 +2264,31 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     };
     let _query_options = SteamworksUgcQueryOptions::new().with_additional_previews(true);
     let _item_detail = root_item_detail(item);
+    let root_state = SteamworksUgcState::default();
+    assert!(root_state.item_details().is_empty());
+    assert_eq!(root_state.item_detail(item), None);
+    assert_eq!(root_state.item_state(item), None);
+    assert_eq!(root_state.item_download_info(item), None);
+    assert_eq!(root_state.item_install_info(item), None);
+    let _item_state = SteamworksUgcItemStateInfo {
+        item,
+        state: steamworks::ItemState::SUBSCRIBED,
+    };
+    let _item_download_info = SteamworksUgcItemDownloadInfoResult {
+        item,
+        info: Some(SteamworksUgcItemDownloadInfo {
+            downloaded_bytes: 1,
+            total_bytes: 2,
+        }),
+    };
+    let _item_install_info = SteamworksUgcItemInstallInfoResult {
+        item,
+        info: Some(SteamworksUgcItemInstallInfo {
+            folder: "workshop/item".to_owned(),
+            size_on_disk: 3,
+            timestamp: 4,
+        }),
+    };
     accepts_root_exports(
         SteamworksUgcPlugin::new(),
         SteamworksUgcCommand::init_workshop_for_game_server(workshop_depot, "workshop_server"),
@@ -2347,6 +2380,31 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     let _prelude_create = PreludeUgcCommand::create_item(480_u32, steamworks::FileType::Community);
     let _prelude_query_options = PreludeUgcQueryOptions::new().with_additional_previews(true);
     let _prelude_item_detail = prelude_item_detail(item);
+    let prelude_state = PreludeUgcState::default();
+    assert!(prelude_state.item_details().is_empty());
+    assert_eq!(prelude_state.item_detail(item), None);
+    assert_eq!(prelude_state.item_state(item), None);
+    assert_eq!(prelude_state.item_download_info(item), None);
+    assert_eq!(prelude_state.item_install_info(item), None);
+    let _prelude_item_state = PreludeUgcItemStateInfo {
+        item,
+        state: steamworks::ItemState::SUBSCRIBED,
+    };
+    let _prelude_item_download_info = PreludeUgcItemDownloadInfoResult {
+        item,
+        info: Some(PreludeUgcItemDownloadInfo {
+            downloaded_bytes: 1,
+            total_bytes: 2,
+        }),
+    };
+    let _prelude_item_install_info = PreludeUgcItemInstallInfoResult {
+        item,
+        info: Some(PreludeUgcItemInstallInfo {
+            folder: "workshop/item".to_owned(),
+            size_on_disk: 3,
+            timestamp: 4,
+        }),
+    };
     let prelude_workshop_depot = PreludeUgcWorkshopDepotId::from(480_u32);
     let _prelude_game_server_workshop_init = PreludeUgcGameServerWorkshopInit {
         workshop_depot: prelude_workshop_depot,

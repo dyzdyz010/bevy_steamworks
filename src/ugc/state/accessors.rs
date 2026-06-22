@@ -1,9 +1,10 @@
 use super::SteamworksUgcState;
 use crate::ugc::{
     SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
-    SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfoResult,
-    SteamworksUgcItemStateInfo, SteamworksUgcItemUpdateProgress, SteamworksUgcQueryIds,
-    SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
+    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfoResult,
+    SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
+    SteamworksUgcItemUpdateProgress, SteamworksUgcQueryIds, SteamworksUgcQueryResults,
+    SteamworksUgcQueryTotal,
 };
 
 impl SteamworksUgcState {
@@ -15,6 +16,21 @@ impl SteamworksUgcState {
     /// Returns the most recent subscribed Workshop item list.
     pub fn subscribed_items(&self) -> &[steamworks::PublishedFileId] {
         &self.subscribed_items
+    }
+
+    /// Returns Workshop item detail snapshots cached from completed full queries.
+    pub fn item_details(&self) -> &[SteamworksUgcItemDetails] {
+        &self.item_details
+    }
+
+    /// Returns cached Workshop item details for one item.
+    pub fn item_detail(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<&SteamworksUgcItemDetails> {
+        self.item_details
+            .iter()
+            .find(|details| details.published_file_id == item)
     }
 
     /// Returns the most recent UGC query result set.
@@ -37,14 +53,42 @@ impl SteamworksUgcState {
         self.last_item_state.as_ref()
     }
 
+    /// Returns cached state flags for one Workshop item.
+    pub fn item_state(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<&SteamworksUgcItemStateInfo> {
+        self.item_states.iter().find(|info| info.item == item)
+    }
+
     /// Returns the most recent item download info snapshot.
     pub fn last_item_download_info(&self) -> Option<&SteamworksUgcItemDownloadInfoResult> {
         self.last_item_download_info.as_ref()
     }
 
+    /// Returns cached download progress info for one Workshop item.
+    pub fn item_download_info(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<&SteamworksUgcItemDownloadInfoResult> {
+        self.item_download_infos
+            .iter()
+            .find(|info| info.item == item)
+    }
+
     /// Returns the most recent item install info snapshot.
     pub fn last_item_install_info(&self) -> Option<&SteamworksUgcItemInstallInfoResult> {
         self.last_item_install_info.as_ref()
+    }
+
+    /// Returns cached install info for one Workshop item.
+    pub fn item_install_info(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<&SteamworksUgcItemInstallInfoResult> {
+        self.item_install_infos
+            .iter()
+            .find(|info| info.item == item)
     }
 
     /// Returns the most recent item update progress snapshot.

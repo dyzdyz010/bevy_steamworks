@@ -12,6 +12,42 @@ use super::validation::{
 };
 use super::*;
 
+fn test_item_details(
+    item: steamworks::PublishedFileId,
+    title: impl Into<String>,
+) -> SteamworksUgcItemDetails {
+    SteamworksUgcItemDetails {
+        published_file_id: item,
+        creator_app_id: Some(steamworks::AppId(480)),
+        consumer_app_id: Some(steamworks::AppId(480)),
+        title: title.into(),
+        description: "Description".to_owned(),
+        owner: steamworks::SteamId::from_raw(1),
+        time_created: 1,
+        time_updated: 2,
+        time_added_to_user_list: 3,
+        visibility: steamworks::PublishedFileVisibility::Public,
+        banned: false,
+        accepted_for_use: true,
+        tags: vec!["tag".to_owned()],
+        tags_truncated: false,
+        file_name: "file.dat".to_owned(),
+        file_type: steamworks::FileType::Community,
+        file_size: 1024,
+        url: "https://example.invalid/item".to_owned(),
+        num_upvotes: 10,
+        num_downvotes: 1,
+        score: 0.9,
+        num_children: 0,
+        preview_url: Some("https://example.invalid/preview.png".to_owned()),
+        content_descriptors: vec![SteamworksUgcContentDescriptor::AnyMatureContent],
+        statistics: Vec::new(),
+        metadata: Some(b"metadata".to_vec()),
+        children: Some(Vec::new()),
+        key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
+    }
+}
+
 #[test]
 fn ugc_plugin_registers_resources_and_messages() {
     let mut app = App::new();
@@ -521,17 +557,19 @@ fn constructors_preserve_inputs() {
 fn state_records_operations_without_unbounded_query_history() {
     let mut state = SteamworksUgcState::default();
     let item = steamworks::PublishedFileId(42);
+    let first_detail = test_item_details(item, "First title");
+    let second_detail = test_item_details(item, "Second title");
     let first = SteamworksUgcQueryResults {
         was_cached: false,
         total_results: 1,
         returned_results: 1,
-        items: Vec::new(),
+        items: vec![first_detail],
     };
     let second = SteamworksUgcQueryResults {
         was_cached: true,
         total_results: 2,
-        returned_results: 0,
-        items: Vec::new(),
+        returned_results: 1,
+        items: vec![second_detail.clone()],
     };
 
     state.record_operation(&SteamworksUgcOperation::SubscribedItemsListed {
@@ -564,6 +602,25 @@ fn state_records_operations_without_unbounded_query_history() {
             state: steamworks::ItemState::SUBSCRIBED,
         },
     });
+    state.record_operation(&SteamworksUgcOperation::ItemDownloadInfoRead {
+        info: SteamworksUgcItemDownloadInfoResult {
+            item,
+            info: Some(SteamworksUgcItemDownloadInfo {
+                downloaded_bytes: 10,
+                total_bytes: 100,
+            }),
+        },
+    });
+    state.record_operation(&SteamworksUgcOperation::ItemInstallInfoRead {
+        info: SteamworksUgcItemInstallInfoResult {
+            item,
+            info: Some(SteamworksUgcItemInstallInfo {
+                folder: "workshop/item".to_owned(),
+                size_on_disk: 2048,
+                timestamp: 1234,
+            }),
+        },
+    });
     state.record_operation(&SteamworksUgcOperation::DownloadItemSubmitted {
         item,
         high_priority: false,
@@ -585,7 +642,38 @@ fn state_records_operations_without_unbounded_query_history() {
             total_bytes: 100,
         },
     });
-    state.record_operation(&SteamworksUgcOperation::ItemUnsubscribed {
+    assert_eq!(state.item_details(), &[second_detail.clone()]);
+    assert_eq!(state.item_detail(item), Some(&second_detail));
+    assert_eq!(
+        state.item_state(item),
+        Some(&SteamworksUgcItemStateInfo {
+            item,
+            state: steamworks::ItemState::SUBSCRIBED,
+        })
+    );
+    assert_eq!(
+        state.item_download_info(item),
+        Some(&SteamworksUgcItemDownloadInfoResult {
+            item,
+            info: Some(SteamworksUgcItemDownloadInfo {
+                downloaded_bytes: 10,
+                total_bytes: 100,
+            }),
+        })
+    );
+    assert_eq!(
+        state.item_install_info(item),
+        Some(&SteamworksUgcItemInstallInfoResult {
+            item,
+            info: Some(SteamworksUgcItemInstallInfo {
+                folder: "workshop/item".to_owned(),
+                size_on_disk: 2048,
+                timestamp: 1234,
+            }),
+        })
+    );
+
+    state.record_operation(&SteamworksUgcOperation::ItemDeleted {
         request_id: 3,
         item,
     });
@@ -595,6 +683,11 @@ fn state_records_operations_without_unbounded_query_history() {
     });
 
     assert!(state.subscribed_items().is_empty());
+    assert!(state.item_details().is_empty());
+    assert_eq!(state.item_detail(item), None);
+    assert_eq!(state.item_state(item), None);
+    assert_eq!(state.item_download_info(item), None);
+    assert_eq!(state.item_install_info(item), None);
     assert_eq!(state.last_query(), Some(&second));
     assert_eq!(
         state.last_query_total(),
@@ -631,4 +724,30 @@ fn state_records_operations_without_unbounded_query_history() {
             folder: "workshop".to_owned(),
         })
     );
+}
+
+#[test]
+fn item_detail_cache_is_bounded() {
+    let mut state = SteamworksUgcState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT as u64 + 1) {
+        let item = steamworks::PublishedFileId(raw);
+        state.record_operation(&SteamworksUgcOperation::QueryCompleted {
+            request_id: raw,
+            query: SteamworksUgcQuery::item(item),
+            results: SteamworksUgcQueryResults {
+                was_cached: false,
+                total_results: 1,
+                returned_results: 1,
+                items: vec![test_item_details(item, format!("Item {raw}"))],
+            },
+        });
+    }
+
+    assert_eq!(
+        state.item_details().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+    assert_eq!(state.item_detail(steamworks::PublishedFileId(1)), None);
+    assert!(state.item_detail(steamworks::PublishedFileId(2)).is_some());
 }

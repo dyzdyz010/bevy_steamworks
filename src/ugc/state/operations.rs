@@ -1,4 +1,7 @@
-use super::SteamworksUgcState;
+use super::{
+    remove_item_cache, upsert_item_details, upsert_item_download_info, upsert_item_install_info,
+    upsert_item_state, SteamworksUgcState,
+};
 use crate::ugc::{
     update_watches::SteamworksUgcUpdateWatches, SteamworksUgcError,
     SteamworksUgcGameServerWorkshopInit, SteamworksUgcOperation,
@@ -15,6 +18,9 @@ impl SteamworksUgcState {
                 self.subscribed_items.clone_from(items);
             }
             SteamworksUgcOperation::QueryCompleted { results, .. } => {
+                for item in &results.items {
+                    upsert_item_details(&mut self.item_details, item.clone());
+                }
                 self.last_query = Some(results.clone());
                 self.record_successful_async_operation();
             }
@@ -27,12 +33,15 @@ impl SteamworksUgcState {
                 self.record_successful_async_operation();
             }
             SteamworksUgcOperation::ItemStateRead { info } => {
+                upsert_item_state(&mut self.item_states, info.clone());
                 self.last_item_state = Some(info.clone());
             }
             SteamworksUgcOperation::ItemDownloadInfoRead { info } => {
+                upsert_item_download_info(&mut self.item_download_infos, info.clone());
                 self.last_item_download_info = Some(info.clone());
             }
             SteamworksUgcOperation::ItemInstallInfoRead { info } => {
+                upsert_item_install_info(&mut self.item_install_infos, info.clone());
                 self.last_item_install_info = Some(info.clone());
             }
             SteamworksUgcOperation::ItemUpdateProgressRead { progress } => {
@@ -66,9 +75,13 @@ impl SteamworksUgcState {
                 }
                 self.record_successful_async_operation();
             }
-            SteamworksUgcOperation::ItemUnsubscribed { item, .. }
-            | SteamworksUgcOperation::ItemDeleted { item, .. } => {
+            SteamworksUgcOperation::ItemUnsubscribed { item, .. } => {
                 self.subscribed_items.retain(|known| known != item);
+                self.record_successful_async_operation();
+            }
+            SteamworksUgcOperation::ItemDeleted { item, .. } => {
+                self.subscribed_items.retain(|known| known != item);
+                remove_item_cache(self, *item);
                 self.record_successful_async_operation();
             }
             SteamworksUgcOperation::DownloadsSuspended { .. }
