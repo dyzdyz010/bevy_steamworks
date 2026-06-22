@@ -5,9 +5,9 @@
 //! sockets and connections owned by a private Bevy resource, while exposing
 //! stable integer IDs, owned snapshots, and command/result messages to game
 //! systems. Most commands can run through either the Steam client or Steam Game
-//! Server accessor; batch [`SteamworksNetworkingSocketsCommand::SendMessages`]
-//! still requires a client because the upstream safe message allocator is
-//! client-only.
+//! Server accessor. Batch [`SteamworksNetworkingSocketsCommand::SendMessages`]
+//! can target client-owned or server-owned connections, but it still requires a
+//! client resource because the upstream safe message allocator is client-only.
 
 /// Maximum number of socket/listen events processed by one poll command.
 pub const STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND: usize = 256;

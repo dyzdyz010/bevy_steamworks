@@ -37,49 +37,61 @@ pub(super) fn send_messages(
     handles: &SteamworksNetworkingSocketsHandleStorage,
     messages: &[SteamworksNetworkingSocketsOutboundMessage],
 ) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
-    let mut outbound = Vec::with_capacity(messages.len());
-    for message in messages {
-        if handles.connection_owner(message.connection)
-            == Some(SteamworksNetworkingSocketsHandleOwner::Server)
-        {
-            return Err(
-                SteamworksNetworkingSocketsError::ServerConnectionBatchSendUnsupported {
-                    connection: message.connection,
-                },
-            );
-        }
-    }
-
     let client = client.ok_or(SteamworksNetworkingSocketsError::ClientUnavailable)?;
-    let (sockets, _) = networking_sockets_for_owner(
-        Some(client),
-        server,
-        SteamworksNetworkingSocketsHandleOwner::Client,
-    )?;
-    for message in messages {
+    let mut client_outbound = Vec::new();
+    let mut server_outbound = Vec::new();
+
+    for (index, message) in messages.iter().enumerate() {
+        let owner = handles.connection_owner(message.connection).ok_or(
+            SteamworksNetworkingSocketsError::ConnectionNotFound {
+                id: message.connection,
+            },
+        )?;
+        if owner == SteamworksNetworkingSocketsHandleOwner::Server && server.is_none() {
+            return Err(SteamworksNetworkingSocketsError::ServerUnavailable);
+        }
         let connection_ref = handles.connections.get(&message.connection).ok_or(
             SteamworksNetworkingSocketsError::ConnectionNotFound {
                 id: message.connection,
             },
         )?;
-        outbound.push(allocate_outbound_message(client, connection_ref, message)?);
+        let outbound = allocate_outbound_message(client, connection_ref, message)?;
+        match owner {
+            SteamworksNetworkingSocketsHandleOwner::Client => {
+                client_outbound.push((index, outbound));
+            }
+            SteamworksNetworkingSocketsHandleOwner::Server => {
+                server_outbound.push((index, outbound));
+            }
+        }
     }
 
-    let send_results = sockets.send_messages(outbound);
-    let messages: Vec<SteamworksNetworkingSocketsMessageSendResult> = messages
-        .iter()
-        .zip(send_results)
-        .map(
-            |(message, result)| SteamworksNetworkingSocketsMessageSendResult {
-                connection: message.connection,
-                send_flags: message.send_flags,
-                channel: message.channel,
-                bytes: message.data.len(),
-                user_data: message.user_data,
-                result: result.map(u64::from),
-            },
-        )
-        .collect();
+    let mut send_results = std::iter::repeat_with(|| None)
+        .take(messages.len())
+        .collect::<Vec<_>>();
+    send_message_batch(
+        Some(client),
+        server,
+        SteamworksNetworkingSocketsHandleOwner::Client,
+        client_outbound,
+        messages,
+        &mut send_results,
+    )?;
+    send_message_batch(
+        Some(client),
+        server,
+        SteamworksNetworkingSocketsHandleOwner::Server,
+        server_outbound,
+        messages,
+        &mut send_results,
+    )?;
+
+    let messages: Vec<SteamworksNetworkingSocketsMessageSendResult> = send_results
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            SteamworksNetworkingSocketsError::operation_failed("networking_sockets.send_messages")
+        })?;
     if messages
         .iter()
         .any(|message: &SteamworksNetworkingSocketsMessageSendResult| message.result.is_err())
@@ -91,6 +103,35 @@ pub(super) fn send_messages(
         );
     }
     Ok(SteamworksNetworkingSocketsOperation::MessagesSent { messages })
+}
+
+fn send_message_batch(
+    client: Option<&SteamworksClient>,
+    server: Option<&SteamworksServer>,
+    owner: SteamworksNetworkingSocketsHandleOwner,
+    batch: Vec<(usize, steamworks::networking_types::NetworkingMessage)>,
+    source_messages: &[SteamworksNetworkingSocketsOutboundMessage],
+    send_results: &mut [Option<SteamworksNetworkingSocketsMessageSendResult>],
+) -> Result<(), SteamworksNetworkingSocketsError> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    let (indices, outbound): (Vec<_>, Vec<_>) = batch.into_iter().unzip();
+    let (sockets, _) = networking_sockets_for_owner(client, server, owner)?;
+    for (index, result) in indices.into_iter().zip(sockets.send_messages(outbound)) {
+        let message = &source_messages[index];
+        send_results[index] = Some(SteamworksNetworkingSocketsMessageSendResult {
+            connection: message.connection,
+            send_flags: message.send_flags,
+            channel: message.channel,
+            bytes: message.data.len(),
+            user_data: message.user_data,
+            result: result.map(u64::from),
+        });
+    }
+
+    Ok(())
 }
 
 pub(super) fn receive_messages(

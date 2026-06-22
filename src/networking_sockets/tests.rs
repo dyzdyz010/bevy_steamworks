@@ -1098,7 +1098,7 @@ fn connection_user_data_read_preserves_unset_sentinel() {
 }
 
 #[test]
-fn server_owned_connections_are_rejected_by_batch_send_before_client_lookup() {
+fn batch_send_checks_client_allocator_before_server_owned_connections() {
     let mut storage = SteamworksNetworkingSocketsHandleStorage::default();
     storage.connection_owners.insert(
         connection_id(),
@@ -1114,11 +1114,7 @@ fn server_owned_connections_are_rejected_by_batch_send_before_client_lookup() {
 
     assert_eq!(
         super::commands::handle_networking_sockets_command(None, None, &mut storage, &command),
-        Err(
-            SteamworksNetworkingSocketsError::ServerConnectionBatchSendUnsupported {
-                connection: connection_id(),
-            }
-        )
+        Err(SteamworksNetworkingSocketsError::ClientUnavailable)
     );
 }
 

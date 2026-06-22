@@ -46,14 +46,6 @@ pub enum SteamworksNetworkingSocketsError {
         /// Poll group with the incompatible owner.
         poll_group: SteamworksNetworkingSocketsPollGroupId,
     },
-    /// A server-owned connection was submitted to the client-only batch send command.
-    #[error(
-        "Steam Networking Sockets connection {connection:?} is server-owned; SendMessages requires client-owned connections"
-    )]
-    ServerConnectionBatchSendUnsupported {
-        /// Server-owned connection that cannot be sent through `SendMessages`.
-        connection: SteamworksNetworkingSocketsConnectionId,
-    },
     /// A max-events value was zero.
     #[error("Steam Networking Sockets max_events must be greater than zero")]
     InvalidEventLimit,
