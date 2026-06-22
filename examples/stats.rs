@@ -31,6 +31,7 @@ fn request_stats(
     }
 
     commands.write(SteamworksStatsCommand::request_current_user_stats());
+    commands.write(SteamworksStatsCommand::get_achievement_count());
     commands.write(SteamworksStatsCommand::request_global_achievement_percentages());
 
     if std::env::var("BEVY_STEAMWORKS_GLOBAL_STAT_I64").is_ok()

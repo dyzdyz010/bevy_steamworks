@@ -49,6 +49,7 @@ pub struct SteamworksStatsState {
     last_error: Option<SteamworksStatsError>,
     local_stat_i32: Vec<(String, i32)>,
     local_stat_f32: Vec<(String, f32)>,
+    achievement_count: Option<u32>,
     last_achievements: Vec<SteamworksAchievementInfo>,
     achievements: Vec<SteamworksAchievementInfo>,
     achievement_display_attributes: Vec<SteamworksAchievementDisplayAttribute>,

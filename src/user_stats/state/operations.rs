@@ -45,6 +45,9 @@ impl SteamworksStatsState {
                     achievement.achieved = Some(*achieved);
                 });
             }
+            SteamworksStatsOperation::AchievementCountRead { count } => {
+                self.achievement_count = Some(*count);
+            }
             SteamworksStatsOperation::AchievementNamesListed { names, .. } => {
                 self.last_achievements = names
                     .iter()

@@ -45,6 +45,8 @@ pub enum SteamworksStatsCommand {
         /// Steamworks achievement API name.
         name: String,
     },
+    /// Read the number of achievements defined for the current app.
+    GetAchievementCount,
     /// List achievement API names for the current app.
     ///
     /// The upstream safe wrapper enumerates the catalog names internally. Keep
@@ -237,6 +239,11 @@ impl SteamworksStatsCommand {
     /// Creates a [`SteamworksStatsCommand::GetAchievement`] command.
     pub fn get_achievement(name: impl Into<String>) -> Self {
         Self::GetAchievement { name: name.into() }
+    }
+
+    /// Creates a [`SteamworksStatsCommand::GetAchievementCount`] command.
+    pub fn get_achievement_count() -> Self {
+        Self::GetAchievementCount
     }
 
     /// Creates a [`SteamworksStatsCommand::ListAchievementNames`] command.

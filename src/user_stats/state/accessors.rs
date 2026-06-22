@@ -38,6 +38,11 @@ impl SteamworksStatsState {
         named_value(&self.local_stat_f32, name).copied()
     }
 
+    /// Returns the most recent achievement count read through this plugin.
+    pub fn achievement_count(&self) -> Option<u32> {
+        self.achievement_count
+    }
+
     /// Returns the most recent achievement catalog snapshot.
     pub fn last_achievements(&self) -> &[SteamworksAchievementInfo] {
         &self.last_achievements

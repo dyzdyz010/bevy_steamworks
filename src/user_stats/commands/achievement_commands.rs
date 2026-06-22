@@ -16,6 +16,11 @@ pub(super) fn handle_achievement_command(
             .get()
             .map(|achieved| SteamworksStatsOperation::AchievementRead { name, achieved })
             .map_err(|()| SteamworksStatsError::operation_failed("achievement.get")),
+        SteamworksStatsCommand::GetAchievementCount => client
+            .user_stats()
+            .get_num_achievements()
+            .map(|count| SteamworksStatsOperation::AchievementCountRead { count })
+            .map_err(|()| SteamworksStatsError::operation_failed("get_num_achievements")),
         SteamworksStatsCommand::ListAchievementNames { offset, limit } => {
             list_achievement_names(&client.user_stats(), offset, limit).map(|(total, names)| {
                 SteamworksStatsOperation::AchievementNamesListed {

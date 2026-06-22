@@ -55,6 +55,11 @@ pub enum SteamworksStatsOperation {
         /// Whether the achievement is unlocked.
         achieved: bool,
     },
+    /// Achievement count was read.
+    AchievementCountRead {
+        /// Total achievements reported by Steam for the current app.
+        count: u32,
+    },
     /// Achievement API names were listed.
     AchievementNamesListed {
         /// Zero-based achievement index the page starts from.

@@ -1838,8 +1838,8 @@ fn stats_api_is_exported_from_root_and_prelude() {
         bevy_steamworks::prelude::STEAMWORKS_ACHIEVEMENT_MAX_ITEMS_PER_COMMAND,
     );
 
-    let command = SteamworksStatsCommand::request_current_user_stats();
-    let operation = SteamworksStatsOperation::GlobalAchievementPercentagesRequested;
+    let command = SteamworksStatsCommand::get_achievement_count();
+    let operation = SteamworksStatsOperation::AchievementCountRead { count: 0 };
     let error = SteamworksStatsError::ClientUnavailable;
     let result = SteamworksStatsResult::Err {
         command: command.clone(),
@@ -1848,8 +1848,8 @@ fn stats_api_is_exported_from_root_and_prelude() {
 
     accepts_root_exports(root_plugin, command, operation, result, error);
 
-    let command = PreludeStatsCommand::request_current_user_stats();
-    let operation = PreludeStatsOperation::GlobalAchievementPercentagesRequested;
+    let command = PreludeStatsCommand::get_achievement_count();
+    let operation = PreludeStatsOperation::AchievementCountRead { count: 0 };
     let error = PreludeStatsError::ClientUnavailable;
     let result = PreludeStatsResult::Err {
         command: command.clone(),

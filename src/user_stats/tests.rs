@@ -269,6 +269,7 @@ fn state_records_local_stats_and_named_achievements() {
         name: "ACH_WIN".to_owned(),
         achieved: false,
     });
+    state.record_operation(&SteamworksStatsOperation::AchievementCountRead { count: 12 });
     state.record_operation(&SteamworksStatsOperation::AchievementDisplayAttributeRead {
         name: "ACH_WIN".to_owned(),
         key: "name".to_owned(),
@@ -312,6 +313,7 @@ fn state_records_local_stats_and_named_achievements() {
 
     assert_eq!(state.stat_i32("kills"), Some(2));
     assert_eq!(state.stat_f32("accuracy"), Some(0.75));
+    assert_eq!(state.achievement_count(), Some(12));
     assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(true));
     assert_eq!(state.achievement_unlock_time("ACH_WIN"), Some(42));
     assert_eq!(
@@ -385,6 +387,10 @@ fn achievement_commands_preserve_inputs() {
             offset: 0,
             limit: STEAMWORKS_ACHIEVEMENT_DEFAULT_ITEMS_PER_COMMAND,
         }
+    );
+    assert_eq!(
+        SteamworksStatsCommand::get_achievement_count(),
+        SteamworksStatsCommand::GetAchievementCount
     );
     assert_eq!(
         SteamworksStatsCommand::list_achievement_names_page(8, 4),

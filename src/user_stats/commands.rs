@@ -175,6 +175,7 @@ fn route_stats_command(
             handle_local_stats_command(client, state, command)
         }
         SteamworksStatsCommand::GetAchievement { .. }
+        | SteamworksStatsCommand::GetAchievementCount
         | SteamworksStatsCommand::ListAchievementNames { .. }
         | SteamworksStatsCommand::ListAchievements { .. }
         | SteamworksStatsCommand::GetAchievementIcon { .. }
