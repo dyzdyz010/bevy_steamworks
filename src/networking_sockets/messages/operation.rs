@@ -127,6 +127,11 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Connection flushed.
         connection: SteamworksNetworkingSocketsConnectionId,
     },
+    /// Pending messages were flushed on every plugin-owned connection.
+    AllMessagesFlushed {
+        /// Connections flushed in plugin ID order.
+        connections: Vec<SteamworksNetworkingSocketsConnectionId>,
+    },
     /// A connection was assigned to a poll group.
     ConnectionPollGroupSet {
         /// Connection assigned.
@@ -292,6 +297,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
             Self::MessagesFlushed { connection } => f
                 .debug_struct("MessagesFlushed")
                 .field("connection", connection)
+                .finish(),
+            Self::AllMessagesFlushed { connections } => f
+                .debug_struct("AllMessagesFlushed")
+                .field("connections", connections)
                 .finish(),
             Self::ConnectionPollGroupSet {
                 connection,

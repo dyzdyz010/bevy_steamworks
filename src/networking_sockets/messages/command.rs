@@ -147,6 +147,8 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Connection to flush.
         connection: SteamworksNetworkingSocketsConnectionId,
     },
+    /// Flush pending messages on every plugin-owned connection.
+    FlushAllMessages,
     /// Assign a connection to a poll group.
     SetConnectionPollGroup {
         /// Connection to assign.

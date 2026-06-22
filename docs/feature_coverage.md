@@ -15,7 +15,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Matchmaking servers | Implemented | Server list requests, refresh/release/detail reads, direct ping/player-details/rules queries, async result tracking. |
 | Legacy networking | Implemented | Legacy P2P sessions, send/read packets, packet availability, session callbacks. |
 | Networking messages | Implemented | Send/receive, session connection info, session request/failure callbacks, configurable auto-accept. |
-| Networking sockets | Implemented | Listen/connect, accept/close, single/all event polling and receives, messages, batch sends, poll groups, connection names/user data, lanes, auth helpers, realtime status, client/server ownership tracking. |
+| Networking sockets | Implemented | Listen/connect, accept/close, single/all event polling, receives, and flushes, messages, batch sends, poll groups, connection names/user data, lanes, auth helpers, realtime status, client/server ownership tracking. |
 | Networking utils | Implemented | Relay initialization, relay status callbacks, detailed relay diagnostics, ping measurement/config/any-relay/debug-message reads. |
 | Input | Implemented | Init/run/shutdown, controller and action handles, digital/analog data, origins/glyphs/names, motion data, action set activation, binding panel. |
 | Screenshots | Implemented | Hook state, trigger, library add, requested/ready callbacks. |

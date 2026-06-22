@@ -137,6 +137,7 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .debug_struct("FlushMessages")
                 .field("connection", connection)
                 .finish(),
+            Self::FlushAllMessages => f.write_str("FlushAllMessages"),
             Self::SetConnectionPollGroup {
                 connection,
                 poll_group,

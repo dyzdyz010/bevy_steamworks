@@ -260,6 +260,11 @@ impl SteamworksNetworkingSocketsCommand {
         Self::FlushMessages { connection }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::FlushAllMessages`] command.
+    pub fn flush_all_messages() -> Self {
+        Self::FlushAllMessages
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::SetConnectionPollGroup`] command.
     pub fn set_connection_poll_group(
         connection: SteamworksNetworkingSocketsConnectionId,

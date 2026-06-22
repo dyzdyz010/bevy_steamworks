@@ -208,6 +208,9 @@ pub(super) fn handle_networking_sockets_command(
         SteamworksNetworkingSocketsCommand::FlushMessages { connection } => {
             message_commands::flush_messages(handles, *connection)?
         }
+        SteamworksNetworkingSocketsCommand::FlushAllMessages => {
+            message_commands::flush_all_messages(handles)?
+        }
         SteamworksNetworkingSocketsCommand::SetConnectionPollGroup {
             connection,
             poll_group,

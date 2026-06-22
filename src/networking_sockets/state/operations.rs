@@ -149,6 +149,9 @@ impl SteamworksNetworkingSocketsState {
             SteamworksNetworkingSocketsOperation::MessagesFlushed { connection } => {
                 self.last_flushed_connection = Some(*connection);
             }
+            SteamworksNetworkingSocketsOperation::AllMessagesFlushed { connections } => {
+                self.last_flushed_connection = connections.last().copied();
+            }
             SteamworksNetworkingSocketsOperation::ConnectionPollGroupSet {
                 connection,
                 poll_group,

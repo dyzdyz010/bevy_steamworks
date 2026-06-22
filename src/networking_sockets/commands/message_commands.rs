@@ -199,3 +199,20 @@ pub(super) fn flush_messages(
     })?;
     Ok(SteamworksNetworkingSocketsOperation::MessagesFlushed { connection })
 }
+
+pub(super) fn flush_all_messages(
+    handles: &SteamworksNetworkingSocketsHandleStorage,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut connections = handles.connections.keys().copied().collect::<Vec<_>>();
+    connections.sort_by_key(|connection| connection.raw());
+
+    for connection in &connections {
+        let SteamworksNetworkingSocketsOperation::MessagesFlushed { .. } =
+            flush_messages(handles, *connection)?
+        else {
+            unreachable!("flush_messages returns MessagesFlushed");
+        };
+    }
+
+    Ok(SteamworksNetworkingSocketsOperation::AllMessagesFlushed { connections })
+}

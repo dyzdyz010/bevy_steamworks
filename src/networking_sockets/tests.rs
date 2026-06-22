@@ -632,6 +632,10 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingSocketsCommand::flush_all_messages(),
+        SteamworksNetworkingSocketsCommand::FlushAllMessages
+    );
+    assert_eq!(
         SteamworksNetworkingSocketsCommand::set_connection_poll_group(
             connection_id(),
             poll_group_id(),
@@ -754,6 +758,17 @@ fn bulk_commands_return_empty_batches_without_handles() {
                 poll_groups: Vec::new(),
             },
         )
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::flush_all_messages(),
+        ),
+        Ok(SteamworksNetworkingSocketsOperation::AllMessagesFlushed {
+            connections: Vec::new(),
+        },)
     );
 }
 
@@ -940,6 +955,19 @@ fn state_records_bulk_receive_operations() {
     assert_eq!(state.received_count(), 2);
     assert_eq!(state.last_received_messages(), &[message]);
     assert_eq!(state.last_poll_group_messages(), &[poll_group_message]);
+}
+
+#[test]
+fn state_records_bulk_flush_operation() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+    let first = SteamworksNetworkingSocketsConnectionId::from_raw(1);
+    let second = SteamworksNetworkingSocketsConnectionId::from_raw(2);
+
+    state.record_operation(&SteamworksNetworkingSocketsOperation::AllMessagesFlushed {
+        connections: vec![first, second],
+    });
+
+    assert_eq!(state.last_flushed_connection(), Some(second));
 }
 
 #[test]

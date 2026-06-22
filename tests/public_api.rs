@@ -1172,6 +1172,21 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
     );
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::flush_all_messages(),
+        SteamworksNetworkingSocketsOperation::AllMessagesFlushed {
+            connections: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllMessagesFlushed {
+                connections: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidHandle {
+            operation: "net_connection.flush_messages",
+        },
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
         server_poll_group_command,
         SteamworksNetworkingSocketsOperation::PollGroupCreated {
             poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
@@ -1346,6 +1361,19 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
             },
         ),
         PreludeNetworkingSocketsError::InvalidBatchSize,
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::flush_all_messages(),
+        PreludeNetworkingSocketsOperation::AllMessagesFlushed {
+            connections: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(PreludeNetworkingSocketsOperation::AllMessagesFlushed {
+            connections: Vec::new(),
+        }),
+        PreludeNetworkingSocketsError::InvalidHandle {
+            operation: "net_connection.flush_messages",
+        },
     );
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),
