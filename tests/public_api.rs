@@ -154,7 +154,8 @@ use bevy_steamworks::{
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
         SteamworksUserPlugin as PreludeUserPlugin, SteamworksUserResult as PreludeUserResult,
-        SteamworksUtilsCommand as PreludeUtilsCommand, SteamworksUtilsError as PreludeUtilsError,
+        SteamworksUserState as PreludeUserState, SteamworksUtilsCommand as PreludeUtilsCommand,
+        SteamworksUtilsError as PreludeUtilsError,
         SteamworksUtilsOperation as PreludeUtilsOperation,
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
@@ -221,8 +222,8 @@ use bevy_steamworks::{
     SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState,
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
     SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
-    SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
-    SteamworksUtilsResult,
+    SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
+    SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -2241,6 +2242,21 @@ fn user_api_is_exported_from_root_and_prelude() {
     ));
     let _identity_ticket: Option<SteamworksIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = SteamworksUserError::InvalidNetworkingIdentity;
+    let user = steamworks::SteamId::from_raw(1);
+    let app_id = steamworks::AppId(480);
+    let root_state = SteamworksUserState::default();
+    assert!(root_state.auth_session_tickets().is_empty());
+    assert!(root_state.auth_session_tickets_for_identity().is_empty());
+    assert!(root_state.web_api_ticket_requests().is_empty());
+    assert!(root_state.user_licenses_for_apps().is_empty());
+    assert_eq!(root_state.user_license_for_app(user, app_id), None);
+    assert!(root_state.auth_ticket_responses().is_empty());
+    assert!(root_state.web_api_ticket_responses().is_empty());
+    assert!(root_state.auth_ticket_validations().is_empty());
+    assert_eq!(root_state.auth_ticket_validation(user), None);
+    assert!(root_state.steam_server_connection_events().is_empty());
+    assert!(root_state.micro_txn_authorization_responses().is_empty());
+    assert_eq!(root_state.micro_txn_authorization_response(app_id, 1), None);
 
     accepts_root_exports(
         SteamworksUserPlugin::new(),
@@ -2269,6 +2285,22 @@ fn user_api_is_exported_from_root_and_prelude() {
     ));
     let _identity_ticket: Option<PreludeIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = PreludeUserError::InvalidNetworkingIdentity;
+    let prelude_state = PreludeUserState::default();
+    assert!(prelude_state.auth_session_tickets().is_empty());
+    assert!(prelude_state.auth_session_tickets_for_identity().is_empty());
+    assert!(prelude_state.web_api_ticket_requests().is_empty());
+    assert!(prelude_state.user_licenses_for_apps().is_empty());
+    assert_eq!(prelude_state.user_license_for_app(user, app_id), None);
+    assert!(prelude_state.auth_ticket_responses().is_empty());
+    assert!(prelude_state.web_api_ticket_responses().is_empty());
+    assert!(prelude_state.auth_ticket_validations().is_empty());
+    assert_eq!(prelude_state.auth_ticket_validation(user), None);
+    assert!(prelude_state.steam_server_connection_events().is_empty());
+    assert!(prelude_state.micro_txn_authorization_responses().is_empty());
+    assert_eq!(
+        prelude_state.micro_txn_authorization_response(app_id, 1),
+        None
+    );
 
     accepts_prelude_exports(PreludeUserPlugin::new(), command, operation, result, error);
 }

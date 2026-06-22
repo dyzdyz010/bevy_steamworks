@@ -59,6 +59,24 @@ impl SteamworksUserState {
         self.last_auth_session_ticket.as_ref()
     }
 
+    /// Returns currently cached issued auth session tickets by ticket handle.
+    ///
+    /// Ticket bytes are removed from this cache when the ticket is cancelled or
+    /// Steam reports ticket creation failure.
+    pub fn auth_session_tickets(&self) -> &[SteamworksIssuedAuthSessionTicket] {
+        &self.auth_session_tickets
+    }
+
+    /// Returns an issued auth session ticket snapshot for a ticket handle.
+    pub fn auth_session_ticket(
+        &self,
+        ticket: steamworks::AuthTicket,
+    ) -> Option<&SteamworksIssuedAuthSessionTicket> {
+        self.auth_session_tickets
+            .iter()
+            .find(|issued| issued.ticket == ticket)
+    }
+
     /// Returns the most recent identity-scoped auth session ticket issued through this command layer.
     pub fn last_auth_session_ticket_for_identity(
         &self,
@@ -66,11 +84,46 @@ impl SteamworksUserState {
         self.last_auth_session_ticket_for_identity.as_ref()
     }
 
+    /// Returns currently cached identity-scoped auth session tickets by ticket handle.
+    ///
+    /// Ticket bytes are removed from this cache when the ticket is cancelled or
+    /// Steam reports ticket creation failure.
+    pub fn auth_session_tickets_for_identity(
+        &self,
+    ) -> &[SteamworksIssuedAuthSessionTicketForIdentity] {
+        &self.auth_session_tickets_for_identity
+    }
+
+    /// Returns an identity-scoped auth session ticket snapshot for a ticket handle.
+    pub fn auth_session_ticket_for_identity(
+        &self,
+        ticket: steamworks::AuthTicket,
+    ) -> Option<&SteamworksIssuedAuthSessionTicketForIdentity> {
+        self.auth_session_tickets_for_identity
+            .iter()
+            .find(|issued| issued.ticket == ticket)
+    }
+
     /// Returns the most recent Web API auth ticket request submitted through this command layer.
     pub fn last_web_api_ticket_request(
         &self,
     ) -> Option<&SteamworksWebApiAuthenticationTicketRequest> {
         self.last_web_api_ticket_request.as_ref()
+    }
+
+    /// Returns currently cached Web API auth ticket requests by ticket handle.
+    pub fn web_api_ticket_requests(&self) -> &[SteamworksWebApiAuthenticationTicketRequest] {
+        &self.web_api_ticket_requests
+    }
+
+    /// Returns a Web API auth ticket request snapshot for a ticket handle.
+    pub fn web_api_ticket_request(
+        &self,
+        ticket: steamworks::AuthTicket,
+    ) -> Option<&SteamworksWebApiAuthenticationTicketRequest> {
+        self.web_api_ticket_requests
+            .iter()
+            .find(|request| request.ticket == ticket)
     }
 
     /// Returns the most recent auth ticket cancelled through this command layer.
@@ -91,6 +144,22 @@ impl SteamworksUserState {
     /// Returns the most recent app-license check submitted through this command layer.
     pub fn last_user_license_for_app(&self) -> Option<&SteamworksUserLicenseForApp> {
         self.last_user_license_for_app.as_ref()
+    }
+
+    /// Returns bounded app-license check snapshots by user and app.
+    pub fn user_licenses_for_apps(&self) -> &[SteamworksUserLicenseForApp] {
+        &self.user_licenses_for_apps
+    }
+
+    /// Returns the latest app-license check for a user/app pair.
+    pub fn user_license_for_app(
+        &self,
+        user: steamworks::SteamId,
+        app_id: steamworks::AppId,
+    ) -> Option<&SteamworksUserLicenseForApp> {
+        self.user_licenses_for_apps
+            .iter()
+            .find(|license| license.user == user && license.app_id == app_id)
     }
 
     /// Returns how many auth session tickets this plugin issued.
@@ -130,6 +199,11 @@ impl SteamworksUserState {
         self.last_steam_server_connection_event.as_ref()
     }
 
+    /// Returns bounded Steam server connection callback snapshots.
+    pub fn steam_server_connection_events(&self) -> &[SteamworksSteamServerConnectionEvent] {
+        &self.steam_server_connection_events
+    }
+
     /// Returns the most recent microtransaction authorization callback snapshot.
     pub fn last_micro_txn_authorization_response(
         &self,
@@ -137,9 +211,40 @@ impl SteamworksUserState {
         self.last_micro_txn_authorization_response.as_ref()
     }
 
+    /// Returns bounded microtransaction authorization callback snapshots by app/order.
+    pub fn micro_txn_authorization_responses(&self) -> &[SteamworksMicroTxnAuthorizationResponse] {
+        &self.micro_txn_authorization_responses
+    }
+
+    /// Returns the latest microtransaction authorization for an app/order pair.
+    pub fn micro_txn_authorization_response(
+        &self,
+        app_id: steamworks::AppId,
+        order_id: u64,
+    ) -> Option<&SteamworksMicroTxnAuthorizationResponse> {
+        self.micro_txn_authorization_responses
+            .iter()
+            .find(|response| response.app_id == app_id && response.order_id == order_id)
+    }
+
     /// Returns the most recent auth session ticket response callback snapshot.
     pub fn last_auth_ticket_response(&self) -> Option<&SteamworksAuthSessionTicketResponse> {
         self.last_auth_ticket_response.as_ref()
+    }
+
+    /// Returns bounded auth session ticket response snapshots by ticket handle.
+    pub fn auth_ticket_responses(&self) -> &[SteamworksAuthSessionTicketResponse] {
+        &self.auth_ticket_responses
+    }
+
+    /// Returns the latest auth session ticket response for a ticket handle.
+    pub fn auth_ticket_response(
+        &self,
+        ticket: steamworks::AuthTicket,
+    ) -> Option<&SteamworksAuthSessionTicketResponse> {
+        self.auth_ticket_responses
+            .iter()
+            .find(|response| response.ticket == ticket)
     }
 
     /// Returns the most recent Web API ticket response callback snapshot.
@@ -147,8 +252,38 @@ impl SteamworksUserState {
         self.last_web_api_ticket_response.as_ref()
     }
 
+    /// Returns bounded Web API ticket response snapshots by ticket handle.
+    pub fn web_api_ticket_responses(&self) -> &[SteamworksWebApiTicketResponse] {
+        &self.web_api_ticket_responses
+    }
+
+    /// Returns the latest Web API ticket response for a ticket handle.
+    pub fn web_api_ticket_response(
+        &self,
+        ticket: steamworks::AuthTicket,
+    ) -> Option<&SteamworksWebApiTicketResponse> {
+        self.web_api_ticket_responses
+            .iter()
+            .find(|response| response.ticket_handle == ticket)
+    }
+
     /// Returns the most recent auth ticket validation callback snapshot.
     pub fn last_auth_ticket_validation(&self) -> Option<&SteamworksAuthTicketValidation> {
         self.last_auth_ticket_validation.as_ref()
+    }
+
+    /// Returns bounded auth ticket validation callback snapshots by Steam user.
+    pub fn auth_ticket_validations(&self) -> &[SteamworksAuthTicketValidation] {
+        &self.auth_ticket_validations
+    }
+
+    /// Returns the latest auth ticket validation for a Steam user.
+    pub fn auth_ticket_validation(
+        &self,
+        user: steamworks::SteamId,
+    ) -> Option<&SteamworksAuthTicketValidation> {
+        self.auth_ticket_validations
+            .iter()
+            .find(|validation| validation.steam_id == user)
     }
 }

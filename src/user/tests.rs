@@ -354,7 +354,7 @@ fn connection_and_microtxn_callbacks_are_bridged_without_client() {
             ),
             SteamworksUserResult::Ok(
                 SteamworksUserOperation::SteamServerConnectionEventReceived {
-                    event: disconnected,
+                    event: disconnected.clone(),
                 },
             ),
             SteamworksUserResult::Ok(
@@ -373,10 +373,24 @@ fn connection_and_microtxn_callbacks_are_bridged_without_client() {
     let state = app.world().resource::<SteamworksUserState>();
     assert_eq!(state.steam_server_connected(), Some(false));
     assert_eq!(state.last_steam_server_connection_event(), Some(&failed));
+    assert_eq!(state.steam_server_connection_events().len(), 3);
+    assert_eq!(
+        state.steam_server_connection_events(),
+        &[
+            SteamworksSteamServerConnectionEvent::Connected,
+            disconnected,
+            failed.clone(),
+        ]
+    );
     assert_eq!(
         state.last_micro_txn_authorization_response(),
         Some(&micro_txn)
     );
+    assert_eq!(
+        state.micro_txn_authorization_response(app_id, 99),
+        Some(&micro_txn)
+    );
+    assert_eq!(state.micro_txn_authorization_responses(), &[micro_txn]);
     assert_eq!(state.last_error(), None);
 }
 
@@ -488,7 +502,40 @@ fn state_records_user_operations_without_unbounded_history() {
             license: steamworks::UserHasLicense::HasLicense,
         })
     );
+    assert_eq!(
+        state.user_license_for_app(first_user, app_id),
+        state.last_user_license_for_app()
+    );
+    assert_eq!(state.user_licenses_for_apps().len(), 1);
     assert_eq!(state.user_license_check_count(), 1);
+}
+
+#[test]
+fn user_state_lookup_caches_are_bounded() {
+    let mut state = SteamworksUserState::default();
+    let user = steamworks::SteamId::from_raw(1);
+    let limit = 1_024;
+
+    for index in 0..(limit + 4) {
+        state.record_operation(&SteamworksUserOperation::UserLicenseForAppRead {
+            user,
+            app_id: steamworks::AppId((index + 1) as u32),
+            license: steamworks::UserHasLicense::HasLicense,
+        });
+    }
+
+    assert_eq!(state.user_licenses_for_apps().len(), limit);
+    assert!(state
+        .user_license_for_app(user, steamworks::AppId(1))
+        .is_none());
+    assert_eq!(
+        state.user_license_for_app(user, steamworks::AppId((limit + 4) as u32)),
+        Some(&SteamworksUserLicenseForApp {
+            user,
+            app_id: steamworks::AppId((limit + 4) as u32),
+            license: steamworks::UserHasLicense::HasLicense,
+        })
+    );
 }
 
 #[test]
@@ -516,6 +563,11 @@ fn validation_callbacks_do_not_create_sessions_but_failures_remove_known_session
             response: Ok(()),
         })
     );
+    assert_eq!(
+        state.auth_ticket_validation(user),
+        state.last_auth_ticket_validation()
+    );
+    assert_eq!(state.auth_ticket_validations().len(), 1);
 
     state.record_operation(&SteamworksUserOperation::AuthenticationSessionStarted { user });
     assert_eq!(state.authenticated_users(), &[user]);
@@ -539,4 +591,9 @@ fn validation_callbacks_do_not_create_sessions_but_failures_remove_known_session
             response: Err(SteamworksAuthSessionValidateError::AuthTicketCancelled),
         })
     );
+    assert_eq!(
+        state.auth_ticket_validation(user),
+        state.last_auth_ticket_validation()
+    );
+    assert_eq!(state.auth_ticket_validations().len(), 1);
 }
