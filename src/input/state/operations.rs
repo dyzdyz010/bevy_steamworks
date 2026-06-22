@@ -1,5 +1,7 @@
 use super::{
-    upsert_action_origin_info, upsert_controller, upsert_named_action_set,
+    upsert_action_origin_info, upsert_action_set_activation, upsert_analog_action_origins_snapshot,
+    upsert_analog_action_snapshot, upsert_controller, upsert_digital_action_origins_snapshot,
+    upsert_digital_action_snapshot, upsert_motion_snapshot, upsert_named_action_set,
     upsert_named_analog_action, upsert_named_digital_action, SteamworksInputActionSetActivation,
     SteamworksInputAnalogActionOriginsSnapshot, SteamworksInputDigitalActionOriginsSnapshot,
     SteamworksInputError, SteamworksInputOperation, SteamworksInputState,
@@ -48,15 +50,22 @@ impl SteamworksInputState {
                 controller,
                 action_set,
             } => {
-                self.last_action_set_activation = Some(SteamworksInputActionSetActivation {
+                let activation = SteamworksInputActionSetActivation {
                     controller: *controller,
                     action_set: *action_set,
-                });
+                };
+                upsert_action_set_activation(&mut self.action_set_activations, activation);
+                self.last_action_set_activation = Some(activation);
             }
             SteamworksInputOperation::DigitalActionDataRead { snapshot } => {
+                upsert_digital_action_snapshot(
+                    &mut self.digital_action_snapshots,
+                    snapshot.clone(),
+                );
                 self.last_digital_action = Some(snapshot.clone());
             }
             SteamworksInputOperation::AnalogActionDataRead { snapshot } => {
+                upsert_analog_action_snapshot(&mut self.analog_action_snapshots, snapshot.clone());
                 self.last_analog_action = Some(snapshot.clone());
             }
             SteamworksInputOperation::DigitalActionOriginsRead {
@@ -69,13 +78,17 @@ impl SteamworksInputState {
                     upsert_action_origin_info(&mut self.action_origin_infos, origin.clone());
                 }
                 self.last_action_origin_info = origins.last().cloned();
-                self.last_digital_action_origins =
-                    Some(SteamworksInputDigitalActionOriginsSnapshot {
-                        controller: *controller,
-                        action_set: *action_set,
-                        action: *action,
-                        origins: origins.clone(),
-                    });
+                let snapshot = SteamworksInputDigitalActionOriginsSnapshot {
+                    controller: *controller,
+                    action_set: *action_set,
+                    action: *action,
+                    origins: origins.clone(),
+                };
+                upsert_digital_action_origins_snapshot(
+                    &mut self.digital_action_origin_snapshots,
+                    snapshot.clone(),
+                );
+                self.last_digital_action_origins = Some(snapshot);
             }
             SteamworksInputOperation::AnalogActionOriginsRead {
                 controller,
@@ -87,15 +100,20 @@ impl SteamworksInputState {
                     upsert_action_origin_info(&mut self.action_origin_infos, origin.clone());
                 }
                 self.last_action_origin_info = origins.last().cloned();
-                self.last_analog_action_origins =
-                    Some(SteamworksInputAnalogActionOriginsSnapshot {
-                        controller: *controller,
-                        action_set: *action_set,
-                        action: *action,
-                        origins: origins.clone(),
-                    });
+                let snapshot = SteamworksInputAnalogActionOriginsSnapshot {
+                    controller: *controller,
+                    action_set: *action_set,
+                    action: *action,
+                    origins: origins.clone(),
+                };
+                upsert_analog_action_origins_snapshot(
+                    &mut self.analog_action_origin_snapshots,
+                    snapshot.clone(),
+                );
+                self.last_analog_action_origins = Some(snapshot);
             }
             SteamworksInputOperation::MotionDataRead { snapshot } => {
+                upsert_motion_snapshot(&mut self.motion_snapshots, snapshot.clone());
                 self.last_motion = Some(snapshot.clone());
             }
             SteamworksInputOperation::BindingPanelShown { controller } => {
@@ -114,13 +132,19 @@ impl SteamworksInputState {
         self.digital_actions.clear();
         self.analog_actions.clear();
         self.last_action_set_activation = None;
+        self.action_set_activations.clear();
         self.last_digital_action = None;
+        self.digital_action_snapshots.clear();
         self.last_analog_action = None;
+        self.analog_action_snapshots.clear();
         self.last_digital_action_origins = None;
+        self.digital_action_origin_snapshots.clear();
         self.last_analog_action_origins = None;
+        self.analog_action_origin_snapshots.clear();
         self.action_origin_infos.clear();
         self.last_action_origin_info = None;
         self.last_motion = None;
+        self.motion_snapshots.clear();
         self.last_binding_panel_controller = None;
     }
 }

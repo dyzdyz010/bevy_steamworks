@@ -21,13 +21,19 @@ pub struct SteamworksInputState {
     analog_actions: Vec<SteamworksInputNamedAnalogActionHandle>,
     action_manifest_path: Option<String>,
     last_action_set_activation: Option<SteamworksInputActionSetActivation>,
+    action_set_activations: Vec<SteamworksInputActionSetActivation>,
     last_digital_action: Option<SteamworksInputDigitalActionSnapshot>,
+    digital_action_snapshots: Vec<SteamworksInputDigitalActionSnapshot>,
     last_analog_action: Option<SteamworksInputAnalogActionSnapshot>,
+    analog_action_snapshots: Vec<SteamworksInputAnalogActionSnapshot>,
     last_digital_action_origins: Option<SteamworksInputDigitalActionOriginsSnapshot>,
+    digital_action_origin_snapshots: Vec<SteamworksInputDigitalActionOriginsSnapshot>,
     last_analog_action_origins: Option<SteamworksInputAnalogActionOriginsSnapshot>,
+    analog_action_origin_snapshots: Vec<SteamworksInputAnalogActionOriginsSnapshot>,
     action_origin_infos: Vec<SteamworksInputActionOriginInfo>,
     last_action_origin_info: Option<SteamworksInputActionOriginInfo>,
     last_motion: Option<SteamworksInputMotionSnapshot>,
+    motion_snapshots: Vec<SteamworksInputMotionSnapshot>,
     last_binding_panel_controller: Option<SteamworksInputHandle>,
 }
 
@@ -97,5 +103,95 @@ pub(super) fn upsert_action_origin_info(
     } else {
         infos.push(info);
         trim_oldest(infos, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_action_set_activation(
+    activations: &mut Vec<SteamworksInputActionSetActivation>,
+    activation: SteamworksInputActionSetActivation,
+) {
+    if let Some(existing) = activations
+        .iter_mut()
+        .find(|existing| existing.controller == activation.controller)
+    {
+        *existing = activation;
+    } else {
+        activations.push(activation);
+        trim_oldest(activations, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_digital_action_snapshot(
+    snapshots: &mut Vec<SteamworksInputDigitalActionSnapshot>,
+    snapshot: SteamworksInputDigitalActionSnapshot,
+) {
+    if let Some(existing) = snapshots.iter_mut().find(|existing| {
+        existing.controller == snapshot.controller && existing.action == snapshot.action
+    }) {
+        *existing = snapshot;
+    } else {
+        snapshots.push(snapshot);
+        trim_oldest(snapshots, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_analog_action_snapshot(
+    snapshots: &mut Vec<SteamworksInputAnalogActionSnapshot>,
+    snapshot: SteamworksInputAnalogActionSnapshot,
+) {
+    if let Some(existing) = snapshots.iter_mut().find(|existing| {
+        existing.controller == snapshot.controller && existing.action == snapshot.action
+    }) {
+        *existing = snapshot;
+    } else {
+        snapshots.push(snapshot);
+        trim_oldest(snapshots, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_digital_action_origins_snapshot(
+    snapshots: &mut Vec<SteamworksInputDigitalActionOriginsSnapshot>,
+    snapshot: SteamworksInputDigitalActionOriginsSnapshot,
+) {
+    if let Some(existing) = snapshots.iter_mut().find(|existing| {
+        existing.controller == snapshot.controller
+            && existing.action_set == snapshot.action_set
+            && existing.action == snapshot.action
+    }) {
+        *existing = snapshot;
+    } else {
+        snapshots.push(snapshot);
+        trim_oldest(snapshots, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_analog_action_origins_snapshot(
+    snapshots: &mut Vec<SteamworksInputAnalogActionOriginsSnapshot>,
+    snapshot: SteamworksInputAnalogActionOriginsSnapshot,
+) {
+    if let Some(existing) = snapshots.iter_mut().find(|existing| {
+        existing.controller == snapshot.controller
+            && existing.action_set == snapshot.action_set
+            && existing.action == snapshot.action
+    }) {
+        *existing = snapshot;
+    } else {
+        snapshots.push(snapshot);
+        trim_oldest(snapshots, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_motion_snapshot(
+    snapshots: &mut Vec<SteamworksInputMotionSnapshot>,
+    snapshot: SteamworksInputMotionSnapshot,
+) {
+    if let Some(existing) = snapshots
+        .iter_mut()
+        .find(|existing| existing.controller == snapshot.controller)
+    {
+        *existing = snapshot;
+    } else {
+        snapshots.push(snapshot);
+        trim_oldest(snapshots, STEAMWORKS_INPUT_STATE_CACHE_LIMIT);
     }
 }

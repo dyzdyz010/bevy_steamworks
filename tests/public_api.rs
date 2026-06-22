@@ -722,6 +722,45 @@ fn input_api_is_exported_from_root_and_prelude() {
         name: "A Button".to_owned(),
     };
     assert_eq!(root_origin_info.origin, root_origin);
+    let root_state = bevy_steamworks::SteamworksInputState::default();
+    assert!(root_state.action_set_activations().is_empty());
+    assert!(root_state
+        .action_set_activation(bevy_steamworks::SteamworksInputHandle::from_raw(1))
+        .is_none());
+    assert!(root_state.digital_action_data_snapshots().is_empty());
+    assert!(root_state
+        .digital_action_data(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1),
+        )
+        .is_none());
+    assert!(root_state.analog_action_data_snapshots().is_empty());
+    assert!(root_state
+        .analog_action_data(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
+        )
+        .is_none());
+    assert!(root_state.digital_action_origin_snapshots().is_empty());
+    assert!(root_state
+        .digital_action_origins(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputActionSetHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1),
+        )
+        .is_none());
+    assert!(root_state.analog_action_origin_snapshots().is_empty());
+    assert!(root_state
+        .analog_action_origins(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputActionSetHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
+        )
+        .is_none());
+    assert!(root_state.motion_snapshots().is_empty());
+    assert!(root_state
+        .motion(bevy_steamworks::SteamworksInputHandle::from_raw(1))
+        .is_none());
 
     let command = SteamworksInputCommand::init(false);
     let operation = SteamworksInputOperation::Initialized {
@@ -774,6 +813,12 @@ fn input_api_is_exported_from_root_and_prelude() {
         name: "B Button".to_owned(),
     };
     assert_eq!(prelude_origin_info.origin, prelude_origin);
+    let prelude_state = bevy_steamworks::prelude::SteamworksInputState::default();
+    assert!(prelude_state.digital_action_data_snapshots().is_empty());
+    assert!(prelude_state.analog_action_data_snapshots().is_empty());
+    assert!(prelude_state.digital_action_origin_snapshots().is_empty());
+    assert!(prelude_state.analog_action_origin_snapshots().is_empty());
+    assert!(prelude_state.motion_snapshots().is_empty());
 }
 
 #[test]

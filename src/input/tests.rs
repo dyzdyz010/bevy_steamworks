@@ -274,13 +274,19 @@ fn state_clears_stale_action_data_on_manifest_change_and_shutdown() {
     assert!(state.action_sets().is_empty());
     assert_eq!(state.action_manifest_path(), Some("new_manifest.vdf"));
     assert!(state.last_action_set_activation().is_none());
+    assert!(state.action_set_activations().is_empty());
     assert!(state.last_digital_action().is_none());
+    assert!(state.digital_action_data_snapshots().is_empty());
     assert!(state.last_analog_action().is_none());
+    assert!(state.analog_action_data_snapshots().is_empty());
     assert!(state.last_digital_action_origins().is_none());
+    assert!(state.digital_action_origin_snapshots().is_empty());
     assert!(state.last_analog_action_origins().is_none());
+    assert!(state.analog_action_origin_snapshots().is_empty());
     assert!(state.action_origin_infos().is_empty());
     assert!(state.last_action_origin_info().is_none());
     assert!(state.last_motion().is_none());
+    assert!(state.motion_snapshots().is_empty());
     assert!(state.last_binding_panel_controller().is_none());
 
     state.record_operation(&SteamworksInputOperation::Initialized {
@@ -422,8 +428,32 @@ fn state_records_input_operations() {
             action_set,
         })
     );
+    assert_eq!(
+        state.action_set_activation(controller),
+        Some(SteamworksInputActionSetActivation {
+            controller,
+            action_set,
+        })
+    );
+    assert_eq!(state.action_set_activations().len(), 1);
     assert_eq!(state.last_digital_action(), Some(&digital_snapshot));
+    assert_eq!(
+        state.digital_action_data(controller, digital_action),
+        Some(&digital_snapshot)
+    );
+    assert_eq!(
+        state.digital_action_data_snapshots(),
+        &[digital_snapshot.clone()]
+    );
     assert_eq!(state.last_analog_action(), Some(&analog_snapshot));
+    assert_eq!(
+        state.analog_action_data(controller, analog_action),
+        Some(&analog_snapshot)
+    );
+    assert_eq!(
+        state.analog_action_data_snapshots(),
+        &[analog_snapshot.clone()]
+    );
     assert_eq!(
         state.last_digital_action_origins(),
         Some(&SteamworksInputDigitalActionOriginsSnapshot {
@@ -434,6 +464,16 @@ fn state_records_input_operations() {
         })
     );
     assert_eq!(
+        state.digital_action_origins(controller, action_set, digital_action),
+        Some(&SteamworksInputDigitalActionOriginsSnapshot {
+            controller,
+            action_set,
+            action: digital_action,
+            origins: vec![origin.clone()],
+        })
+    );
+    assert_eq!(state.digital_action_origin_snapshots().len(), 1);
+    assert_eq!(
         state.last_analog_action_origins(),
         Some(&SteamworksInputAnalogActionOriginsSnapshot {
             controller,
@@ -442,6 +482,16 @@ fn state_records_input_operations() {
             origins: vec![updated_origin.clone(), second_origin.clone()],
         })
     );
+    assert_eq!(
+        state.analog_action_origins(controller, action_set, analog_action),
+        Some(&SteamworksInputAnalogActionOriginsSnapshot {
+            controller,
+            action_set,
+            action: analog_action,
+            origins: vec![updated_origin.clone(), second_origin.clone()],
+        })
+    );
+    assert_eq!(state.analog_action_origin_snapshots().len(), 1);
     assert_eq!(
         state.action_origin_infos(),
         &[updated_origin.clone(), second_origin.clone()]
@@ -456,6 +506,8 @@ fn state_records_input_operations() {
     );
     assert_eq!(state.last_action_origin_info(), Some(&second_origin));
     assert_eq!(state.last_motion(), Some(&motion));
+    assert_eq!(state.motion(controller), Some(&motion));
+    assert_eq!(state.motion_snapshots(), &[motion]);
     assert_eq!(state.last_binding_panel_controller(), Some(controller));
 }
 
@@ -488,6 +540,32 @@ fn input_state_caches_are_bounded() {
             name: format!("analog-{raw}"),
             handle: analog_action,
         });
+        state.record_operation(&SteamworksInputOperation::ActionSetActivated {
+            controller,
+            action_set,
+        });
+        state.record_operation(&SteamworksInputOperation::DigitalActionDataRead {
+            snapshot: SteamworksInputDigitalActionSnapshot {
+                controller,
+                action: digital_action,
+                data: SteamworksInputDigitalActionData {
+                    state: raw % 2 == 0,
+                    active: true,
+                },
+            },
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionDataRead {
+            snapshot: SteamworksInputAnalogActionSnapshot {
+                controller,
+                action: analog_action,
+                data: SteamworksInputAnalogActionData {
+                    mode: SteamworksInputSourceMode::JoystickMove,
+                    x: raw as f32,
+                    y: -(raw as f32),
+                    active: true,
+                },
+            },
+        });
         state.record_operation(&SteamworksInputOperation::DigitalActionOriginsRead {
             controller,
             action_set,
@@ -497,6 +575,26 @@ fn input_state_caches_are_bounded() {
                 glyph_path: format!("glyph-{raw}.svg"),
                 name: format!("Origin {raw}"),
             }],
+        });
+        state.record_operation(&SteamworksInputOperation::AnalogActionOriginsRead {
+            controller,
+            action_set,
+            action: analog_action,
+            origins: vec![SteamworksInputActionOriginInfo {
+                origin,
+                glyph_path: format!("analog-glyph-{raw}.svg"),
+                name: format!("Analog Origin {raw}"),
+            }],
+        });
+        state.record_operation(&SteamworksInputOperation::MotionDataRead {
+            snapshot: SteamworksInputMotionSnapshot {
+                controller,
+                data: SteamworksInputMotionData {
+                    rotation_quaternion: [0.0, 0.0, 0.0, 1.0],
+                    position_acceleration: [raw as f32, 0.0, 0.0],
+                    rotation_velocity: [0.0, raw as f32, 0.0],
+                },
+            },
         });
     }
 
@@ -520,6 +618,30 @@ fn input_state_caches_are_bounded() {
         state.action_origin_infos().len(),
         super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
     );
+    assert_eq!(
+        state.action_set_activations().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.digital_action_data_snapshots().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.analog_action_data_snapshots().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.digital_action_origin_snapshots().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.analog_action_origin_snapshots().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.motion_snapshots().len(),
+        super::state::STEAMWORKS_INPUT_STATE_CACHE_LIMIT
+    );
 
     assert_eq!(state.controller(SteamworksInputHandle::from_raw(1)), None);
     assert_eq!(state.action_set_handle("set-1"), None);
@@ -529,6 +651,41 @@ fn input_state_caches_are_bounded() {
         state.action_origin_info(SteamworksInputActionOrigin::from_code(1)),
         None
     );
+    assert_eq!(
+        state.action_set_activation(SteamworksInputHandle::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.digital_action_data(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.analog_action_data(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.digital_action_origins(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputActionSetHandle::from_raw(1),
+            SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.analog_action_origins(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputActionSetHandle::from_raw(1),
+            SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(state.motion(SteamworksInputHandle::from_raw(1)), None);
 
     assert!(state
         .controller(SteamworksInputHandle::from_raw(2))
@@ -548,4 +705,38 @@ fn input_state_caches_are_bounded() {
     assert!(state
         .action_origin_info(SteamworksInputActionOrigin::from_code(2))
         .is_some());
+    assert_eq!(
+        state.action_set_activation(SteamworksInputHandle::from_raw(2)),
+        Some(SteamworksInputActionSetActivation {
+            controller: SteamworksInputHandle::from_raw(2),
+            action_set: SteamworksInputActionSetHandle::from_raw(2),
+        })
+    );
+    assert!(state
+        .digital_action_data(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputDigitalActionHandle::from_raw(2),
+        )
+        .is_some());
+    assert!(state
+        .analog_action_data(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputAnalogActionHandle::from_raw(2),
+        )
+        .is_some());
+    assert!(state
+        .digital_action_origins(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputActionSetHandle::from_raw(2),
+            SteamworksInputDigitalActionHandle::from_raw(2),
+        )
+        .is_some());
+    assert!(state
+        .analog_action_origins(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputActionSetHandle::from_raw(2),
+            SteamworksInputAnalogActionHandle::from_raw(2),
+        )
+        .is_some());
+    assert!(state.motion(SteamworksInputHandle::from_raw(2)).is_some());
 }

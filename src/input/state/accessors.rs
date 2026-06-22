@@ -88,14 +88,62 @@ impl SteamworksInputState {
         self.last_action_set_activation
     }
 
+    /// Returns cached action set activations keyed by controller.
+    pub fn action_set_activations(&self) -> &[SteamworksInputActionSetActivation] {
+        &self.action_set_activations
+    }
+
+    /// Returns the cached action set activation for a controller.
+    pub fn action_set_activation(
+        &self,
+        controller: SteamworksInputHandle,
+    ) -> Option<SteamworksInputActionSetActivation> {
+        self.action_set_activations
+            .iter()
+            .find(|activation| activation.controller == controller)
+            .copied()
+    }
+
     /// Returns the most recent digital action data snapshot.
     pub fn last_digital_action(&self) -> Option<&SteamworksInputDigitalActionSnapshot> {
         self.last_digital_action.as_ref()
     }
 
+    /// Returns cached digital action data snapshots keyed by controller and action.
+    pub fn digital_action_data_snapshots(&self) -> &[SteamworksInputDigitalActionSnapshot] {
+        &self.digital_action_snapshots
+    }
+
+    /// Returns the cached digital action data snapshot for a controller/action pair.
+    pub fn digital_action_data(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputDigitalActionHandle,
+    ) -> Option<&SteamworksInputDigitalActionSnapshot> {
+        self.digital_action_snapshots
+            .iter()
+            .find(|snapshot| snapshot.controller == controller && snapshot.action == action)
+    }
+
     /// Returns the most recent analog action data snapshot.
     pub fn last_analog_action(&self) -> Option<&SteamworksInputAnalogActionSnapshot> {
         self.last_analog_action.as_ref()
+    }
+
+    /// Returns cached analog action data snapshots keyed by controller and action.
+    pub fn analog_action_data_snapshots(&self) -> &[SteamworksInputAnalogActionSnapshot] {
+        &self.analog_action_snapshots
+    }
+
+    /// Returns the cached analog action data snapshot for a controller/action pair.
+    pub fn analog_action_data(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<&SteamworksInputAnalogActionSnapshot> {
+        self.analog_action_snapshots
+            .iter()
+            .find(|snapshot| snapshot.controller == controller && snapshot.action == action)
     }
 
     /// Returns the most recent digital action origin snapshot.
@@ -105,11 +153,53 @@ impl SteamworksInputState {
         self.last_digital_action_origins.as_ref()
     }
 
+    /// Returns cached digital action origin snapshots keyed by controller, action set, and action.
+    pub fn digital_action_origin_snapshots(
+        &self,
+    ) -> &[SteamworksInputDigitalActionOriginsSnapshot] {
+        &self.digital_action_origin_snapshots
+    }
+
+    /// Returns the cached digital action origins for a controller/action-set/action triple.
+    pub fn digital_action_origins(
+        &self,
+        controller: SteamworksInputHandle,
+        action_set: SteamworksInputActionSetHandle,
+        action: SteamworksInputDigitalActionHandle,
+    ) -> Option<&SteamworksInputDigitalActionOriginsSnapshot> {
+        self.digital_action_origin_snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot.controller == controller
+                    && snapshot.action_set == action_set
+                    && snapshot.action == action
+            })
+    }
+
     /// Returns the most recent analog action origin snapshot.
     pub fn last_analog_action_origins(
         &self,
     ) -> Option<&SteamworksInputAnalogActionOriginsSnapshot> {
         self.last_analog_action_origins.as_ref()
+    }
+
+    /// Returns cached analog action origin snapshots keyed by controller, action set, and action.
+    pub fn analog_action_origin_snapshots(&self) -> &[SteamworksInputAnalogActionOriginsSnapshot] {
+        &self.analog_action_origin_snapshots
+    }
+
+    /// Returns the cached analog action origins for a controller/action-set/action triple.
+    pub fn analog_action_origins(
+        &self,
+        controller: SteamworksInputHandle,
+        action_set: SteamworksInputActionSetHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<&SteamworksInputAnalogActionOriginsSnapshot> {
+        self.analog_action_origin_snapshots.iter().find(|snapshot| {
+            snapshot.controller == controller
+                && snapshot.action_set == action_set
+                && snapshot.action == action
+        })
     }
 
     /// Returns cached action origin presentation data read from origin queries.
@@ -135,6 +225,21 @@ impl SteamworksInputState {
     /// Returns the most recent motion data snapshot.
     pub fn last_motion(&self) -> Option<&SteamworksInputMotionSnapshot> {
         self.last_motion.as_ref()
+    }
+
+    /// Returns cached motion snapshots keyed by controller.
+    pub fn motion_snapshots(&self) -> &[SteamworksInputMotionSnapshot] {
+        &self.motion_snapshots
+    }
+
+    /// Returns the cached motion snapshot for a controller.
+    pub fn motion(
+        &self,
+        controller: SteamworksInputHandle,
+    ) -> Option<&SteamworksInputMotionSnapshot> {
+        self.motion_snapshots
+            .iter()
+            .find(|snapshot| snapshot.controller == controller)
     }
 
     /// Returns the most recent controller for which the binding panel was shown.
