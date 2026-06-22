@@ -16,6 +16,7 @@ pub use item_update::{
 };
 pub use query::{SteamworksUgcQuery, SteamworksUgcQueryOptions};
 pub use query_results::{
-    SteamworksUgcItemDetails, SteamworksUgcQueryIds, SteamworksUgcQueryResults,
-    SteamworksUgcQueryTotal, SteamworksUgcStatistic,
+    SteamworksUgcItemDetails, SteamworksUgcQueryIds, SteamworksUgcQueryIdsResult,
+    SteamworksUgcQueryRequest, SteamworksUgcQueryResult, SteamworksUgcQueryResults,
+    SteamworksUgcQueryTotal, SteamworksUgcQueryTotalResult, SteamworksUgcStatistic,
 };

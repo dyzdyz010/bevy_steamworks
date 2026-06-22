@@ -3,8 +3,9 @@ use crate::ugc::{
     SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
     SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
-    SteamworksUgcItemUpdateProgress, SteamworksUgcQueryIds, SteamworksUgcQueryResults,
-    SteamworksUgcQueryTotal,
+    SteamworksUgcItemUpdateProgress, SteamworksUgcQueryIds, SteamworksUgcQueryIdsResult,
+    SteamworksUgcQueryRequest, SteamworksUgcQueryResult, SteamworksUgcQueryResults,
+    SteamworksUgcQueryTotal, SteamworksUgcQueryTotalResult,
 };
 
 impl SteamworksUgcState {
@@ -38,14 +39,62 @@ impl SteamworksUgcState {
         self.last_query.as_ref()
     }
 
+    /// Returns bounded submitted UGC query snapshots by request ID.
+    pub fn query_requests(&self) -> &[SteamworksUgcQueryRequest] {
+        &self.query_requests
+    }
+
+    /// Returns the submitted UGC query snapshot for a request ID.
+    pub fn query_request(&self, request_id: u64) -> Option<&SteamworksUgcQueryRequest> {
+        self.query_requests
+            .iter()
+            .find(|request| request.request_id == request_id)
+    }
+
+    /// Returns bounded completed full UGC query snapshots by request ID.
+    pub fn query_results(&self) -> &[SteamworksUgcQueryResult] {
+        &self.query_results
+    }
+
+    /// Returns the completed full UGC query snapshot for a request ID.
+    pub fn query_result(&self, request_id: u64) -> Option<&SteamworksUgcQueryResult> {
+        self.query_results
+            .iter()
+            .find(|result| result.request_id == request_id)
+    }
+
     /// Returns the most recent UGC total-only query result.
     pub fn last_query_total(&self) -> Option<&SteamworksUgcQueryTotal> {
         self.last_query_total.as_ref()
     }
 
+    /// Returns bounded completed total-only UGC query snapshots by request ID.
+    pub fn query_total_results(&self) -> &[SteamworksUgcQueryTotalResult] {
+        &self.query_total_results
+    }
+
+    /// Returns the completed total-only UGC query snapshot for a request ID.
+    pub fn query_total_result(&self, request_id: u64) -> Option<&SteamworksUgcQueryTotalResult> {
+        self.query_total_results
+            .iter()
+            .find(|result| result.request_id == request_id)
+    }
+
     /// Returns the most recent UGC ID-only query result.
     pub fn last_query_ids(&self) -> Option<&SteamworksUgcQueryIds> {
         self.last_query_ids.as_ref()
+    }
+
+    /// Returns bounded completed ID-only UGC query snapshots by request ID.
+    pub fn query_ids_results(&self) -> &[SteamworksUgcQueryIdsResult] {
+        &self.query_ids_results
+    }
+
+    /// Returns the completed ID-only UGC query snapshot for a request ID.
+    pub fn query_ids_result(&self, request_id: u64) -> Option<&SteamworksUgcQueryIdsResult> {
+        self.query_ids_results
+            .iter()
+            .find(|result| result.request_id == request_id)
     }
 
     /// Returns the most recent item state snapshot.

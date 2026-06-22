@@ -579,6 +579,10 @@ fn state_records_operations_without_unbounded_query_history() {
         include_locally_disabled: false,
         items: vec![item],
     });
+    state.record_operation(&SteamworksUgcOperation::QueryRequested {
+        request_id: 0,
+        query: SteamworksUgcQuery::item(item),
+    });
     state.record_operation(&SteamworksUgcOperation::QueryCompleted {
         request_id: 0,
         query: SteamworksUgcQuery::item(item),
@@ -691,6 +695,39 @@ fn state_records_operations_without_unbounded_query_history() {
         })
     );
     assert_eq!(state.download_item_failed(item), Some(false));
+    assert_eq!(
+        state.query_request(0),
+        Some(&SteamworksUgcQueryRequest {
+            request_id: 0,
+            query: SteamworksUgcQuery::item(item),
+        })
+    );
+    assert_eq!(
+        state.query_result(1),
+        Some(&SteamworksUgcQueryResult {
+            request_id: 1,
+            query: SteamworksUgcQuery::item(item),
+            results: second.clone(),
+        })
+    );
+    assert_eq!(state.query_requests().len(), 4);
+    assert_eq!(state.query_results().len(), 2);
+    assert_eq!(
+        state.query_total_result(2),
+        Some(&SteamworksUgcQueryTotalResult {
+            request_id: 2,
+            query: SteamworksUgcQuery::item(item),
+            total: SteamworksUgcQueryTotal { total_results: 42 },
+        })
+    );
+    assert_eq!(
+        state.query_ids_result(3),
+        Some(&SteamworksUgcQueryIdsResult {
+            request_id: 3,
+            query: SteamworksUgcQuery::item(item),
+            ids: SteamworksUgcQueryIds { items: vec![item] },
+        })
+    );
 
     state.record_operation(&SteamworksUgcOperation::ItemDeleted {
         request_id: 3,
@@ -799,4 +836,67 @@ fn item_detail_cache_is_bounded() {
     );
     assert_eq!(state.item_detail(steamworks::PublishedFileId(1)), None);
     assert!(state.item_detail(steamworks::PublishedFileId(2)).is_some());
+}
+
+#[test]
+fn query_result_caches_are_bounded() {
+    let mut state = SteamworksUgcState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT as u64 + 1) {
+        let item = steamworks::PublishedFileId(raw);
+        let query = SteamworksUgcQuery::item(item);
+
+        state.record_operation(&SteamworksUgcOperation::QueryRequested {
+            request_id: raw,
+            query: query.clone(),
+        });
+        state.record_operation(&SteamworksUgcOperation::QueryCompleted {
+            request_id: raw,
+            query: query.clone(),
+            results: SteamworksUgcQueryResults {
+                was_cached: false,
+                total_results: 1,
+                returned_results: 1,
+                items: vec![test_item_details(item, format!("Item {raw}"))],
+            },
+        });
+        state.record_operation(&SteamworksUgcOperation::QueryTotalCompleted {
+            request_id: raw,
+            query: query.clone(),
+            total: SteamworksUgcQueryTotal {
+                total_results: raw as u32,
+            },
+        });
+        state.record_operation(&SteamworksUgcOperation::QueryIdsCompleted {
+            request_id: raw,
+            query,
+            ids: SteamworksUgcQueryIds { items: vec![item] },
+        });
+    }
+
+    assert_eq!(
+        state.query_requests().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.query_results().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.query_total_results().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.query_ids_results().len(),
+        super::state::STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT
+    );
+
+    assert_eq!(state.query_request(1), None);
+    assert_eq!(state.query_result(1), None);
+    assert_eq!(state.query_total_result(1), None);
+    assert_eq!(state.query_ids_result(1), None);
+    assert!(state.query_request(2).is_some());
+    assert!(state.query_result(2).is_some());
+    assert!(state.query_total_result(2).is_some());
+    assert!(state.query_ids_result(2).is_some());
 }

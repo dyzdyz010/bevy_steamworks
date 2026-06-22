@@ -1,4 +1,4 @@
-use super::SteamworksUgcContentDescriptor;
+use super::{query::SteamworksUgcQuery, SteamworksUgcContentDescriptor};
 
 /// Owned result set for a UGC query.
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +13,26 @@ pub struct SteamworksUgcQueryResults {
     pub items: Vec<SteamworksUgcItemDetails>,
 }
 
+/// Submitted UGC query keyed by this plugin's request ID.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksUgcQueryRequest {
+    /// Plugin request ID.
+    pub request_id: u64,
+    /// Query submitted to Steam.
+    pub query: SteamworksUgcQuery,
+}
+
+/// Completed full UGC query keyed by this plugin's request ID.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksUgcQueryResult {
+    /// Plugin request ID.
+    pub request_id: u64,
+    /// Query submitted to Steam.
+    pub query: SteamworksUgcQuery,
+    /// Owned query results.
+    pub results: SteamworksUgcQueryResults,
+}
+
 /// Owned result count returned by a total-only UGC query.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksUgcQueryTotal {
@@ -20,11 +40,33 @@ pub struct SteamworksUgcQueryTotal {
     pub total_results: u32,
 }
 
+/// Completed total-only UGC query keyed by this plugin's request ID.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksUgcQueryTotalResult {
+    /// Plugin request ID.
+    pub request_id: u64,
+    /// Query submitted to Steam.
+    pub query: SteamworksUgcQuery,
+    /// Total result count.
+    pub total: SteamworksUgcQueryTotal,
+}
+
 /// Owned item IDs returned by an ID-only UGC query for the submitted page/result set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksUgcQueryIds {
     /// Matching Workshop item IDs returned by Steam.
     pub items: Vec<steamworks::PublishedFileId>,
+}
+
+/// Completed ID-only UGC query keyed by this plugin's request ID.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SteamworksUgcQueryIdsResult {
+    /// Plugin request ID.
+    pub request_id: u64,
+    /// Query submitted to Steam.
+    pub query: SteamworksUgcQuery,
+    /// Returned item IDs.
+    pub ids: SteamworksUgcQueryIds,
 }
 
 /// Owned UGC item details copied from one query result row.

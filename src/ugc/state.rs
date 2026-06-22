@@ -20,8 +20,12 @@ pub struct SteamworksUgcState {
     item_install_infos: Vec<SteamworksUgcItemInstallInfoResult>,
     download_item_results: Vec<SteamworksUgcDownloadItemResult>,
     last_query: Option<SteamworksUgcQueryResults>,
+    query_requests: Vec<SteamworksUgcQueryRequest>,
+    query_results: Vec<SteamworksUgcQueryResult>,
     last_query_total: Option<SteamworksUgcQueryTotal>,
+    query_total_results: Vec<SteamworksUgcQueryTotalResult>,
     last_query_ids: Option<SteamworksUgcQueryIds>,
+    query_ids_results: Vec<SteamworksUgcQueryIdsResult>,
     last_item_state: Option<SteamworksUgcItemStateInfo>,
     last_item_download_info: Option<SteamworksUgcItemDownloadInfoResult>,
     last_item_install_info: Option<SteamworksUgcItemInstallInfoResult>,
@@ -96,6 +100,66 @@ pub(super) fn upsert_download_item_result(
     if let Some(existing) = results
         .iter_mut()
         .find(|existing| existing.item == result.item)
+    {
+        *existing = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_query_request(
+    requests: &mut Vec<SteamworksUgcQueryRequest>,
+    request: SteamworksUgcQueryRequest,
+) {
+    if let Some(existing) = requests
+        .iter_mut()
+        .find(|existing| existing.request_id == request.request_id)
+    {
+        *existing = request;
+    } else {
+        requests.push(request);
+        trim_oldest(requests, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_query_result(
+    results: &mut Vec<SteamworksUgcQueryResult>,
+    result: SteamworksUgcQueryResult,
+) {
+    if let Some(existing) = results
+        .iter_mut()
+        .find(|existing| existing.request_id == result.request_id)
+    {
+        *existing = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_query_total_result(
+    results: &mut Vec<SteamworksUgcQueryTotalResult>,
+    result: SteamworksUgcQueryTotalResult,
+) {
+    if let Some(existing) = results
+        .iter_mut()
+        .find(|existing| existing.request_id == result.request_id)
+    {
+        *existing = result;
+    } else {
+        results.push(result);
+        trim_oldest(results, STEAMWORKS_UGC_STATE_ITEM_CACHE_LIMIT);
+    }
+}
+
+pub(super) fn upsert_query_ids_result(
+    results: &mut Vec<SteamworksUgcQueryIdsResult>,
+    result: SteamworksUgcQueryIdsResult,
+) {
+    if let Some(existing) = results
+        .iter_mut()
+        .find(|existing| existing.request_id == result.request_id)
     {
         *existing = result;
     } else {

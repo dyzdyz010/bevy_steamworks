@@ -1,10 +1,12 @@
 use super::{
     remove_item_cache, upsert_download_item_result, upsert_item_details, upsert_item_download_info,
-    upsert_item_install_info, upsert_item_state, SteamworksUgcState,
+    upsert_item_install_info, upsert_item_state, upsert_query_ids_result, upsert_query_request,
+    upsert_query_result, upsert_query_total_result, SteamworksUgcState,
 };
 use crate::ugc::{
     update_watches::SteamworksUgcUpdateWatches, SteamworksUgcError,
-    SteamworksUgcGameServerWorkshopInit, SteamworksUgcOperation,
+    SteamworksUgcGameServerWorkshopInit, SteamworksUgcOperation, SteamworksUgcQueryIdsResult,
+    SteamworksUgcQueryRequest, SteamworksUgcQueryResult, SteamworksUgcQueryTotalResult,
 };
 
 impl SteamworksUgcState {
@@ -17,18 +19,86 @@ impl SteamworksUgcState {
             SteamworksUgcOperation::SubscribedItemsListed { items, .. } => {
                 self.subscribed_items.clone_from(items);
             }
-            SteamworksUgcOperation::QueryCompleted { results, .. } => {
+            SteamworksUgcOperation::QueryRequested { request_id, query }
+            | SteamworksUgcOperation::QueryTotalRequested { request_id, query }
+            | SteamworksUgcOperation::QueryIdsRequested { request_id, query } => {
+                upsert_query_request(
+                    &mut self.query_requests,
+                    SteamworksUgcQueryRequest {
+                        request_id: *request_id,
+                        query: query.clone(),
+                    },
+                );
+            }
+            SteamworksUgcOperation::QueryCompleted {
+                request_id,
+                query,
+                results,
+            } => {
                 for item in &results.items {
                     upsert_item_details(&mut self.item_details, item.clone());
                 }
+                upsert_query_request(
+                    &mut self.query_requests,
+                    SteamworksUgcQueryRequest {
+                        request_id: *request_id,
+                        query: query.clone(),
+                    },
+                );
+                upsert_query_result(
+                    &mut self.query_results,
+                    SteamworksUgcQueryResult {
+                        request_id: *request_id,
+                        query: query.clone(),
+                        results: results.clone(),
+                    },
+                );
                 self.last_query = Some(results.clone());
                 self.record_successful_async_operation();
             }
-            SteamworksUgcOperation::QueryTotalCompleted { total, .. } => {
+            SteamworksUgcOperation::QueryTotalCompleted {
+                request_id,
+                query,
+                total,
+            } => {
+                upsert_query_request(
+                    &mut self.query_requests,
+                    SteamworksUgcQueryRequest {
+                        request_id: *request_id,
+                        query: query.clone(),
+                    },
+                );
+                upsert_query_total_result(
+                    &mut self.query_total_results,
+                    SteamworksUgcQueryTotalResult {
+                        request_id: *request_id,
+                        query: query.clone(),
+                        total: total.clone(),
+                    },
+                );
                 self.last_query_total = Some(total.clone());
                 self.record_successful_async_operation();
             }
-            SteamworksUgcOperation::QueryIdsCompleted { ids, .. } => {
+            SteamworksUgcOperation::QueryIdsCompleted {
+                request_id,
+                query,
+                ids,
+            } => {
+                upsert_query_request(
+                    &mut self.query_requests,
+                    SteamworksUgcQueryRequest {
+                        request_id: *request_id,
+                        query: query.clone(),
+                    },
+                );
+                upsert_query_ids_result(
+                    &mut self.query_ids_results,
+                    SteamworksUgcQueryIdsResult {
+                        request_id: *request_id,
+                        query: query.clone(),
+                        ids: ids.clone(),
+                    },
+                );
                 self.last_query_ids = Some(ids.clone());
                 self.record_successful_async_operation();
             }
@@ -86,9 +156,6 @@ impl SteamworksUgcState {
                 self.record_successful_async_operation();
             }
             SteamworksUgcOperation::DownloadsSuspended { .. }
-            | SteamworksUgcOperation::QueryRequested { .. }
-            | SteamworksUgcOperation::QueryTotalRequested { .. }
-            | SteamworksUgcOperation::QueryIdsRequested { .. }
             | SteamworksUgcOperation::ItemCreateRequested { .. }
             | SteamworksUgcOperation::ItemUpdateSubmitted { .. }
             | SteamworksUgcOperation::ItemUpdateForgotten { .. }

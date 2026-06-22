@@ -135,9 +135,13 @@ use bevy_steamworks::{
         SteamworksUgcItemStateInfo as PreludeUgcItemStateInfo,
         SteamworksUgcOperation as PreludeUgcOperation, SteamworksUgcPlugin as PreludeUgcPlugin,
         SteamworksUgcQuery as PreludeUgcQuery, SteamworksUgcQueryIds as PreludeUgcQueryIds,
+        SteamworksUgcQueryIdsResult as PreludeUgcQueryIdsResult,
         SteamworksUgcQueryOptions as PreludeUgcQueryOptions,
-        SteamworksUgcQueryTotal as PreludeUgcQueryTotal, SteamworksUgcResult as PreludeUgcResult,
-        SteamworksUgcState as PreludeUgcState,
+        SteamworksUgcQueryRequest as PreludeUgcQueryRequest,
+        SteamworksUgcQueryResult as PreludeUgcQueryResult,
+        SteamworksUgcQueryTotal as PreludeUgcQueryTotal,
+        SteamworksUgcQueryTotalResult as PreludeUgcQueryTotalResult,
+        SteamworksUgcResult as PreludeUgcResult, SteamworksUgcState as PreludeUgcState,
         SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
@@ -200,7 +204,9 @@ use bevy_steamworks::{
     SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
-    SteamworksUgcQueryOptions, SteamworksUgcQueryTotal, SteamworksUgcResult, SteamworksUgcState,
+    SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
+    SteamworksUgcQueryResult, SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
+    SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState,
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
     SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
     SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin,
@@ -2489,6 +2495,38 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert!(root_state.download_item_results().is_empty());
     assert_eq!(root_state.download_item_result(item), None);
     assert_eq!(root_state.download_item_failed(item), None);
+    assert!(root_state.query_requests().is_empty());
+    assert_eq!(root_state.query_request(0), None);
+    assert!(root_state.query_results().is_empty());
+    assert_eq!(root_state.query_result(0), None);
+    assert!(root_state.query_total_results().is_empty());
+    assert_eq!(root_state.query_total_result(0), None);
+    assert!(root_state.query_ids_results().is_empty());
+    assert_eq!(root_state.query_ids_result(0), None);
+    let _query_request = SteamworksUgcQueryRequest {
+        request_id: 0,
+        query: query.clone(),
+    };
+    let _query_result = SteamworksUgcQueryResult {
+        request_id: 0,
+        query: query.clone(),
+        results: SteamworksUgcQueryResults {
+            was_cached: false,
+            total_results: 1,
+            returned_results: 1,
+            items: vec![root_item_detail(item)],
+        },
+    };
+    let _query_total_result = SteamworksUgcQueryTotalResult {
+        request_id: 1,
+        query: query.clone(),
+        total: SteamworksUgcQueryTotal { total_results: 1 },
+    };
+    let _query_ids_result = SteamworksUgcQueryIdsResult {
+        request_id: 2,
+        query: query.clone(),
+        ids: SteamworksUgcQueryIds { items: vec![item] },
+    };
     let _download_result = SteamworksUgcDownloadItemResult {
         app_id: steamworks::AppId(480),
         item,
@@ -2613,6 +2651,38 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert!(prelude_state.download_item_results().is_empty());
     assert_eq!(prelude_state.download_item_result(item), None);
     assert_eq!(prelude_state.download_item_failed(item), None);
+    assert!(prelude_state.query_requests().is_empty());
+    assert_eq!(prelude_state.query_request(0), None);
+    assert!(prelude_state.query_results().is_empty());
+    assert_eq!(prelude_state.query_result(0), None);
+    assert!(prelude_state.query_total_results().is_empty());
+    assert_eq!(prelude_state.query_total_result(0), None);
+    assert!(prelude_state.query_ids_results().is_empty());
+    assert_eq!(prelude_state.query_ids_result(0), None);
+    let _prelude_query_request = PreludeUgcQueryRequest {
+        request_id: 0,
+        query: prelude_query.clone(),
+    };
+    let _prelude_query_result = PreludeUgcQueryResult {
+        request_id: 0,
+        query: prelude_query.clone(),
+        results: bevy_steamworks::prelude::SteamworksUgcQueryResults {
+            was_cached: false,
+            total_results: 1,
+            returned_results: 1,
+            items: vec![prelude_item_detail(item)],
+        },
+    };
+    let _prelude_query_total_result = PreludeUgcQueryTotalResult {
+        request_id: 1,
+        query: prelude_query.clone(),
+        total: PreludeUgcQueryTotal { total_results: 1 },
+    };
+    let _prelude_query_ids_result = PreludeUgcQueryIdsResult {
+        request_id: 2,
+        query: prelude_query.clone(),
+        ids: PreludeUgcQueryIds { items: vec![item] },
+    };
     let _prelude_download_result = PreludeUgcDownloadItemResult {
         app_id: steamworks::AppId(480),
         item,
