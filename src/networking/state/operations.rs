@@ -1,6 +1,8 @@
 use super::{
-    SteamworksNetworkingError, SteamworksNetworkingOperation, SteamworksNetworkingState,
-    SteamworksP2pPacketSent, SteamworksP2pSessionConnectFailure,
+    push_received_packet, upsert_packet_availability, upsert_session_connect_failure,
+    upsert_session_request, upsert_session_state, SteamworksNetworkingError,
+    SteamworksNetworkingOperation, SteamworksNetworkingState, SteamworksP2pPacketSent,
+    SteamworksP2pSessionConnectFailure,
 };
 
 impl SteamworksNetworkingState {
@@ -18,6 +20,7 @@ impl SteamworksNetworkingState {
             }
             SteamworksNetworkingOperation::SessionClosed { user } => {
                 self.last_closed_session = Some(*user);
+                self.session_states.retain(|state| state.user != *user);
                 if self
                     .last_session_state
                     .as_ref()
@@ -27,6 +30,7 @@ impl SteamworksNetworkingState {
                 }
             }
             SteamworksNetworkingOperation::SessionStateRead { state } => {
+                upsert_session_state(&mut self.session_states, state.clone());
                 self.last_session_state = Some(state.clone());
             }
             SteamworksNetworkingOperation::PacketSent {
@@ -48,6 +52,7 @@ impl SteamworksNetworkingState {
                 ..
             } => {
                 self.received_count = self.received_count.saturating_add(1);
+                push_received_packet(&mut self.received_packets, packet.clone());
                 self.last_packet = Some(packet.clone());
             }
             SteamworksNetworkingOperation::PacketRead {
@@ -58,19 +63,23 @@ impl SteamworksNetworkingState {
                 self.last_empty_read_channel = Some(*channel);
             }
             SteamworksNetworkingOperation::PacketAvailabilityRead { availability } => {
+                upsert_packet_availability(&mut self.packet_availabilities, availability.clone());
                 self.last_packet_availability = Some(availability.clone());
             }
             SteamworksNetworkingOperation::SessionRequestReceived { remote } => {
                 self.session_request_count = self.session_request_count.saturating_add(1);
+                upsert_session_request(&mut self.session_requests, *remote);
                 self.last_session_request = Some(*remote);
             }
             SteamworksNetworkingOperation::SessionConnectFailed { remote, error } => {
                 self.session_connect_failure_count =
                     self.session_connect_failure_count.saturating_add(1);
-                self.last_session_connect_failure = Some(SteamworksP2pSessionConnectFailure {
+                let failure = SteamworksP2pSessionConnectFailure {
                     remote: *remote,
                     error: *error,
-                });
+                };
+                upsert_session_connect_failure(&mut self.session_connect_failures, failure);
+                self.last_session_connect_failure = Some(failure);
             }
         }
     }
