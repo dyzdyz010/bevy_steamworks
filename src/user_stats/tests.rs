@@ -666,6 +666,16 @@ fn leaderboard_state_records_latest_info_and_entries() {
         },
     );
     state.record_operation(&SteamworksStatsOperation::LeaderboardInfoRead { info: info.clone() });
+    assert_eq!(state.leaderboard_id("daily_score"), Some(leaderboard));
+    assert_eq!(
+        state.leaderboard_id("weekly_score"),
+        Some(created_leaderboard)
+    );
+    assert_eq!(state.leaderboards(), &[info.clone()]);
+    assert_eq!(state.leaderboard_info(leaderboard), Some(&info));
+    assert_eq!(state.leaderboard_info_by_name("daily_score"), Some(&info));
+    assert_eq!(state.leaderboard_info_by_name("weekly_score"), None);
+
     state.record_operation(&SteamworksStatsOperation::LeaderboardScoreUploadSubmitted {
         leaderboard,
         method: SteamworksLeaderboardUploadScoreMethod::KeepBest,
@@ -688,6 +698,14 @@ fn leaderboard_state_records_latest_info_and_entries() {
         entries: vec![entry.clone()],
     });
     state.record_operation(&SteamworksStatsOperation::LeaderboardForgotten { leaderboard });
+    assert_eq!(state.leaderboard_id("daily_score"), None);
+    assert_eq!(
+        state.leaderboard_id("weekly_score"),
+        Some(created_leaderboard)
+    );
+    assert!(state.leaderboards().is_empty());
+    assert_eq!(state.leaderboard_info(leaderboard), None);
+    assert_eq!(state.leaderboard_info_by_name("daily_score"), None);
 
     assert_eq!(
         state.last_leaderboard_find_request(),

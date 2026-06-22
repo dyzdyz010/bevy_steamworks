@@ -10,7 +10,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Apps | Implemented | Subscription, install/DLC checks, ownership, languages, beta, launch command/query params, URL launch callback. |
 | Friends | Implemented | Persona/friend snapshots, coplay, user info requests, rich presence, overlays, invites, played-with, relationship checks, avatars, callbacks. |
 | User | Implemented | Steam ID, level, logged-on state, auth session tickets, Web API tickets, remote ticket validation, license checks, relevant callbacks. |
-| User stats | Implemented | Current stats lifecycle, int/float stats, achievements, global stats/history, global achievement percentages, leaderboards, store/reset. |
+| User stats | Implemented | Current stats lifecycle, int/float stats, achievements, global stats/history, global achievement percentages, leaderboards with ID/metadata caches, store/reset. |
 | Matchmaking | Implemented | Lobby create/join/leave, lobby lists/filters, lobby data, member data, owner/limits/joinability, chat, game server assignment, callbacks. |
 | Matchmaking servers | Implemented | Server list requests, refresh/release/detail reads, direct ping/player-details/rules queries, async result tracking. |
 | Legacy networking | Implemented | Legacy P2P sessions, send/read packets, packet availability, session callbacks. |

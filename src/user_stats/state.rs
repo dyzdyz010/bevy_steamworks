@@ -66,6 +66,8 @@ pub struct SteamworksStatsState {
     last_global_stat_history_i64: Option<SteamworksGlobalStatHistory<i64>>,
     last_global_stat_history_f64: Option<SteamworksGlobalStatHistory<f64>>,
     leaderboard_count: usize,
+    leaderboard_ids: Vec<(String, SteamworksLeaderboardId)>,
+    leaderboard_infos: Vec<SteamworksLeaderboardInfo>,
     last_leaderboard_find_request: Option<SteamworksLeaderboardFindRequest>,
     last_leaderboard_find_result: Option<SteamworksLeaderboardFindResult>,
     last_leaderboard_find_or_create_request: Option<SteamworksLeaderboardFindOrCreateRequest>,

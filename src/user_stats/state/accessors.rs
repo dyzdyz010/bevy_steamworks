@@ -149,6 +149,33 @@ impl SteamworksStatsState {
         self.leaderboard_count
     }
 
+    /// Returns the plugin-owned leaderboard ID most recently associated with a name.
+    pub fn leaderboard_id(&self, name: &str) -> Option<SteamworksLeaderboardId> {
+        self.leaderboard_ids
+            .iter()
+            .find_map(|(known_name, leaderboard)| (known_name == name).then_some(*leaderboard))
+    }
+
+    /// Returns leaderboard metadata snapshots read through this plugin.
+    pub fn leaderboards(&self) -> &[SteamworksLeaderboardInfo] {
+        &self.leaderboard_infos
+    }
+
+    /// Returns cached leaderboard metadata for a plugin-owned leaderboard ID.
+    pub fn leaderboard_info(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+    ) -> Option<&SteamworksLeaderboardInfo> {
+        self.leaderboard_infos
+            .iter()
+            .find(|info| info.leaderboard == leaderboard)
+    }
+
+    /// Returns cached leaderboard metadata for a Steamworks leaderboard name.
+    pub fn leaderboard_info_by_name(&self, name: &str) -> Option<&SteamworksLeaderboardInfo> {
+        self.leaderboard_infos.iter().find(|info| info.name == name)
+    }
+
     /// Returns the most recent submitted leaderboard find request.
     pub fn last_leaderboard_find_request(&self) -> Option<&SteamworksLeaderboardFindRequest> {
         self.last_leaderboard_find_request.as_ref()

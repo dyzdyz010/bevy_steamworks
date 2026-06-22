@@ -2031,10 +2031,13 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_plugin.settings(), &root_settings);
     assert!(!root_plugin.requests_current_user_stats_on_startup());
     assert!(!root_plugin.auto_store_enabled());
-    let _root_state: bevy_steamworks::SteamworksStatsState =
-        bevy_steamworks::SteamworksStatsState::default();
-    let _root_leaderboard: bevy_steamworks::SteamworksLeaderboardId =
+    let root_state = bevy_steamworks::SteamworksStatsState::default();
+    let root_leaderboard: bevy_steamworks::SteamworksLeaderboardId =
         bevy_steamworks::SteamworksLeaderboardId::from_raw(1);
+    assert_eq!(root_state.leaderboard_id("daily"), None);
+    assert_eq!(root_state.leaderboard_info(root_leaderboard), None);
+    assert_eq!(root_state.leaderboard_info_by_name("daily"), None);
+    assert!(root_state.leaderboards().is_empty());
     let _root_achievement: Option<bevy_steamworks::SteamworksAchievementInfo> = None;
     let _root_achievement_icon: Option<bevy_steamworks::SteamworksAchievementIcon> = None;
     let _root_achievement_icon_status: bevy_steamworks::SteamworksAchievementIconStatus =
@@ -2062,10 +2065,13 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_plugin.settings(), &prelude_settings);
     assert!(!prelude_plugin.requests_current_user_stats_on_startup());
     assert!(!prelude_plugin.auto_store_enabled());
-    let _prelude_state: bevy_steamworks::prelude::SteamworksStatsState =
-        bevy_steamworks::prelude::SteamworksStatsState::default();
-    let _prelude_leaderboard: bevy_steamworks::prelude::SteamworksLeaderboardId =
+    let prelude_state = bevy_steamworks::prelude::SteamworksStatsState::default();
+    let prelude_leaderboard: bevy_steamworks::prelude::SteamworksLeaderboardId =
         bevy_steamworks::prelude::SteamworksLeaderboardId::from_raw(1);
+    assert_eq!(prelude_state.leaderboard_id("daily"), None);
+    assert_eq!(prelude_state.leaderboard_info(prelude_leaderboard), None);
+    assert_eq!(prelude_state.leaderboard_info_by_name("daily"), None);
+    assert!(prelude_state.leaderboards().is_empty());
     let _prelude_achievement: Option<bevy_steamworks::prelude::SteamworksAchievementInfo> = None;
     let _prelude_achievement_icon: Option<bevy_steamworks::prelude::SteamworksAchievementIcon> =
         None;

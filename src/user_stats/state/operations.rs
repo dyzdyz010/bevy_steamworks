@@ -1,7 +1,8 @@
 use super::{
     helpers::{
-        merge_achievement_display_attributes, merge_achievement_info, update_achievement,
-        upsert_achievement_display_attribute, upsert_global_achievement_percentage,
+        merge_achievement_display_attributes, merge_achievement_info, remove_leaderboard_id,
+        remove_leaderboard_info, update_achievement, upsert_achievement_display_attribute,
+        upsert_global_achievement_percentage, upsert_leaderboard_id, upsert_leaderboard_info,
         upsert_named_value,
     },
     SteamworksAchievementInfo, SteamworksGlobalStatHistory, SteamworksGlobalStatValue,
@@ -221,6 +222,9 @@ impl SteamworksStatsState {
                     name: name.clone(),
                     leaderboard: *leaderboard,
                 });
+                if let Some(leaderboard) = leaderboard {
+                    upsert_leaderboard_id(&mut self.leaderboard_ids, name.clone(), *leaderboard);
+                }
             }
             SteamworksStatsOperation::LeaderboardFindOrCreateSubmitted {
                 name,
@@ -240,8 +244,17 @@ impl SteamworksStatsState {
                         name: name.clone(),
                         leaderboard: *leaderboard,
                     });
+                if let Some(leaderboard) = leaderboard {
+                    upsert_leaderboard_id(&mut self.leaderboard_ids, name.clone(), *leaderboard);
+                }
             }
             SteamworksStatsOperation::LeaderboardInfoRead { info } => {
+                upsert_leaderboard_id(
+                    &mut self.leaderboard_ids,
+                    info.name.clone(),
+                    info.leaderboard,
+                );
+                upsert_leaderboard_info(&mut self.leaderboard_infos, info.clone());
                 self.last_leaderboard_info = Some(info.clone());
             }
             SteamworksStatsOperation::LeaderboardScoreUploadSubmitted {
@@ -292,6 +305,8 @@ impl SteamworksStatsState {
                     });
             }
             SteamworksStatsOperation::LeaderboardForgotten { leaderboard } => {
+                remove_leaderboard_id(&mut self.leaderboard_ids, *leaderboard);
+                remove_leaderboard_info(&mut self.leaderboard_infos, *leaderboard);
                 self.last_forgotten_leaderboard = Some(*leaderboard);
             }
         }

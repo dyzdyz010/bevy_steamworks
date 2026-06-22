@@ -1,6 +1,6 @@
 use super::{
     SteamworksAchievementDisplayAttribute, SteamworksAchievementGlobalPercentage,
-    SteamworksAchievementInfo,
+    SteamworksAchievementInfo, SteamworksLeaderboardId, SteamworksLeaderboardInfo,
 };
 
 pub(super) fn named_value<'a, T>(values: &'a [(String, T)], name: &str) -> Option<&'a T> {
@@ -128,4 +128,47 @@ pub(super) fn upsert_global_achievement_percentage(
     } else {
         percentages.push(SteamworksAchievementGlobalPercentage { api_name, percent });
     }
+}
+
+pub(super) fn upsert_leaderboard_id(
+    leaderboards: &mut Vec<(String, SteamworksLeaderboardId)>,
+    name: String,
+    leaderboard: SteamworksLeaderboardId,
+) {
+    if let Some((_, known_leaderboard)) = leaderboards
+        .iter_mut()
+        .find(|(known_name, _)| known_name == &name)
+    {
+        *known_leaderboard = leaderboard;
+    } else {
+        leaderboards.push((name, leaderboard));
+    }
+}
+
+pub(super) fn upsert_leaderboard_info(
+    leaderboards: &mut Vec<SteamworksLeaderboardInfo>,
+    info: SteamworksLeaderboardInfo,
+) {
+    if let Some(known_info) = leaderboards
+        .iter_mut()
+        .find(|known_info| known_info.leaderboard == info.leaderboard)
+    {
+        *known_info = info;
+    } else {
+        leaderboards.push(info);
+    }
+}
+
+pub(super) fn remove_leaderboard_id(
+    leaderboards: &mut Vec<(String, SteamworksLeaderboardId)>,
+    leaderboard: SteamworksLeaderboardId,
+) {
+    leaderboards.retain(|(_, known_leaderboard)| *known_leaderboard != leaderboard);
+}
+
+pub(super) fn remove_leaderboard_info(
+    leaderboards: &mut Vec<SteamworksLeaderboardInfo>,
+    leaderboard: SteamworksLeaderboardId,
+) {
+    leaderboards.retain(|info| info.leaderboard != leaderboard);
 }
