@@ -1,4 +1,4 @@
-use super::SteamworksTimelineState;
+use super::{push_timeline_event, SteamworksTimelineState};
 use crate::timeline::{
     SteamworksTimelineError, SteamworksTimelineOperation, SteamworksTimelineStateDescription,
 };
@@ -34,6 +34,7 @@ impl SteamworksTimelineState {
                 self.state_description = None;
             }
             SteamworksTimelineOperation::TimelineEventAdded { event } => {
+                push_timeline_event(&mut self.events, event.clone());
                 self.last_event = Some(event.clone());
                 self.event_count = self.event_count.saturating_add(1);
             }

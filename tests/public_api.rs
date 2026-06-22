@@ -130,7 +130,7 @@ use bevy_steamworks::{
         SteamworksTimelineOperation as PreludeTimelineOperation,
         SteamworksTimelinePlugin as PreludeTimelinePlugin,
         SteamworksTimelineResult as PreludeTimelineResult,
-        SteamworksUgcCommand as PreludeUgcCommand,
+        SteamworksTimelineState as PreludeTimelineState, SteamworksUgcCommand as PreludeUgcCommand,
         SteamworksUgcContentDescriptor as PreludeUgcContentDescriptor,
         SteamworksUgcDownloadItemResult as PreludeUgcDownloadItemResult,
         SteamworksUgcError as PreludeUgcError,
@@ -212,18 +212,18 @@ use bevy_steamworks::{
     SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
     SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
     SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
-    SteamworksTimelineResult, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
-    SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
-    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
-    SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
-    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
-    SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
-    SteamworksUgcQueryResult, SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
-    SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState,
-    SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
-    SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
-    SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksTimelineResult, SteamworksTimelineState, SteamworksUgcCommand,
+    SteamworksUgcContentDescriptor, SteamworksUgcDownloadItemResult, SteamworksUgcError,
+    SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo,
+    SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfo,
+    SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcOperation,
+    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryIdsResult,
+    SteamworksUgcQueryOptions, SteamworksUgcQueryRequest, SteamworksUgcQueryResult,
+    SteamworksUgcQueryResults, SteamworksUgcQueryTotal, SteamworksUgcQueryTotalResult,
+    SteamworksUgcResult, SteamworksUgcState, SteamworksUgcWorkshopDepotId, SteamworksUnavailable,
+    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
+    SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError,
+    SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -2183,6 +2183,10 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    let root_state = SteamworksTimelineState::default();
+    assert!(root_state.events().is_empty());
+    assert_eq!(root_state.last_event(), None);
+    assert_eq!(root_state.event_count(), 0);
 
     let command = PreludeTimelineCommand::set_game_mode(PreludeTimelineGameMode::Playing);
     let operation = PreludeTimelineOperation::GameModeSet {
@@ -2201,6 +2205,10 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    let prelude_state = PreludeTimelineState::default();
+    assert!(prelude_state.events().is_empty());
+    assert_eq!(prelude_state.last_event(), None);
+    assert_eq!(prelude_state.event_count(), 0);
 }
 
 #[test]

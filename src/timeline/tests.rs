@@ -68,7 +68,7 @@ fn commands_fail_when_client_is_unavailable() {
 }
 
 #[test]
-fn state_tracks_last_event_and_count_without_unbounded_history() {
+fn state_tracks_events_and_count_without_unbounded_history() {
     let mut state = SteamworksTimelineState::default();
     let state_description = SteamworksTimelineStateDescription {
         description: "boss phase".to_owned(),
@@ -111,6 +111,8 @@ fn state_tracks_last_event_and_count_without_unbounded_history() {
 
     assert_eq!(state.event_count(), 2);
     assert_eq!(state.last_event(), Some(&second));
+    assert_eq!(state.events().len(), 2);
+    assert_eq!(state.events().last(), Some(&second));
 
     state.set_event_count_for_test(u64::MAX);
     state.record_operation(&SteamworksTimelineOperation::TimelineEventAdded {
@@ -118,4 +120,36 @@ fn state_tracks_last_event_and_count_without_unbounded_history() {
     });
 
     assert_eq!(state.event_count(), u64::MAX);
+}
+
+#[test]
+fn timeline_event_history_is_bounded() {
+    let mut state = SteamworksTimelineState::default();
+    let limit = 1_024;
+
+    for index in 0..(limit + 4) {
+        state.record_operation(&SteamworksTimelineOperation::TimelineEventAdded {
+            event: SteamworksTimelineEventInfo {
+                icon: format!("icon-{index}"),
+                title: format!("title-{index}"),
+                description: format!("description-{index}"),
+                priority: index as u32,
+                start_offset_seconds: 0.0,
+                duration: Duration::ZERO,
+                clip_priority: SteamworksTimelineEventClipPriority::None,
+            },
+        });
+    }
+
+    assert_eq!(state.event_count(), (limit + 4) as u64);
+    assert_eq!(state.events().len(), limit);
+    assert_eq!(
+        state.events().first().map(|event| event.icon.as_str()),
+        Some("icon-4")
+    );
+    let expected_last_icon = format!("icon-{}", limit + 3);
+    assert_eq!(
+        state.last_event().map(|event| event.icon.as_str()),
+        Some(expected_last_icon.as_str())
+    );
 }

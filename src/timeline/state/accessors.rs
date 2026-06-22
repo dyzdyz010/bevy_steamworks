@@ -20,6 +20,11 @@ impl SteamworksTimelineState {
         self.state_description.as_ref()
     }
 
+    /// Returns bounded Timeline event snapshots submitted through the plugin.
+    pub fn events(&self) -> &[SteamworksTimelineEventInfo] {
+        &self.events
+    }
+
     /// Returns the most recent Timeline event submitted through the plugin.
     pub fn last_event(&self) -> Option<&SteamworksTimelineEventInfo> {
         self.last_event.as_ref()
