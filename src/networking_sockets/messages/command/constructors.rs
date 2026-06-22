@@ -150,6 +150,17 @@ impl SteamworksNetworkingSocketsCommand {
         }
     }
 
+    /// Creates a [`SteamworksNetworkingSocketsCommand::PollAllListenSocketEvents`] command.
+    pub fn poll_all_listen_socket_events(
+        max_events_per_socket: usize,
+        request_policy: SteamworksConnectionRequestPolicy,
+    ) -> Self {
+        Self::PollAllListenSocketEvents {
+            max_events_per_socket,
+            request_policy,
+        }
+    }
+
     /// Creates a [`SteamworksNetworkingSocketsCommand::PollConnectionEvents`] command.
     pub fn poll_connection_events(
         connection: SteamworksNetworkingSocketsConnectionId,
@@ -158,6 +169,13 @@ impl SteamworksNetworkingSocketsCommand {
         Self::PollConnectionEvents {
             connection,
             max_events,
+        }
+    }
+
+    /// Creates a [`SteamworksNetworkingSocketsCommand::PollAllConnectionEvents`] command.
+    pub fn poll_all_connection_events(max_events_per_connection: usize) -> Self {
+        Self::PollAllConnectionEvents {
+            max_events_per_connection,
         }
     }
 

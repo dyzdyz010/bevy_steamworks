@@ -1,8 +1,9 @@
 use super::super::{
     SteamworksListenSocketEventInfo, SteamworksListenSocketId,
-    SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsConnectionInfo, SteamworksNetworkingSocketsConnectionTarget,
-    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessage,
+    SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionEvents,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionInfo,
+    SteamworksNetworkingSocketsConnectionTarget, SteamworksNetworkingSocketsListenEndpoint,
+    SteamworksNetworkingSocketsListenSocketEvents, SteamworksNetworkingSocketsMessage,
     SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsPollGroupId,
     SteamworksNetworkingSocketsPollGroupMessage, SteamworksNetworkingSocketsRealtimeStatus,
 };
@@ -46,6 +47,11 @@ pub enum SteamworksNetworkingSocketsOperation {
         /// Events observed.
         events: Vec<SteamworksListenSocketEventInfo>,
     },
+    /// Events were processed from every plugin-owned listen socket.
+    AllListenSocketEventsPolled {
+        /// Per-listen-socket event batches.
+        listen_sockets: Vec<SteamworksNetworkingSocketsListenSocketEvents>,
+    },
     /// Connection events were processed.
     ConnectionEventsPolled {
         /// Connection that was polled.
@@ -54,6 +60,11 @@ pub enum SteamworksNetworkingSocketsOperation {
         events: Vec<SteamworksNetworkingSocketsConnectionEventInfo>,
         /// Whether a terminal event caused the plugin to remove this connection.
         connection_removed: bool,
+    },
+    /// Events were processed from every plugin-owned connection.
+    AllConnectionEventsPolled {
+        /// Per-connection event batches.
+        connections: Vec<SteamworksNetworkingSocketsConnectionEvents>,
     },
     /// Connection info was read.
     ConnectionInfoRead {
@@ -195,6 +206,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .field("listen_socket", listen_socket)
                 .field("events", events)
                 .finish(),
+            Self::AllListenSocketEventsPolled { listen_sockets } => f
+                .debug_struct("AllListenSocketEventsPolled")
+                .field("listen_sockets", listen_sockets)
+                .finish(),
             Self::ConnectionEventsPolled {
                 connection,
                 events,
@@ -204,6 +219,10 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsOperation {
                 .field("connection", connection)
                 .field("events", events)
                 .field("connection_removed", connection_removed)
+                .finish(),
+            Self::AllConnectionEventsPolled { connections } => f
+                .debug_struct("AllConnectionEventsPolled")
+                .field("connections", connections)
                 .finish(),
             Self::ConnectionInfoRead { info } => f
                 .debug_struct("ConnectionInfoRead")

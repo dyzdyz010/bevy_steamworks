@@ -15,7 +15,10 @@ use crate::{SteamworksClient, SteamworksServer};
 
 use super::{
     handles::{SteamworksNetworkingSocketsHandleStorage, SteamworksNetworkingSocketsHandles},
-    polling::{poll_connection_events, poll_listen_socket_events},
+    polling::{
+        poll_all_connection_events, poll_all_listen_socket_events, poll_connection_events,
+        poll_listen_socket_events,
+    },
     validation::validate_command,
     SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsError,
     SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsResult,
@@ -151,10 +154,17 @@ pub(super) fn handle_networking_sockets_command(
             max_events,
             request_policy,
         } => poll_listen_socket_events(handles, *listen_socket, *max_events, request_policy)?,
+        SteamworksNetworkingSocketsCommand::PollAllListenSocketEvents {
+            max_events_per_socket,
+            request_policy,
+        } => poll_all_listen_socket_events(handles, *max_events_per_socket, request_policy)?,
         SteamworksNetworkingSocketsCommand::PollConnectionEvents {
             connection,
             max_events,
         } => poll_connection_events(handles, *connection, *max_events)?,
+        SteamworksNetworkingSocketsCommand::PollAllConnectionEvents {
+            max_events_per_connection,
+        } => poll_all_connection_events(handles, *max_events_per_connection)?,
         SteamworksNetworkingSocketsCommand::GetConnectionInfo { connection } => {
             connection_commands::get_connection_info(handles, *connection)?
         }

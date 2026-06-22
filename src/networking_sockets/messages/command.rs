@@ -68,12 +68,24 @@ pub enum SteamworksNetworkingSocketsCommand {
         /// Policy for incoming connection requests.
         request_policy: SteamworksConnectionRequestPolicy,
     },
+    /// Poll events from every plugin-owned listen socket.
+    PollAllListenSocketEvents {
+        /// Maximum events to process per listen socket.
+        max_events_per_socket: usize,
+        /// Policy for incoming connection requests.
+        request_policy: SteamworksConnectionRequestPolicy,
+    },
     /// Poll events from one connection.
     PollConnectionEvents {
         /// Connection to poll.
         connection: SteamworksNetworkingSocketsConnectionId,
         /// Maximum events to process.
         max_events: usize,
+    },
+    /// Poll events from every plugin-owned connection.
+    PollAllConnectionEvents {
+        /// Maximum events to process per connection.
+        max_events_per_connection: usize,
     },
     /// Read connection info.
     GetConnectionInfo {

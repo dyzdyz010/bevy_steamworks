@@ -6,7 +6,10 @@ use std::{
 use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
 
-use super::handles::{SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsHandles};
+use super::handles::{
+    SteamworksNetworkingSocketsHandleOwner, SteamworksNetworkingSocketsHandleStorage,
+    SteamworksNetworkingSocketsHandles,
+};
 use super::*;
 
 #[test]
@@ -172,10 +175,46 @@ fn validation_rejects_invalid_inputs() {
         Err(SteamworksNetworkingSocketsError::InvalidEventLimit)
     );
     assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::poll_all_listen_socket_events(
+                0,
+                SteamworksConnectionRequestPolicy::Accept,
+            ),
+        ),
+        Err(SteamworksNetworkingSocketsError::InvalidEventLimit)
+    );
+    assert_eq!(
+        validate_command(&SteamworksNetworkingSocketsCommand::poll_all_connection_events(0,)),
+        Err(SteamworksNetworkingSocketsError::InvalidEventLimit)
+    );
+    assert_eq!(
         validate_command(&SteamworksNetworkingSocketsCommand::poll_connection_events(
             connection_id(),
             STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
         )),
+        Err(SteamworksNetworkingSocketsError::TooManyEvents {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::poll_all_listen_socket_events(
+                STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+                SteamworksConnectionRequestPolicy::Accept,
+            ),
+        ),
+        Err(SteamworksNetworkingSocketsError::TooManyEvents {
+            requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+            max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
+        })
+    );
+    assert_eq!(
+        validate_command(
+            &SteamworksNetworkingSocketsCommand::poll_all_connection_events(
+                STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
+            )
+        ),
         Err(SteamworksNetworkingSocketsError::TooManyEvents {
             requested: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND + 1,
             max_supported: STEAMWORKS_NETWORKING_SOCKETS_MAX_EVENTS_PER_COMMAND,
@@ -484,6 +523,22 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingSocketsCommand::poll_all_listen_socket_events(
+            8,
+            SteamworksConnectionRequestPolicy::Accept,
+        ),
+        SteamworksNetworkingSocketsCommand::PollAllListenSocketEvents {
+            max_events_per_socket: 8,
+            request_policy: SteamworksConnectionRequestPolicy::Accept,
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingSocketsCommand::poll_all_connection_events(6),
+        SteamworksNetworkingSocketsCommand::PollAllConnectionEvents {
+            max_events_per_connection: 6,
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingSocketsCommand::create_poll_group(),
         SteamworksNetworkingSocketsCommand::CreatePollGroup
     );
@@ -604,6 +659,41 @@ fn constructors_preserve_inputs() {
 }
 
 #[test]
+fn poll_all_commands_return_empty_batches_without_handles() {
+    let mut handles = SteamworksNetworkingSocketsHandleStorage::default();
+
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::poll_all_listen_socket_events(
+                4,
+                SteamworksConnectionRequestPolicy::Accept,
+            ),
+        ),
+        Ok(
+            SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+                listen_sockets: Vec::new(),
+            },
+        )
+    );
+    assert_eq!(
+        commands::handle_networking_sockets_command(
+            None,
+            None,
+            &mut handles,
+            &SteamworksNetworkingSocketsCommand::poll_all_connection_events(4),
+        ),
+        Ok(
+            SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
+                connections: Vec::new(),
+            },
+        )
+    );
+}
+
+#[test]
 fn debug_redacts_config_entry_strings() {
     let entry = SteamworksNetworkingSocketsConfigEntry::string(
         steamworks::networking_types::NetworkingConfigValue::P2PSTUNServerList,
@@ -712,6 +802,37 @@ fn debug_redacts_message_payload_bytes() {
     assert!(!operation_debug.contains("[4, 5, 6]"));
     assert!(result_debug.contains("data_len: 3"));
     assert!(!result_debug.contains("[7, 8, 9]"));
+}
+
+#[test]
+fn state_records_bulk_poll_operations() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+    let listen_socket_events = SteamworksNetworkingSocketsListenSocketEvents {
+        listen_socket: listen_socket_id(),
+        events: Vec::new(),
+    };
+    let connection_events = SteamworksNetworkingSocketsConnectionEvents {
+        connection: connection_id(),
+        events: Vec::new(),
+        connection_removed: false,
+    };
+
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+            listen_sockets: vec![listen_socket_events.clone()],
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
+            connections: vec![connection_events.clone()],
+        },
+    );
+
+    assert_eq!(
+        state.last_listen_socket_events(),
+        Some(&listen_socket_events)
+    );
+    assert_eq!(state.last_connection_events(), Some(&connection_events));
 }
 
 #[test]

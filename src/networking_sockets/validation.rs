@@ -46,9 +46,19 @@ pub(super) fn validate_command(
             validate_event_limit(*max_events)?;
             validate_request_policy(request_policy)
         }
+        SteamworksNetworkingSocketsCommand::PollAllListenSocketEvents {
+            max_events_per_socket,
+            request_policy,
+        } => {
+            validate_event_limit(*max_events_per_socket)?;
+            validate_request_policy(request_policy)
+        }
         SteamworksNetworkingSocketsCommand::PollConnectionEvents { max_events, .. } => {
             validate_event_limit(*max_events)
         }
+        SteamworksNetworkingSocketsCommand::PollAllConnectionEvents {
+            max_events_per_connection,
+        } => validate_event_limit(*max_events_per_connection),
         SteamworksNetworkingSocketsCommand::ReceiveMessages { batch_size, .. } => {
             validate_message_batch_size(*batch_size)
         }

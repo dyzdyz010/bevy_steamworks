@@ -56,9 +56,7 @@ mod types;
 mod validation;
 
 #[cfg(test)]
-use handles::{
-    SteamworksNetworkingSocketsConnectionMetadata, SteamworksNetworkingSocketsHandleStorage,
-};
+use handles::SteamworksNetworkingSocketsConnectionMetadata;
 #[cfg(test)]
 use validation::validate_command;
 

@@ -65,6 +65,11 @@ impl SteamworksNetworkingSocketsState {
                         events: events.clone(),
                     });
             }
+            SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+                listen_sockets,
+            } => {
+                self.last_listen_socket_events = listen_sockets.last().cloned();
+            }
             SteamworksNetworkingSocketsOperation::ConnectionEventsPolled {
                 connection,
                 events,
@@ -75,6 +80,9 @@ impl SteamworksNetworkingSocketsState {
                     events: events.clone(),
                     connection_removed: *connection_removed,
                 });
+            }
+            SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled { connections } => {
+                self.last_connection_events = connections.last().cloned();
             }
             SteamworksNetworkingSocketsOperation::ConnectionInfoRead { info } => {
                 self.last_connection_info = Some(info.clone());

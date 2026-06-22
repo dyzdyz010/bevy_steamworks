@@ -56,6 +56,14 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .field("max_events", max_events)
                 .field("request_policy", request_policy)
                 .finish(),
+            Self::PollAllListenSocketEvents {
+                max_events_per_socket,
+                request_policy,
+            } => f
+                .debug_struct("PollAllListenSocketEvents")
+                .field("max_events_per_socket", max_events_per_socket)
+                .field("request_policy", request_policy)
+                .finish(),
             Self::PollConnectionEvents {
                 connection,
                 max_events,
@@ -63,6 +71,12 @@ impl std::fmt::Debug for SteamworksNetworkingSocketsCommand {
                 .debug_struct("PollConnectionEvents")
                 .field("connection", connection)
                 .field("max_events", max_events)
+                .finish(),
+            Self::PollAllConnectionEvents {
+                max_events_per_connection,
+            } => f
+                .debug_struct("PollAllConnectionEvents")
+                .field("max_events_per_connection", max_events_per_connection)
                 .finish(),
             Self::GetConnectionInfo { connection } => f
                 .debug_struct("GetConnectionInfo")

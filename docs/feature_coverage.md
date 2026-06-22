@@ -15,7 +15,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Matchmaking servers | Implemented | Server list requests, refresh/release/detail reads, direct ping/player-details/rules queries, async result tracking. |
 | Legacy networking | Implemented | Legacy P2P sessions, send/read packets, packet availability, session callbacks. |
 | Networking messages | Implemented | Send/receive, session connection info, session request/failure callbacks, configurable auto-accept. |
-| Networking sockets | Implemented | Listen/connect, accept/close, messages, batch sends, poll groups, connection names/user data, lanes, auth helpers, realtime status, client/server ownership tracking. |
+| Networking sockets | Implemented | Listen/connect, accept/close, single/all event polling, messages, batch sends, poll groups, connection names/user data, lanes, auth helpers, realtime status, client/server ownership tracking. |
 | Networking utils | Implemented | Relay initialization, relay status callbacks, detailed relay diagnostics, ping measurement/config/any-relay/debug-message reads. |
 | Input | Implemented | Init/run/shutdown, controller and action handles, digital/analog data, origins/glyphs/names, motion data, action set activation, binding panel. |
 | Screenshots | Implemented | Hook state, trigger, library add, requested/ready callbacks. |
@@ -30,6 +30,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 The crate intentionally does not call raw Steamworks SDK functions directly unless there is a clear reason and a safe design. Known limits that are currently gated by upstream safe API support include:
 
 - `ISteamNetworkingMessages` session/channel close commands are not exposed as safe methods by `steamworks` 0.13.1. The upstream crate only uses raw close internally for `SessionRequest::reject`.
+- Dedicated-server `ISteamApps` access is not exposed as a safe method by `steamworks` 0.13.1; the upstream `Server::apps` wrapper is commented out as buggy.
 - Some UGC query options, such as requesting additional previews, can be forwarded, but owned snapshots only include rows that the upstream `steamworks` crate exposes through safe accessors.
 - Screenshot tagging and some lower-level Steamworks SDK surfaces are not wrapped until the upstream crate exposes safe APIs or this crate adds a reviewed safe abstraction.
 

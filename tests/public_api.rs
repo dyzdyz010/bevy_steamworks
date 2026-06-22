@@ -6,8 +6,9 @@ use bevy_steamworks::{
         SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
         SteamworksCallbackRegistry as PreludeCallbackRegistry, SteamworksClient as PreludeClient,
         SteamworksClientPlugins as PreludeClientPlugins,
-        SteamworksCommandError as PreludeCommandError, SteamworksEvent as PreludeEvent,
-        SteamworksFailurePolicy as PreludeFailurePolicy,
+        SteamworksCommandError as PreludeCommandError,
+        SteamworksConnectionRequestPolicy as PreludeConnectionRequestPolicy,
+        SteamworksEvent as PreludeEvent, SteamworksFailurePolicy as PreludeFailurePolicy,
         SteamworksFloatingGamepadTextInputDismissed as PreludeFloatingGamepadTextInputDismissed,
         SteamworksFloatingGamepadTextInputMode as PreludeFloatingGamepadTextInputMode,
         SteamworksFloatingGamepadTextInputRequest as PreludeFloatingGamepadTextInputRequest,
@@ -135,16 +136,16 @@ use bevy_steamworks::{
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
     SteamworksAppsPlugin, SteamworksAppsResult, SteamworksCallbackRegistry, SteamworksClient,
-    SteamworksClientPlugins, SteamworksCommandError, SteamworksEvent, SteamworksFailurePolicy,
-    SteamworksFloatingGamepadTextInputDismissed, SteamworksFloatingGamepadTextInputMode,
-    SteamworksFloatingGamepadTextInputRequest, SteamworksFloatingGamepadTextInputShown,
-    SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
-    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksGamepadTextInputDismissed,
-    SteamworksGamepadTextInputLineMode, SteamworksGamepadTextInputMode,
-    SteamworksGamepadTextInputRequest, SteamworksGamepadTextInputShown,
-    SteamworksGamepadTextInputSubmitted, SteamworksInitMode, SteamworksInputCommand,
-    SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
-    SteamworksIssuedAuthSessionTicketForIdentity, SteamworksLobbyListFilter,
+    SteamworksClientPlugins, SteamworksCommandError, SteamworksConnectionRequestPolicy,
+    SteamworksEvent, SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
+    SteamworksFloatingGamepadTextInputMode, SteamworksFloatingGamepadTextInputRequest,
+    SteamworksFloatingGamepadTextInputShown, SteamworksFriendsCommand, SteamworksFriendsError,
+    SteamworksFriendsOperation, SteamworksFriendsPlugin, SteamworksFriendsResult,
+    SteamworksGamepadTextInputDismissed, SteamworksGamepadTextInputLineMode,
+    SteamworksGamepadTextInputMode, SteamworksGamepadTextInputRequest,
+    SteamworksGamepadTextInputShown, SteamworksGamepadTextInputSubmitted, SteamworksInitMode,
+    SteamworksInputCommand, SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin,
+    SteamworksInputResult, SteamworksIssuedAuthSessionTicketForIdentity, SteamworksLobbyListFilter,
     SteamworksMatchmakingCommand, SteamworksMatchmakingError, SteamworksMatchmakingOperation,
     SteamworksMatchmakingPlugin, SteamworksMatchmakingResult, SteamworksMatchmakingServersCommand,
     SteamworksMatchmakingServersError, SteamworksMatchmakingServersOperation,
@@ -1099,6 +1100,35 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
     );
     accepts_root_exports(
         SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::poll_all_listen_socket_events(
+            16,
+            SteamworksConnectionRequestPolicy::Accept,
+        ),
+        SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+            listen_sockets: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
+                connections: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidEventLimit,
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
+        SteamworksNetworkingSocketsCommand::poll_all_connection_events(16),
+        SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
+            connections: Vec::new(),
+        },
+        SteamworksNetworkingSocketsResult::Ok(
+            SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+                listen_sockets: Vec::new(),
+            },
+        ),
+        SteamworksNetworkingSocketsError::InvalidEventLimit,
+    );
+    accepts_root_exports(
+        SteamworksNetworkingSocketsPlugin::new(),
         server_poll_group_command,
         SteamworksNetworkingSocketsOperation::PollGroupCreated {
             poll_group: bevy_steamworks::SteamworksNetworkingSocketsPollGroupId::from_raw(1),
@@ -1208,6 +1238,35 @@ fn networking_sockets_api_is_exported_from_root_and_prelude() {
             },
         ),
         PreludeNetworkingSocketsError::ConnectionNotFound { id: connection },
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::poll_all_listen_socket_events(
+            16,
+            PreludeConnectionRequestPolicy::Accept,
+        ),
+        PreludeNetworkingSocketsOperation::AllListenSocketEventsPolled {
+            listen_sockets: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllConnectionEventsPolled {
+                connections: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::InvalidEventLimit,
+    );
+    accepts_prelude_exports(
+        PreludeNetworkingSocketsPlugin::new(),
+        PreludeNetworkingSocketsCommand::poll_all_connection_events(16),
+        PreludeNetworkingSocketsOperation::AllConnectionEventsPolled {
+            connections: Vec::new(),
+        },
+        PreludeNetworkingSocketsResult::Ok(
+            PreludeNetworkingSocketsOperation::AllListenSocketEventsPolled {
+                listen_sockets: Vec::new(),
+            },
+        ),
+        PreludeNetworkingSocketsError::InvalidEventLimit,
     );
     accepts_prelude_exports(
         PreludeNetworkingSocketsPlugin::new(),

@@ -4,8 +4,9 @@ use super::{
         SteamworksNetworkingSocketsHandleStorage,
     },
     SteamworksConnectionRequestPolicy, SteamworksListenSocketEventInfo, SteamworksListenSocketId,
-    SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionId,
-    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsConnectionEventInfo, SteamworksNetworkingSocketsConnectionEvents,
+    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsError,
+    SteamworksNetworkingSocketsListenSocketEvents, SteamworksNetworkingSocketsOperation,
 };
 
 pub(super) fn poll_listen_socket_events(
@@ -110,6 +111,44 @@ pub(super) fn poll_listen_socket_events(
     )
 }
 
+pub(super) fn poll_all_listen_socket_events(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+    max_events_per_socket: usize,
+    request_policy: &SteamworksConnectionRequestPolicy,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut listen_sockets = handles.listen_sockets.keys().copied().collect::<Vec<_>>();
+    listen_sockets.sort_by_key(|listen_socket| listen_socket.raw());
+
+    let mut batches = Vec::with_capacity(listen_sockets.len());
+    for listen_socket in listen_sockets {
+        if !handles.listen_sockets.contains_key(&listen_socket) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::ListenSocketEventsPolled {
+            listen_socket,
+            events,
+        } = poll_listen_socket_events(
+            handles,
+            listen_socket,
+            max_events_per_socket,
+            request_policy,
+        )?
+        else {
+            unreachable!("poll_listen_socket_events returns ListenSocketEventsPolled");
+        };
+        batches.push(SteamworksNetworkingSocketsListenSocketEvents {
+            listen_socket,
+            events,
+        });
+    }
+
+    Ok(
+        SteamworksNetworkingSocketsOperation::AllListenSocketEventsPolled {
+            listen_sockets: batches,
+        },
+    )
+}
+
 pub(super) fn poll_connection_events(
     handles: &mut SteamworksNetworkingSocketsHandleStorage,
     connection: SteamworksNetworkingSocketsConnectionId,
@@ -152,6 +191,40 @@ pub(super) fn poll_connection_events(
             connection,
             events,
             connection_removed: should_remove,
+        },
+    )
+}
+
+pub(super) fn poll_all_connection_events(
+    handles: &mut SteamworksNetworkingSocketsHandleStorage,
+    max_events_per_connection: usize,
+) -> Result<SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsError> {
+    let mut connections = handles.connections.keys().copied().collect::<Vec<_>>();
+    connections.sort_by_key(|connection| connection.raw());
+
+    let mut batches = Vec::with_capacity(connections.len());
+    for connection in connections {
+        if !handles.connections.contains_key(&connection) {
+            continue;
+        }
+        let SteamworksNetworkingSocketsOperation::ConnectionEventsPolled {
+            connection,
+            events,
+            connection_removed,
+        } = poll_connection_events(handles, connection, max_events_per_connection)?
+        else {
+            unreachable!("poll_connection_events returns ConnectionEventsPolled");
+        };
+        batches.push(SteamworksNetworkingSocketsConnectionEvents {
+            connection,
+            events,
+            connection_removed,
+        });
+    }
+
+    Ok(
+        SteamworksNetworkingSocketsOperation::AllConnectionEventsPolled {
+            connections: batches,
         },
     )
 }
