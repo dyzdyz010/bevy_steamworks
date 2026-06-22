@@ -1,9 +1,9 @@
 use crate::user::SteamworksSteamServerConnectionEvent;
 
 use super::{
-    SteamworksServerIncomingPacket, SteamworksServerIssuedAuthSessionTicket,
-    SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerOperation,
-    SteamworksServerState,
+    push_bounded, upsert_by, SteamworksServerIncomingPacket,
+    SteamworksServerIssuedAuthSessionTicket, SteamworksServerIssuedAuthSessionTicketForIdentity,
+    SteamworksServerOperation, SteamworksServerState,
 };
 
 impl SteamworksServerState {
@@ -27,11 +27,15 @@ impl SteamworksServerState {
                 if !self.active_auth_tickets.contains(ticket) {
                     self.active_auth_tickets.push(*ticket);
                 }
-                self.last_auth_session_ticket = Some(SteamworksServerIssuedAuthSessionTicket {
+                let issued = SteamworksServerIssuedAuthSessionTicket {
                     ticket: *ticket,
                     ticket_bytes: ticket_bytes.clone(),
                     steam_id: *steam_id,
+                };
+                upsert_by(&mut self.auth_session_tickets, issued.clone(), |existing| {
+                    existing.ticket == *ticket
                 });
+                self.last_auth_session_ticket = Some(issued);
                 self.auth_session_ticket_issue_count =
                     self.auth_session_ticket_issue_count.saturating_add(1);
             }
@@ -43,17 +47,23 @@ impl SteamworksServerState {
                 if !self.active_auth_tickets.contains(ticket) {
                     self.active_auth_tickets.push(*ticket);
                 }
-                self.last_auth_session_ticket_for_identity =
-                    Some(SteamworksServerIssuedAuthSessionTicketForIdentity {
-                        ticket: *ticket,
-                        ticket_bytes: ticket_bytes.clone(),
-                        identity: identity.clone(),
-                    });
+                let issued = SteamworksServerIssuedAuthSessionTicketForIdentity {
+                    ticket: *ticket,
+                    ticket_bytes: ticket_bytes.clone(),
+                    identity: identity.clone(),
+                };
+                upsert_by(
+                    &mut self.auth_session_tickets_for_identity,
+                    issued.clone(),
+                    |existing| existing.ticket == *ticket,
+                );
+                self.last_auth_session_ticket_for_identity = Some(issued);
                 self.auth_session_ticket_issue_count =
                     self.auth_session_ticket_issue_count.saturating_add(1);
             }
             SteamworksServerOperation::AuthenticationTicketCancelled { ticket } => {
                 self.active_auth_tickets.retain(|known| known != ticket);
+                remove_ticket_caches(self, *ticket);
                 self.last_cancelled_auth_ticket = Some(*ticket);
                 self.auth_ticket_cancel_count = self.auth_ticket_cancel_count.saturating_add(1);
             }
@@ -75,7 +85,13 @@ impl SteamworksServerState {
                 if response.result.is_err() {
                     self.active_auth_tickets
                         .retain(|known| *known != response.ticket);
+                    remove_ticket_caches(self, response.ticket);
                 }
+                upsert_by(
+                    &mut self.auth_ticket_responses,
+                    response.clone(),
+                    |existing| existing.ticket == response.ticket,
+                );
                 self.last_auth_ticket_response = Some(response.clone());
             }
             SteamworksServerOperation::AuthenticationTicketValidationReceived { validation } => {
@@ -83,6 +99,11 @@ impl SteamworksServerState {
                     self.authenticated_users
                         .retain(|known| *known != validation.steam_id);
                 }
+                upsert_by(
+                    &mut self.auth_ticket_validations,
+                    validation.clone(),
+                    |existing| existing.steam_id == validation.steam_id,
+                );
                 self.last_auth_ticket_validation = Some(validation.clone());
             }
             SteamworksServerOperation::SteamServerConnectionEventReceived { event } => {
@@ -90,24 +111,39 @@ impl SteamworksServerState {
                     event,
                     SteamworksSteamServerConnectionEvent::Connected
                 ));
+                push_bounded(&mut self.steam_server_connection_events, event.clone());
                 self.last_steam_server_connection_event = Some(event.clone());
             }
             SteamworksServerOperation::ClientApproved { approval } => {
                 if !self.authenticated_users.contains(&approval.user) {
                     self.authenticated_users.push(approval.user);
                 }
+                upsert_by(&mut self.client_approvals, approval.clone(), |existing| {
+                    existing.user == approval.user
+                });
                 self.last_client_approval = Some(approval.clone());
             }
             SteamworksServerOperation::ClientDenied { denial } => {
                 self.authenticated_users
                     .retain(|known| *known != denial.user);
+                upsert_by(&mut self.client_denials, denial.clone(), |existing| {
+                    existing.user == denial.user
+                });
                 self.last_client_denial = Some(denial.clone());
             }
             SteamworksServerOperation::ClientKicked { kick } => {
                 self.authenticated_users.retain(|known| *known != kick.user);
+                upsert_by(&mut self.client_kicks, kick.clone(), |existing| {
+                    existing.user == kick.user
+                });
                 self.last_client_kick = Some(kick.clone());
             }
             SteamworksServerOperation::ClientGroupStatusReceived { status } => {
+                upsert_by(
+                    &mut self.client_group_statuses,
+                    status.clone(),
+                    |existing| existing.user == status.user && existing.group == status.group,
+                );
                 self.last_client_group_status = Some(status.clone());
             }
             SteamworksServerOperation::ProductSet { product } => {
@@ -188,4 +224,16 @@ impl SteamworksServerState {
             }
         }
     }
+}
+
+fn remove_ticket_caches(state: &mut SteamworksServerState, ticket: steamworks::AuthTicket) {
+    state
+        .auth_session_tickets
+        .retain(|issued| issued.ticket != ticket);
+    state
+        .auth_session_tickets_for_identity
+        .retain(|issued| issued.ticket != ticket);
+    state
+        .auth_ticket_responses
+        .retain(|response| response.ticket != ticket);
 }

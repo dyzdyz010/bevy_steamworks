@@ -119,7 +119,7 @@ use bevy_steamworks::{
         SteamworksServerQueryKind as PreludeServerQueryKind,
         SteamworksServerQueryTarget as PreludeServerQueryTarget,
         SteamworksServerResult as PreludeServerResult, SteamworksServerRule as PreludeServerRule,
-        SteamworksServerRules as PreludeServerRules,
+        SteamworksServerRules as PreludeServerRules, SteamworksServerState as PreludeServerState,
         SteamworksServerUnavailable as PreludeServerUnavailable,
         SteamworksStatsCommand as PreludeStatsCommand, SteamworksStatsError as PreludeStatsError,
         SteamworksStatsOperation as PreludeStatsOperation,
@@ -208,22 +208,23 @@ use bevy_steamworks::{
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
     SteamworksServerPlugin, SteamworksServerQueryId, SteamworksServerQueryInfo,
     SteamworksServerQueryKind, SteamworksServerQueryTarget, SteamworksServerResult,
-    SteamworksServerRule, SteamworksServerRules, SteamworksServerUnavailable,
-    SteamworksStatsCommand, SteamworksStatsError, SteamworksStatsOperation, SteamworksStatsPlugin,
-    SteamworksStatsResult, SteamworksSystem, SteamworksTimelineCommand, SteamworksTimelineError,
-    SteamworksTimelineGameMode, SteamworksTimelineOperation, SteamworksTimelinePlugin,
-    SteamworksTimelineResult, SteamworksTimelineState, SteamworksUgcCommand,
-    SteamworksUgcContentDescriptor, SteamworksUgcDownloadItemResult, SteamworksUgcError,
-    SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo,
-    SteamworksUgcItemDownloadInfoResult, SteamworksUgcItemInstallInfo,
-    SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo, SteamworksUgcOperation,
-    SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds, SteamworksUgcQueryIdsResult,
-    SteamworksUgcQueryOptions, SteamworksUgcQueryRequest, SteamworksUgcQueryResult,
-    SteamworksUgcQueryResults, SteamworksUgcQueryTotal, SteamworksUgcQueryTotalResult,
-    SteamworksUgcResult, SteamworksUgcState, SteamworksUgcWorkshopDepotId, SteamworksUnavailable,
-    SteamworksUserCommand, SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin,
-    SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError,
-    SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksServerRule, SteamworksServerRules, SteamworksServerState,
+    SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
+    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem,
+    SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineGameMode,
+    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
+    SteamworksTimelineState, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+    SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
+    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+    SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
+    SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
+    SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
+    SteamworksUgcQueryResult, SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
+    SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState,
+    SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
+    SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
+    SteamworksUtilsPlugin, SteamworksUtilsResult,
 };
 use std::error::Error;
 
@@ -656,6 +657,23 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     ));
     let _identity_ticket: Option<SteamworksServerIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = SteamworksServerError::InvalidNetworkingIdentity;
+    let user = steamworks::SteamId::from_raw(7);
+    let group = steamworks::SteamId::from_raw(8);
+    let root_state = SteamworksServerState::default();
+    assert!(root_state.auth_session_tickets().is_empty());
+    assert!(root_state.auth_session_tickets_for_identity().is_empty());
+    assert!(root_state.auth_ticket_responses().is_empty());
+    assert!(root_state.auth_ticket_validations().is_empty());
+    assert_eq!(root_state.auth_ticket_validation(user), None);
+    assert!(root_state.steam_server_connection_events().is_empty());
+    assert!(root_state.client_approvals().is_empty());
+    assert_eq!(root_state.client_approval(user), None);
+    assert!(root_state.client_denials().is_empty());
+    assert_eq!(root_state.client_denial(user), None);
+    assert!(root_state.client_kicks().is_empty());
+    assert_eq!(root_state.client_kick(user), None);
+    assert!(root_state.client_group_statuses().is_empty());
+    assert_eq!(root_state.client_group_status(user, group), None);
 
     accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
@@ -701,6 +719,21 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     ));
     let _identity_ticket: Option<PreludeServerIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = PreludeServerError::InvalidNetworkingIdentity;
+    let prelude_state = PreludeServerState::default();
+    assert!(prelude_state.auth_session_tickets().is_empty());
+    assert!(prelude_state.auth_session_tickets_for_identity().is_empty());
+    assert!(prelude_state.auth_ticket_responses().is_empty());
+    assert!(prelude_state.auth_ticket_validations().is_empty());
+    assert_eq!(prelude_state.auth_ticket_validation(user), None);
+    assert!(prelude_state.steam_server_connection_events().is_empty());
+    assert!(prelude_state.client_approvals().is_empty());
+    assert_eq!(prelude_state.client_approval(user), None);
+    assert!(prelude_state.client_denials().is_empty());
+    assert_eq!(prelude_state.client_denial(user), None);
+    assert!(prelude_state.client_kicks().is_empty());
+    assert_eq!(prelude_state.client_kick(user), None);
+    assert!(prelude_state.client_group_statuses().is_empty());
+    assert_eq!(prelude_state.client_group_status(user, group), None);
 
     accepts_prelude_exports(plugin, command, operation, result, error, unavailable);
 }

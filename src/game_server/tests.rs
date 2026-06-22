@@ -314,13 +314,30 @@ fn server_callbacks_are_bridged_without_server() {
         Some(&SteamworksSteamServerConnectionEvent::Connected)
     );
     assert_eq!(
+        state.steam_server_connection_events(),
+        &[SteamworksSteamServerConnectionEvent::Connected]
+    );
+    assert_eq!(
         state.last_auth_ticket_validation(),
         Some(&validation_failed)
     );
+    assert_eq!(
+        state.auth_ticket_validation(user),
+        state.last_auth_ticket_validation()
+    );
+    assert_eq!(state.auth_ticket_validations().len(), 1);
     assert_eq!(state.last_client_approval(), Some(&approval));
+    assert_eq!(state.client_approval(user), Some(&approval));
+    assert_eq!(state.client_approvals(), &[approval]);
     assert_eq!(state.last_client_denial(), Some(&denial));
+    assert_eq!(state.client_denial(user), Some(&denial));
+    assert_eq!(state.client_denials(), &[denial]);
     assert_eq!(state.last_client_kick(), Some(&kick));
+    assert_eq!(state.client_kick(user), Some(&kick));
+    assert_eq!(state.client_kicks(), &[kick]);
     assert_eq!(state.last_client_group_status(), Some(&group_status));
+    assert_eq!(state.client_group_status(user, group), Some(&group_status));
+    assert_eq!(state.client_group_statuses(), &[group_status]);
     assert!(state.authenticated_users().is_empty());
     assert_eq!(state.last_error(), None);
 }
@@ -664,7 +681,9 @@ fn state_records_server_operations() {
     assert_eq!(state.authenticated_users(), &[user]);
     assert!(state.active_auth_tickets().is_empty());
     assert!(state.last_auth_session_ticket().is_none());
+    assert!(state.auth_session_tickets().is_empty());
     assert!(state.last_auth_session_ticket_for_identity().is_none());
+    assert!(state.auth_session_tickets_for_identity().is_empty());
     assert_eq!(state.auth_session_ticket_issue_count(), 0);
     assert!(state.last_cancelled_auth_ticket().is_none());
     assert_eq!(state.auth_ticket_cancel_count(), 0);
@@ -709,6 +728,33 @@ fn state_records_server_operations() {
     assert_eq!(state.last_ended_authentication_session(), Some(user));
     assert_eq!(state.authentication_session_end_count(), 1);
     assert!(state.key_values().is_empty());
+}
+
+#[test]
+fn server_state_callback_lookup_caches_are_bounded() {
+    let mut state = SteamworksServerState::default();
+    let limit = 1_024;
+
+    for index in 0..(limit + 4) {
+        let user = steamworks::SteamId::from_raw((index + 1) as u64);
+        state.record_operation(&SteamworksServerOperation::ClientApproved {
+            approval: SteamworksServerClientApproval { user, owner: user },
+        });
+    }
+
+    assert_eq!(state.client_approvals().len(), limit);
+    assert_eq!(
+        state.client_approval(steamworks::SteamId::from_raw(1)),
+        None
+    );
+    let last_user = steamworks::SteamId::from_raw((limit + 4) as u64);
+    assert_eq!(
+        state.client_approval(last_user),
+        Some(&SteamworksServerClientApproval {
+            user: last_user,
+            owner: last_user,
+        })
+    );
 }
 
 #[test]
