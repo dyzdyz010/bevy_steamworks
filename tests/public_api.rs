@@ -602,8 +602,9 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
         std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
     );
-    let identity_command =
-        SteamworksServerCommand::get_authentication_session_ticket_for_identity(identity);
+    let identity_command = SteamworksServerCommand::get_authentication_session_ticket_for_identity(
+        SteamworksNetworkingPeer::from(identity),
+    );
     assert!(matches!(
         identity_command,
         SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { .. }
@@ -646,8 +647,9 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
         std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
     );
-    let identity_command =
-        PreludeServerCommand::get_authentication_session_ticket_for_identity(identity);
+    let identity_command = PreludeServerCommand::get_authentication_session_ticket_for_identity(
+        PreludeNetworkingPeer::from(identity),
+    );
     assert!(matches!(
         identity_command,
         PreludeServerCommand::GetAuthenticationSessionTicketForIdentity { .. }
@@ -1677,8 +1679,9 @@ fn user_api_is_exported_from_root_and_prelude() {
     let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
         std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
     );
-    let identity_command =
-        SteamworksUserCommand::get_authentication_session_ticket_for_identity(identity);
+    let identity_command = SteamworksUserCommand::get_authentication_session_ticket_for_identity(
+        SteamworksNetworkingPeer::from(identity),
+    );
     assert!(matches!(
         identity_command,
         SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { .. }
@@ -1704,8 +1707,9 @@ fn user_api_is_exported_from_root_and_prelude() {
     let identity = steamworks::networking_types::NetworkingIdentity::new_ip(
         std::net::SocketAddr::from(([127, 0, 0, 1], 27015)),
     );
-    let identity_command =
-        PreludeUserCommand::get_authentication_session_ticket_for_identity(identity);
+    let identity_command = PreludeUserCommand::get_authentication_session_ticket_for_identity(
+        PreludeNetworkingPeer::from(identity),
+    );
     assert!(matches!(
         identity_command,
         PreludeUserCommand::GetAuthenticationSessionTicketForIdentity { .. }

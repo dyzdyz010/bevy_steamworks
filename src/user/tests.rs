@@ -89,7 +89,9 @@ fn constructors_preserve_inputs() {
         SteamworksUserCommand::GetAuthenticationSessionTicket { steam_id }
     );
     assert_eq!(
-        SteamworksUserCommand::get_authentication_session_ticket_for_identity(identity.clone()),
+        SteamworksUserCommand::get_authentication_session_ticket_for_identity(
+            crate::SteamworksNetworkingPeer::from(identity.clone())
+        ),
         SteamworksUserCommand::GetAuthenticationSessionTicketForIdentity { identity }
     );
     assert_eq!(

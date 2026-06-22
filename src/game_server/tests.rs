@@ -342,7 +342,9 @@ fn constructors_preserve_inputs() {
         SteamworksServerCommand::GetAuthenticationSessionTicket { steam_id: user }
     );
     assert_eq!(
-        SteamworksServerCommand::get_authentication_session_ticket_for_identity(identity.clone()),
+        SteamworksServerCommand::get_authentication_session_ticket_for_identity(
+            crate::SteamworksNetworkingPeer::from(identity.clone())
+        ),
         SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity { identity }
     );
     let _cancel_constructor: fn(steamworks::AuthTicket) -> SteamworksServerCommand =

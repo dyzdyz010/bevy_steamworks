@@ -230,9 +230,11 @@ impl SteamworksServerCommand {
 
     /// Creates a [`SteamworksServerCommand::GetAuthenticationSessionTicketForIdentity`] command.
     pub fn get_authentication_session_ticket_for_identity(
-        identity: steamworks::networking_types::NetworkingIdentity,
+        identity: impl Into<steamworks::networking_types::NetworkingIdentity>,
     ) -> Self {
-        Self::GetAuthenticationSessionTicketForIdentity { identity }
+        Self::GetAuthenticationSessionTicketForIdentity {
+            identity: identity.into(),
+        }
     }
 
     /// Creates a [`SteamworksServerCommand::CancelAuthenticationTicket`] command.

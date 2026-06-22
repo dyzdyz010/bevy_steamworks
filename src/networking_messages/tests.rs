@@ -183,6 +183,12 @@ fn constructors_preserve_inputs() {
         SteamworksNetworkingPeer::from(addr).to_identity(),
         steamworks::networking_types::NetworkingIdentity::new_ip(addr)
     );
+    assert_eq!(
+        steamworks::networking_types::NetworkingIdentity::from(SteamworksNetworkingPeer::from(
+            steam_id
+        )),
+        steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
+    );
 
     assert_eq!(
         SteamworksNetworkingMessagesCommand::send_message(

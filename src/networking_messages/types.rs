@@ -69,6 +69,12 @@ impl From<steamworks::networking_types::NetworkingIdentity> for SteamworksNetwor
     }
 }
 
+impl From<SteamworksNetworkingPeer> for steamworks::networking_types::NetworkingIdentity {
+    fn from(value: SteamworksNetworkingPeer) -> Self {
+        value.to_identity()
+    }
+}
+
 /// Owned snapshot of one received Steam networking message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingMessage {
