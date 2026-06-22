@@ -3,7 +3,7 @@ use super::{
     SteamworksFriendRichPresenceValue, SteamworksFriendsError, SteamworksFriendsOperation,
     SteamworksFriendsState, SteamworksHasFriendResult, SteamworksOverlayStoreActivation,
     SteamworksOverlayUserActivation, SteamworksRichPresenceChange, SteamworksUserGameInvite,
-    SteamworksUserInformationRequest,
+    SteamworksUserInformationRequest, STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT,
 };
 
 impl SteamworksFriendsState {
@@ -139,6 +139,7 @@ fn upsert_friend(friends: &mut Vec<SteamworksFriendInfo>, friend: SteamworksFrie
         *known = friend;
     } else {
         friends.push(friend);
+        trim_cache(friends);
     }
 }
 
@@ -159,6 +160,7 @@ fn upsert_friend_rich_presence(
             key,
             value,
         });
+        trim_cache(values);
     }
 }
 
@@ -179,6 +181,7 @@ fn upsert_has_friend_result(
             flags,
             has_friend,
         });
+        trim_cache(values);
     }
 }
 
@@ -199,5 +202,13 @@ fn upsert_friend_avatar(
             size,
             avatar,
         });
+        trim_cache(values);
+    }
+}
+
+fn trim_cache<T>(items: &mut Vec<T>) {
+    if items.len() > STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT {
+        let overflow = items.len() - STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT;
+        items.drain(0..overflow);
     }
 }

@@ -5,6 +5,16 @@ use crate::SteamworksEvent;
 
 use super::*;
 
+fn test_friend(raw: u64) -> SteamworksFriendInfo {
+    SteamworksFriendInfo {
+        steam_id: steamworks::SteamId::from_raw(raw),
+        name: format!("Friend {raw}"),
+        nickname: None,
+        state: steamworks::FriendState::Online,
+        game: None,
+    }
+}
+
 #[test]
 fn friends_plugin_registers_resources_and_messages() {
     let mut app = App::new();
@@ -370,6 +380,66 @@ fn state_records_friend_operations() {
         Some(Some(&avatar))
     );
     assert_eq!(state.friend_avatars().len(), 1);
+}
+
+#[test]
+fn friend_state_caches_are_bounded() {
+    let mut state = SteamworksFriendsState::default();
+    let flags = steamworks::FriendFlags::IMMEDIATE;
+    let size = SteamworksAvatarSize::Small;
+
+    for raw in 1..=(super::state::STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT as u64 + 1) {
+        let steam_id = steamworks::SteamId::from_raw(raw);
+        state.record_operation(&SteamworksFriendsOperation::FriendRead {
+            friend: test_friend(raw),
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendRichPresenceRead {
+            steam_id,
+            key: "status".to_owned(),
+            value: Some(format!("status-{raw}")),
+        });
+        state.record_operation(&SteamworksFriendsOperation::HasFriendRead {
+            steam_id,
+            flags,
+            has_friend: raw % 2 == 0,
+        });
+        state.record_operation(&SteamworksFriendsOperation::FriendAvatarRead {
+            steam_id,
+            size,
+            avatar: None,
+        });
+    }
+
+    assert_eq!(
+        state.known_friends().len(),
+        super::state::STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.friend_rich_presence_values().len(),
+        super::state::STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.has_friend_results().len(),
+        super::state::STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state.friend_avatars().len(),
+        super::state::STEAMWORKS_FRIENDS_STATE_CACHE_LIMIT
+    );
+
+    let evicted = steamworks::SteamId::from_raw(1);
+    let retained = steamworks::SteamId::from_raw(2);
+    assert_eq!(state.friend(evicted), None);
+    assert_eq!(state.friend_rich_presence(evicted, "status"), None);
+    assert_eq!(state.has_friend(evicted, flags), None);
+    assert_eq!(state.friend_avatar(evicted, size), None);
+    assert!(state.friend(retained).is_some());
+    assert_eq!(
+        state.friend_rich_presence(retained, "status"),
+        Some(Some("status-2"))
+    );
+    assert_eq!(state.has_friend(retained, flags), Some(true));
+    assert_eq!(state.friend_avatar(retained, size), Some(None));
 }
 
 #[test]
