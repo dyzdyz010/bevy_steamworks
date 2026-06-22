@@ -50,6 +50,12 @@ impl SteamworksScreenshotsState {
                 self.screenshot_requested_count = *count;
             }
             SteamworksScreenshotsOperation::ScreenshotReady { ready } => {
+                self.screenshot_ready_count = self.screenshot_ready_count.saturating_add(1);
+                self.screenshot_ready_events.push(ready.clone());
+                trim_oldest(
+                    &mut self.screenshot_ready_events,
+                    STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT,
+                );
                 self.last_screenshot_ready = Some(ready.clone());
             }
         }

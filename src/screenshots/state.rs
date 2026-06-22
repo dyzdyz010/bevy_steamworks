@@ -19,5 +19,7 @@ pub struct SteamworksScreenshotsState {
     submitted_screenshots: Vec<SteamworksSubmittedScreenshot>,
     screenshot_trigger_count: u64,
     screenshot_requested_count: u64,
+    screenshot_ready_count: u64,
+    screenshot_ready_events: Vec<SteamworksScreenshotReady>,
     last_screenshot_ready: Option<SteamworksScreenshotReady>,
 }

@@ -53,6 +53,30 @@ impl SteamworksScreenshotsState {
         self.screenshot_requested_count
     }
 
+    /// Returns how many screenshot ready callbacks this plugin observed.
+    pub fn screenshot_ready_count(&self) -> u64 {
+        self.screenshot_ready_count
+    }
+
+    /// Returns bounded screenshot ready callback snapshots observed by this plugin.
+    pub fn screenshot_ready_events(&self) -> &[SteamworksScreenshotReady] {
+        &self.screenshot_ready_events
+    }
+
+    /// Returns the most recent ready callback snapshot for a screenshot handle.
+    pub fn screenshot_ready(
+        &self,
+        handle: steamworks::screenshots::ScreenshotHandle,
+    ) -> Option<&SteamworksScreenshotReady> {
+        self.screenshot_ready_events
+            .iter()
+            .rev()
+            .find(|ready| match &ready.local_handle {
+                Ok(ready_handle) => *ready_handle == handle,
+                Err(_) => false,
+            })
+    }
+
     /// Returns the most recent screenshot ready callback snapshot.
     pub fn last_screenshot_ready(&self) -> Option<&SteamworksScreenshotReady> {
         self.last_screenshot_ready.as_ref()

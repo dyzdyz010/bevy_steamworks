@@ -210,6 +210,20 @@ fn state_records_screenshot_operations() {
     );
     assert_eq!(state.last_submitted_screenshot(), Some(&updated_submission));
     assert_eq!(state.screenshot_requested_count(), 3);
+    assert_eq!(state.screenshot_ready_count(), 1);
+    assert_eq!(
+        state.screenshot_ready_events(),
+        &[SteamworksScreenshotReady {
+            local_handle: Ok(updated_submission.handle),
+        }]
+    );
+    assert_eq!(
+        state.screenshot_ready(updated_submission.handle),
+        Some(&SteamworksScreenshotReady {
+            local_handle: Ok(updated_submission.handle),
+        })
+    );
+    assert_eq!(state.screenshot_ready(99), None);
     assert_eq!(
         state.last_screenshot_ready(),
         Some(&SteamworksScreenshotReady {
@@ -253,6 +267,41 @@ fn screenshot_submission_caches_are_bounded() {
             thumbnail_filename: None,
             width: 1920,
             height: 1080,
+        })
+    );
+}
+
+#[test]
+fn screenshot_ready_cache_is_bounded() {
+    let mut state = SteamworksScreenshotsState::default();
+
+    for raw in 1..=(super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT as u32 + 1) {
+        state.record_operation(&SteamworksScreenshotsOperation::ScreenshotReady {
+            ready: SteamworksScreenshotReady {
+                local_handle: Ok(raw),
+            },
+        });
+    }
+
+    assert_eq!(
+        state.screenshot_ready_count(),
+        super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT as u64 + 1
+    );
+    assert_eq!(
+        state.screenshot_ready_events().len(),
+        super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT
+    );
+    assert_eq!(state.screenshot_ready(1), None);
+    assert_eq!(
+        state.screenshot_ready(2),
+        Some(&SteamworksScreenshotReady {
+            local_handle: Ok(2),
+        })
+    );
+    assert_eq!(
+        state.last_screenshot_ready(),
+        Some(&SteamworksScreenshotReady {
+            local_handle: Ok(super::state::STEAMWORKS_SCREENSHOTS_STATE_CACHE_LIMIT as u32 + 1),
         })
     );
 }
@@ -318,6 +367,14 @@ fn screenshot_callbacks_are_bridged_without_client() {
 
     let state = app.world().resource::<SteamworksScreenshotsState>();
     assert_eq!(state.screenshot_requested_count(), 2);
+    assert_eq!(state.screenshot_ready_count(), 2);
+    assert_eq!(state.screenshot_ready_events().len(), 2);
+    assert_eq!(
+        state.screenshot_ready(handle),
+        Some(&SteamworksScreenshotReady {
+            local_handle: Ok(handle),
+        })
+    );
     assert_eq!(
         state.last_screenshot_ready(),
         Some(&SteamworksScreenshotReady {
