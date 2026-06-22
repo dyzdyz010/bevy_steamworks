@@ -33,12 +33,10 @@ fn request_ugc(
         if let Ok(item) = item.parse::<u64>() {
             let item = PublishedFileId(item);
             commands.write(SteamworksUgcCommand::query(
-                SteamworksUgcQuery::item(item).with_options(
-                    SteamworksUgcQueryOptions::new()
-                        .with_metadata(true)
-                        .with_key_value_tags(true)
-                        .with_statistic(UGCStatisticType::Subscriptions),
-                ),
+                SteamworksUgcQuery::item(item)
+                    .with_metadata(true)
+                    .with_key_value_tags(true)
+                    .with_statistic(UGCStatisticType::Subscriptions),
             ));
             commands.write(SteamworksUgcCommand::get_item_state(item));
             commands.write(SteamworksUgcCommand::get_item_download_info(item));
@@ -70,11 +68,8 @@ fn request_ugc(
             AppIDs::ConsumerAppId(AppId(480)),
             1,
         )
-        .with_options(
-            SteamworksUgcQueryOptions::new()
-                .with_search_text(search_text)
-                .with_long_description(false),
-        );
+        .with_search_text(search_text)
+        .with_long_description(false);
         commands.write(SteamworksUgcCommand::query(query.clone()));
         if std::env::var("BEVY_STEAMWORKS_UGC_SEARCH_TOTAL").as_deref() == Ok("1") {
             commands.write(SteamworksUgcCommand::query_total(query.clone()));

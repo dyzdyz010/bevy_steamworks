@@ -1914,7 +1914,10 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     );
 
     let item = steamworks::PublishedFileId(42);
-    let query = SteamworksUgcQuery::item(item);
+    let query = SteamworksUgcQuery::item(item)
+        .with_metadata(true)
+        .with_key_value_tags(true)
+        .with_statistic(steamworks::UGCStatisticType::Subscriptions);
     let workshop_depot = SteamworksUgcWorkshopDepotId::from(steamworks::AppId(480));
     let _game_server_workshop_init = SteamworksUgcGameServerWorkshopInit {
         workshop_depot,

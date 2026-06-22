@@ -345,6 +345,50 @@ fn constructors_preserve_inputs() {
             .with_metadata(true)
             .with_key_value_tags(true),
     );
+    let direct_query = SteamworksUgcQuery::all(
+        steamworks::UGCQueryType::RankedByTextSearch,
+        steamworks::UGCType::Items,
+        steamworks::AppIDs::ConsumerAppId(steamworks::AppId(480)),
+        1,
+    )
+    .with_required_tag("arena")
+    .with_excluded_tag("draft")
+    .with_required_key_value_tag("mode", "ranked")
+    .with_match_any_tag(true)
+    .with_language("english")
+    .with_allow_cached_response(60)
+    .with_cloud_file_name_filter("save.dat")
+    .with_search_text("space battle")
+    .with_ranked_by_trend_days(7)
+    .with_long_description(true)
+    .with_children(true)
+    .with_metadata(true)
+    .with_key_value_tags(true)
+    .with_additional_previews(true)
+    .with_return_only_ids(true)
+    .with_return_total_only(true)
+    .with_statistic(steamworks::UGCStatisticType::Subscriptions);
+    assert_eq!(
+        direct_query.options(),
+        &SteamworksUgcQueryOptions::new()
+            .with_required_tag("arena")
+            .with_excluded_tag("draft")
+            .with_required_key_value_tag("mode", "ranked")
+            .with_match_any_tag(true)
+            .with_language("english")
+            .with_allow_cached_response(60)
+            .with_cloud_file_name_filter("save.dat")
+            .with_search_text("space battle")
+            .with_ranked_by_trend_days(7)
+            .with_long_description(true)
+            .with_children(true)
+            .with_metadata(true)
+            .with_key_value_tags(true)
+            .with_additional_previews(true)
+            .with_return_only_ids(true)
+            .with_return_total_only(true)
+            .with_statistic(steamworks::UGCStatisticType::Subscriptions)
+    );
     assert!(
         SteamworksUgcQueryOptions::new()
             .with_additional_previews(true)

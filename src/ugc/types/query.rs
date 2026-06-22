@@ -248,21 +248,131 @@ impl SteamworksUgcQuery {
 
     /// Replaces the query options.
     pub fn with_options(mut self, options: SteamworksUgcQueryOptions) -> Self {
-        match &mut self {
-            Self::All {
-                options: current, ..
-            }
-            | Self::User {
-                options: current, ..
-            }
-            | Self::Items {
-                options: current, ..
-            } => *current = options,
-        }
+        *self.options_mut() = options;
+        self
+    }
+
+    /// Adds a required tag.
+    pub fn with_required_tag(mut self, tag: impl Into<String>) -> Self {
+        self.options_mut().required_tags.push(tag.into());
+        self
+    }
+
+    /// Adds an excluded tag.
+    pub fn with_excluded_tag(mut self, tag: impl Into<String>) -> Self {
+        self.options_mut().excluded_tags.push(tag.into());
+        self
+    }
+
+    /// Adds a required key/value tag.
+    pub fn with_required_key_value_tag(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.options_mut()
+            .required_key_value_tags
+            .push((key.into(), value.into()));
+        self
+    }
+
+    /// Sets whether any required tag is sufficient.
+    pub fn with_match_any_tag(mut self, match_any_tag: bool) -> Self {
+        self.options_mut().match_any_tag = Some(match_any_tag);
+        self
+    }
+
+    /// Sets the query language.
+    pub fn with_language(mut self, language: impl Into<String>) -> Self {
+        self.options_mut().language = Some(language.into());
+        self
+    }
+
+    /// Allows cached responses up to `seconds` old.
+    pub fn with_allow_cached_response(mut self, seconds: u32) -> Self {
+        self.options_mut().allow_cached_response_seconds = Some(seconds);
+        self
+    }
+
+    /// Sets a Cloud file name filter.
+    pub fn with_cloud_file_name_filter(mut self, file_name: impl Into<String>) -> Self {
+        self.options_mut().cloud_file_name_filter = Some(file_name.into());
+        self
+    }
+
+    /// Sets the full-text search query.
+    pub fn with_search_text(mut self, search_text: impl Into<String>) -> Self {
+        self.options_mut().search_text = Some(search_text.into());
+        self
+    }
+
+    /// Sets ranked-by-trend days.
+    pub fn with_ranked_by_trend_days(mut self, days: u32) -> Self {
+        self.options_mut().ranked_by_trend_days = Some(days);
+        self
+    }
+
+    /// Includes long descriptions.
+    pub fn with_long_description(mut self, include: bool) -> Self {
+        self.options_mut().return_long_description = include;
+        self
+    }
+
+    /// Includes child item IDs.
+    pub fn with_children(mut self, include: bool) -> Self {
+        self.options_mut().return_children = include;
+        self
+    }
+
+    /// Includes developer metadata.
+    pub fn with_metadata(mut self, include: bool) -> Self {
+        self.options_mut().return_metadata = include;
+        self
+    }
+
+    /// Includes key/value tags.
+    pub fn with_key_value_tags(mut self, include: bool) -> Self {
+        self.options_mut().return_key_value_tags = include;
+        self
+    }
+
+    /// Includes additional preview rows when supported by Steam.
+    ///
+    /// The upstream `steamworks` crate currently exposes the request flag but
+    /// not a safe accessor for additional preview rows, so this only affects
+    /// the Steam query request.
+    pub fn with_additional_previews(mut self, include: bool) -> Self {
+        self.options_mut().return_additional_previews = include;
+        self
+    }
+
+    /// Returns only item IDs.
+    pub fn with_return_only_ids(mut self, enabled: bool) -> Self {
+        self.options_mut().return_only_ids = enabled;
+        self
+    }
+
+    /// Returns only the total result count.
+    pub fn with_return_total_only(mut self, enabled: bool) -> Self {
+        self.options_mut().return_total_only = enabled;
+        self
+    }
+
+    /// Adds a statistic to copy from each returned item.
+    pub fn with_statistic(mut self, statistic: steamworks::UGCStatisticType) -> Self {
+        self.options_mut().statistics.push(statistic);
         self
     }
 
     pub(in crate::ugc) fn options(&self) -> &SteamworksUgcQueryOptions {
+        match self {
+            Self::All { options, .. }
+            | Self::User { options, .. }
+            | Self::Items { options, .. } => options,
+        }
+    }
+
+    fn options_mut(&mut self) -> &mut SteamworksUgcQueryOptions {
         match self {
             Self::All { options, .. }
             | Self::User { options, .. }

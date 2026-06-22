@@ -832,12 +832,10 @@ When both `BEVY_STEAMWORKS_REMOTE_STORAGE_WRITE` and `BEVY_STEAMWORKS_REMOTE_STO
 fn request_ugc(mut ugc: MessageWriter<SteamworksUgcCommand>) {
     ugc.write(SteamworksUgcCommand::list_subscribed_items(false));
     ugc.write(SteamworksUgcCommand::query(
-        SteamworksUgcQuery::item(PublishedFileId(123456)).with_options(
-            SteamworksUgcQueryOptions::new()
-                .with_metadata(true)
-                .with_key_value_tags(true)
-                .with_statistic(UGCStatisticType::Subscriptions),
-        ),
+        SteamworksUgcQuery::item(PublishedFileId(123456))
+            .with_metadata(true)
+            .with_key_value_tags(true)
+            .with_statistic(UGCStatisticType::Subscriptions),
     ));
     ugc.write(SteamworksUgcCommand::query_ids(SteamworksUgcQuery::all(
         UGCQueryType::RankedByVote,
