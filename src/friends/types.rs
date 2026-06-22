@@ -210,10 +210,16 @@ pub enum SteamworksOverlayToStoreAction {
 
 impl SteamworksOverlayToStoreAction {
     pub(super) fn to_steam(self) -> steamworks::OverlayToStoreFlag {
-        match self {
-            Self::None => steamworks::OverlayToStoreFlag::None,
-            Self::AddToCart => steamworks::OverlayToStoreFlag::AddToCart,
-            Self::AddToCartAndShow => steamworks::OverlayToStoreFlag::AddToCartAndShow,
+        self.into()
+    }
+}
+
+impl From<SteamworksOverlayToStoreAction> for steamworks::OverlayToStoreFlag {
+    fn from(value: SteamworksOverlayToStoreAction) -> Self {
+        match value {
+            SteamworksOverlayToStoreAction::None => Self::None,
+            SteamworksOverlayToStoreAction::AddToCart => Self::AddToCart,
+            SteamworksOverlayToStoreAction::AddToCartAndShow => Self::AddToCartAndShow,
         }
     }
 }

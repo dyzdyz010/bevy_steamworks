@@ -143,6 +143,10 @@ fn constructors_preserve_inputs() {
             action: SteamworksOverlayToStoreAction::AddToCart,
         }
     );
+    assert!(matches!(
+        steamworks::OverlayToStoreFlag::from(SteamworksOverlayToStoreAction::AddToCartAndShow),
+        steamworks::OverlayToStoreFlag::AddToCartAndShow
+    ));
     assert_eq!(
         SteamworksFriendsCommand::activate_game_overlay_to_user("steamid", friend),
         SteamworksFriendsCommand::ActivateGameOverlayToUser {

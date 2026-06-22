@@ -34,11 +34,17 @@ pub enum SteamworksNotificationPosition {
 
 impl SteamworksNotificationPosition {
     pub(super) fn to_steam(self) -> steamworks::NotificationPosition {
-        match self {
-            Self::TopLeft => steamworks::NotificationPosition::TopLeft,
-            Self::TopRight => steamworks::NotificationPosition::TopRight,
-            Self::BottomLeft => steamworks::NotificationPosition::BottomLeft,
-            Self::BottomRight => steamworks::NotificationPosition::BottomRight,
+        self.into()
+    }
+}
+
+impl From<SteamworksNotificationPosition> for steamworks::NotificationPosition {
+    fn from(value: SteamworksNotificationPosition) -> Self {
+        match value {
+            SteamworksNotificationPosition::TopLeft => Self::TopLeft,
+            SteamworksNotificationPosition::TopRight => Self::TopRight,
+            SteamworksNotificationPosition::BottomLeft => Self::BottomLeft,
+            SteamworksNotificationPosition::BottomRight => Self::BottomRight,
         }
     }
 }
@@ -54,9 +60,15 @@ pub enum SteamworksGamepadTextInputMode {
 
 impl SteamworksGamepadTextInputMode {
     pub(super) fn to_steam(self) -> steamworks::GamepadTextInputMode {
-        match self {
-            Self::Normal => steamworks::GamepadTextInputMode::Normal,
-            Self::Password => steamworks::GamepadTextInputMode::Password,
+        self.into()
+    }
+}
+
+impl From<SteamworksGamepadTextInputMode> for steamworks::GamepadTextInputMode {
+    fn from(value: SteamworksGamepadTextInputMode) -> Self {
+        match value {
+            SteamworksGamepadTextInputMode::Normal => Self::Normal,
+            SteamworksGamepadTextInputMode::Password => Self::Password,
         }
     }
 }
@@ -72,9 +84,15 @@ pub enum SteamworksGamepadTextInputLineMode {
 
 impl SteamworksGamepadTextInputLineMode {
     pub(super) fn to_steam(self) -> steamworks::GamepadTextInputLineMode {
-        match self {
-            Self::SingleLine => steamworks::GamepadTextInputLineMode::SingleLine,
-            Self::MultipleLines => steamworks::GamepadTextInputLineMode::MultipleLines,
+        self.into()
+    }
+}
+
+impl From<SteamworksGamepadTextInputLineMode> for steamworks::GamepadTextInputLineMode {
+    fn from(value: SteamworksGamepadTextInputLineMode) -> Self {
+        match value {
+            SteamworksGamepadTextInputLineMode::SingleLine => Self::SingleLine,
+            SteamworksGamepadTextInputLineMode::MultipleLines => Self::MultipleLines,
         }
     }
 }
@@ -94,11 +112,17 @@ pub enum SteamworksFloatingGamepadTextInputMode {
 
 impl SteamworksFloatingGamepadTextInputMode {
     pub(super) fn to_steam(self) -> steamworks::FloatingGamepadTextInputMode {
-        match self {
-            Self::SingleLine => steamworks::FloatingGamepadTextInputMode::SingleLine,
-            Self::MultipleLines => steamworks::FloatingGamepadTextInputMode::MultipleLines,
-            Self::Email => steamworks::FloatingGamepadTextInputMode::Email,
-            Self::Numeric => steamworks::FloatingGamepadTextInputMode::Numeric,
+        self.into()
+    }
+}
+
+impl From<SteamworksFloatingGamepadTextInputMode> for steamworks::FloatingGamepadTextInputMode {
+    fn from(value: SteamworksFloatingGamepadTextInputMode) -> Self {
+        match value {
+            SteamworksFloatingGamepadTextInputMode::SingleLine => Self::SingleLine,
+            SteamworksFloatingGamepadTextInputMode::MultipleLines => Self::MultipleLines,
+            SteamworksFloatingGamepadTextInputMode::Email => Self::Email,
+            SteamworksFloatingGamepadTextInputMode::Numeric => Self::Numeric,
         }
     }
 }

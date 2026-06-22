@@ -178,6 +178,26 @@ fn constructors_preserve_inputs() {
             position: SteamworksNotificationPosition::BottomRight,
         }
     );
+    assert!(matches!(
+        steamworks::NotificationPosition::from(SteamworksNotificationPosition::TopLeft),
+        steamworks::NotificationPosition::TopLeft
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputMode::from(SteamworksGamepadTextInputMode::Password),
+        steamworks::GamepadTextInputMode::Password
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputLineMode::from(
+            SteamworksGamepadTextInputLineMode::MultipleLines
+        ),
+        steamworks::GamepadTextInputLineMode::MultipleLines
+    ));
+    assert!(matches!(
+        steamworks::FloatingGamepadTextInputMode::from(
+            SteamworksFloatingGamepadTextInputMode::Email
+        ),
+        steamworks::FloatingGamepadTextInputMode::Email
+    ));
     assert_eq!(
         SteamworksUtilsCommand::show_gamepad_text_input(gamepad_request.clone()),
         SteamworksUtilsCommand::ShowGamepadTextInput {

@@ -68,6 +68,7 @@ use bevy_steamworks::{
         SteamworksNetworkingUtilsPlugin as PreludeNetworkingUtilsPlugin,
         SteamworksNetworkingUtilsResult as PreludeNetworkingUtilsResult,
         SteamworksNotificationPosition as PreludeNotificationPosition,
+        SteamworksOverlayToStoreAction as PreludeOverlayToStoreAction,
         SteamworksPlugin as PreludePlugin, SteamworksPlugins as PreludePlugins,
         SteamworksRemotePlayCommand as PreludeRemotePlayCommand,
         SteamworksRemotePlayError as PreludeRemotePlayError,
@@ -161,15 +162,16 @@ use bevy_steamworks::{
     SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
     SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
     SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
-    SteamworksNotificationPosition, SteamworksPlugin, SteamworksPlugins,
-    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
-    SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
-    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
-    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
-    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
-    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
+    SteamworksNotificationPosition, SteamworksOverlayToStoreAction, SteamworksPlugin,
+    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
+    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
+    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
+    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
+    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
+    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
+    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
+    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
@@ -506,6 +508,10 @@ fn friends_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    assert!(matches!(
+        steamworks::OverlayToStoreFlag::from(SteamworksOverlayToStoreAction::AddToCart),
+        steamworks::OverlayToStoreFlag::AddToCart
+    ));
 
     accepts_root_exports(
         SteamworksFriendsPlugin::new(),
@@ -524,6 +530,10 @@ fn friends_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    assert!(matches!(
+        steamworks::OverlayToStoreFlag::from(PreludeOverlayToStoreAction::AddToCartAndShow),
+        steamworks::OverlayToStoreFlag::AddToCartAndShow
+    ));
 
     accepts_prelude_exports(
         PreludeFriendsPlugin::new(),
@@ -2162,6 +2172,26 @@ fn utils_api_is_exported_from_root_and_prelude() {
         SteamworksGamepadTextInputLineMode::SingleLine,
         SteamworksGamepadTextInputLineMode::MultipleLines,
     ];
+    assert!(matches!(
+        steamworks::NotificationPosition::from(SteamworksNotificationPosition::TopLeft),
+        steamworks::NotificationPosition::TopLeft
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputMode::from(SteamworksGamepadTextInputMode::Password),
+        steamworks::GamepadTextInputMode::Password
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputLineMode::from(
+            SteamworksGamepadTextInputLineMode::MultipleLines
+        ),
+        steamworks::GamepadTextInputLineMode::MultipleLines
+    ));
+    assert!(matches!(
+        steamworks::FloatingGamepadTextInputMode::from(
+            SteamworksFloatingGamepadTextInputMode::Numeric
+        ),
+        steamworks::FloatingGamepadTextInputMode::Numeric
+    ));
 
     let command = SteamworksUtilsCommand::set_overlay_notification_position(
         SteamworksNotificationPosition::TopLeft,
@@ -2268,6 +2298,24 @@ fn utils_api_is_exported_from_root_and_prelude() {
         PreludeGamepadTextInputLineMode::SingleLine,
         PreludeGamepadTextInputLineMode::MultipleLines,
     ];
+    assert!(matches!(
+        steamworks::NotificationPosition::from(PreludeNotificationPosition::TopRight),
+        steamworks::NotificationPosition::TopRight
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputMode::from(PreludeGamepadTextInputMode::Normal),
+        steamworks::GamepadTextInputMode::Normal
+    ));
+    assert!(matches!(
+        steamworks::GamepadTextInputLineMode::from(PreludeGamepadTextInputLineMode::SingleLine),
+        steamworks::GamepadTextInputLineMode::SingleLine
+    ));
+    assert!(matches!(
+        steamworks::FloatingGamepadTextInputMode::from(
+            PreludeFloatingGamepadTextInputMode::MultipleLines
+        ),
+        steamworks::FloatingGamepadTextInputMode::MultipleLines
+    ));
 
     let command = PreludeUtilsCommand::set_overlay_notification_position(
         PreludeNotificationPosition::TopLeft,
