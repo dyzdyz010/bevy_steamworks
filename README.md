@@ -183,7 +183,7 @@ fn main() {
 }
 ```
 
-The server command layer covers server identity reads, anonymous or token logon, metadata, advertisement and heartbeat flags, auth tickets, remote auth sessions, key/value rules, and shared-query incoming/outgoing packet handling. `SteamworksServerCommand::get_authentication_session_ticket(...)` keeps the Steam ID convenience path, while `SteamworksServerCommand::get_authentication_session_ticket_for_identity(...)` issues a ticket for any valid Steam `NetworkingIdentity` or `SteamworksNetworkingPeer`; invalid identities fail synchronously with `SteamworksServerError::InvalidNetworkingIdentity`. Login tokens use `SteamworksServerLoginToken`, whose `Debug` output is redacted so command tracing does not leak secrets. `SteamworksServerCommand::drain_outgoing_packets()` returns `SteamworksServerOutgoingPacket` values that the app should send through its game server socket; it mirrors upstream's drain-all behavior for packets currently queued by Steam. `SteamworksServerState` caches bounded snapshots for latest auth/session activity, identity-scoped auth tickets, metadata, heartbeat state, incoming packet context, outgoing packet drains, and callback results. Packet and auth-ticket `Debug` output reports byte lengths instead of raw bytes. The layer validates strings, game tag lengths, invalid networking identities, and documented pre-logon-only metadata before calling upstream `steamworks`, so common C string conversion panics and logon-order mistakes become `SteamworksServerError` values. The server plugin also registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors auth ticket, validation, connection, `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` callbacks through both `SteamworksEvent` and `SteamworksServerResult`. Use `SteamworksUgcPlugin` for game-server Workshop initialization, `SteamworksUtilsPlugin` for read-only game-server utility queries, and the networking plugins for game-server networking accessors. Use the `SteamworksServer` resource directly for upstream safe APIs not yet wrapped by commands, such as game-server apps accessors.
+The server command layer covers server identity reads, anonymous or token logon, metadata, advertisement and heartbeat flags, auth tickets, remote auth sessions, key/value rules, and shared-query incoming/outgoing packet handling. `SteamworksServerCommand::get_authentication_session_ticket(...)` keeps the Steam ID convenience path, while `SteamworksServerCommand::get_authentication_session_ticket_for_identity(...)` issues a ticket for any valid Steam `NetworkingIdentity` or `SteamworksNetworkingPeer`; invalid identities fail synchronously with `SteamworksServerError::InvalidNetworkingIdentity`. Login tokens use `SteamworksServerLoginToken`, whose `Debug` output is redacted so command tracing does not leak secrets. `SteamworksServerCommand::drain_outgoing_packets()` returns `SteamworksServerOutgoingPacket` values that the app should send through its game server socket; it mirrors upstream's drain-all behavior for packets currently queued by Steam. `SteamworksServerState` caches bounded snapshots for latest auth/session activity, identity-scoped auth tickets, metadata, heartbeat state, incoming packet context, outgoing packet drains, and callback results. Packet and auth-ticket `Debug` output reports byte lengths instead of raw bytes. The layer validates strings, game tag lengths, invalid networking identities, and documented pre-logon-only metadata before calling upstream `steamworks`, so common C string conversion panics and logon-order mistakes become `SteamworksServerError` values. The server plugin also registers `SteamworksServerCallbackRegistry` for lower-level typed server callbacks and mirrors auth ticket, validation, connection, `GSClientApprove`, `GSClientDeny`, `GSClientKick`, and `GSClientGroupStatus` callbacks through both `SteamworksEvent` and `SteamworksServerResult`. Use `SteamworksUgcPlugin` for game-server Workshop initialization, `SteamworksUtilsPlugin` for read-only game-server utility queries, and the networking plugins for game-server networking accessors. Use the `SteamworksServer` resource directly for upstream safe APIs not yet wrapped by commands.
 
 Run the dedicated server example with:
 
@@ -603,7 +603,7 @@ cargo run --example networking_messages
 
 ## Networking Utils and Relay Status
 
-`SteamworksNetworkingUtilsPlugin` adds command/result messages for Steam Datagram Relay diagnostics: initialize relay network access early, read summary relay availability, read detailed relay status, and receive relay status callbacks as Bevy messages.
+`SteamworksNetworkingUtilsPlugin` adds command/result messages for Steam Datagram Relay diagnostics: initialize relay network access early, read summary relay availability, read detailed relay status, read individual ping/config/any-relay/debug fields, and receive relay status callbacks as Bevy messages.
 
 ```rust,no_run
 # use bevy::prelude::*;
@@ -611,6 +611,8 @@ cargo run --example networking_messages
 fn request_relay_status(mut utils: MessageWriter<SteamworksNetworkingUtilsCommand>) {
     utils.write(SteamworksNetworkingUtilsCommand::init_relay_network_access());
     utils.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
+    utils.write(SteamworksNetworkingUtilsCommand::get_any_relay_status());
+    utils.write(SteamworksNetworkingUtilsCommand::get_relay_debug_message());
 }
 
 fn read_relay_status(mut results: MessageReader<SteamworksNetworkingUtilsResult>) {
@@ -630,7 +632,7 @@ fn main() {
 }
 ```
 
-Relay status callbacks arrive through the main `SteamworksEvent::RelayNetworkStatusCallback` stream. This plugin observes those events after `SteamworksSystem::RunCallbacks`, reads the current detailed relay status, and emits an owned `SteamworksNetworkingUtilsResult::Ok` snapshot. Detailed status is copied into `SteamworksRelayNetworkStatus`, including Steam's diagnostic debug string, so the snapshot can be stored in ECS state safely.
+Relay status callbacks arrive through the main `SteamworksEvent::RelayNetworkStatusCallback` stream. This plugin observes those events after `SteamworksSystem::RunCallbacks`, reads the current detailed relay status, and emits an owned `SteamworksNetworkingUtilsResult::Ok` snapshot. Detailed status is copied into `SteamworksRelayNetworkStatus`, including Steam's diagnostic debug string, so the snapshot can be stored in ECS state safely. `SteamworksNetworkingUtilsState` also caches the most recent summary availability, detailed status, ping-measurement flag, network-config availability, any-relay availability, and relay debug message from commands or callbacks.
 
 Allocated `NetworkingUtils::allocate_message` handles are owned by the `networking_sockets` command layer through `SteamworksNetworkingSocketsCommand::send_messages`, because they are part of low-level socket send workflows rather than relay diagnostics.
 

@@ -30,6 +30,8 @@ fn configure_networking_utils(
 
     commands.write(SteamworksNetworkingUtilsCommand::get_relay_network_status());
     commands.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
+    commands.write(SteamworksNetworkingUtilsCommand::get_any_relay_status());
+    commands.write(SteamworksNetworkingUtilsCommand::get_relay_debug_message());
 }
 
 fn poll_relay_status(
@@ -38,6 +40,8 @@ fn poll_relay_status(
 ) {
     if countdown.0 == 0 {
         commands.write(SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status());
+        commands.write(SteamworksNetworkingUtilsCommand::is_relay_ping_measurement_in_progress());
+        commands.write(SteamworksNetworkingUtilsCommand::get_relay_network_config_status());
         countdown.0 = env_u32("BEVY_STEAMWORKS_RELAY_POLL_FRAMES").unwrap_or(30);
     } else {
         countdown.0 -= 1;

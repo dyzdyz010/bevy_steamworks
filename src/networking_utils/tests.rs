@@ -92,6 +92,22 @@ fn constructors_preserve_inputs() {
         SteamworksNetworkingUtilsCommand::get_detailed_relay_network_status(),
         SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus
     );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::is_relay_ping_measurement_in_progress(),
+        SteamworksNetworkingUtilsCommand::IsRelayPingMeasurementInProgress
+    );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::get_relay_network_config_status(),
+        SteamworksNetworkingUtilsCommand::GetRelayNetworkConfigStatus
+    );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::get_any_relay_status(),
+        SteamworksNetworkingUtilsCommand::GetAnyRelayStatus
+    );
+    assert_eq!(
+        SteamworksNetworkingUtilsCommand::get_relay_debug_message(),
+        SteamworksNetworkingUtilsCommand::GetRelayDebugMessage
+    );
 }
 
 #[test]
@@ -111,6 +127,36 @@ fn state_records_operations_without_unbounded_callback_history() {
         },
     );
     state.record_operation(
+        &SteamworksNetworkingUtilsOperation::RelayPingMeasurementStateRead { in_progress: true },
+    );
+    state.record_operation(
+        &SteamworksNetworkingUtilsOperation::RelayNetworkConfigStatusRead {
+            availability: Ok(steamworks::networking_types::NetworkingAvailability::Attempting),
+        },
+    );
+    state.record_operation(&SteamworksNetworkingUtilsOperation::AnyRelayStatusRead {
+        availability: Ok(steamworks::networking_types::NetworkingAvailability::Current),
+    });
+    state.record_operation(&SteamworksNetworkingUtilsOperation::RelayDebugMessageRead {
+        message: "measuring".to_owned(),
+    });
+
+    assert_eq!(state.relay_ping_measurement_in_progress(), Some(true));
+    assert_eq!(
+        state.last_relay_network_config_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Attempting
+        ))
+    );
+    assert_eq!(
+        state.last_any_relay_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(state.last_relay_debugging_message(), Some("measuring"));
+
+    state.record_operation(
         &SteamworksNetworkingUtilsOperation::RelayNetworkStatusChanged {
             status: status.clone(),
         },
@@ -124,6 +170,20 @@ fn state_records_operations_without_unbounded_callback_history() {
         ))
     );
     assert_eq!(state.last_relay_network_status(), Some(&status));
+    assert_eq!(state.relay_ping_measurement_in_progress(), Some(false));
+    assert_eq!(
+        state.last_relay_network_config_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(
+        state.last_any_relay_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(state.last_relay_debugging_message(), Some("ready"));
     assert_eq!(state.relay_network_status_callback_count(), 1);
 }
 
@@ -138,5 +198,19 @@ fn relay_status_callback_operation_updates_state() {
         },
     );
     assert_eq!(state.last_relay_network_status(), Some(&status));
+    assert_eq!(state.relay_ping_measurement_in_progress(), Some(false));
+    assert_eq!(
+        state.last_relay_network_config_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(
+        state.last_any_relay_availability(),
+        Some(&Ok(
+            steamworks::networking_types::NetworkingAvailability::Current
+        ))
+    );
+    assert_eq!(state.last_relay_debugging_message(), Some("ready"));
     assert_eq!(state.relay_network_status_callback_count(), 1);
 }

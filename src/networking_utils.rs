@@ -2,8 +2,8 @@
 //!
 //! This module builds on top of the upstream
 //! [`steamworks::networking_utils::NetworkingUtils`] API. It exposes Steam
-//! Datagram Relay initialization and relay status diagnostics through Bevy
-//! commands/results, and turns relay status callbacks into owned Bevy messages.
+//! Datagram Relay initialization, relay status diagnostics, individual relay
+//! detail reads, and relay status callbacks through owned Bevy messages.
 
 mod callbacks;
 mod commands;

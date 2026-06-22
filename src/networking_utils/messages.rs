@@ -12,6 +12,14 @@ pub enum SteamworksNetworkingUtilsCommand {
     GetRelayNetworkStatus,
     /// Read the detailed relay network status snapshot.
     GetDetailedRelayNetworkStatus,
+    /// Read whether Steam is currently measuring relay latency.
+    IsRelayPingMeasurementInProgress,
+    /// Read the relay network-config prerequisite availability.
+    GetRelayNetworkConfigStatus,
+    /// Read whether any Steam Datagram Relay can be reached.
+    GetAnyRelayStatus,
+    /// Read Steam's non-localized relay diagnostic message.
+    GetRelayDebugMessage,
 }
 
 impl SteamworksNetworkingUtilsCommand {
@@ -29,6 +37,26 @@ impl SteamworksNetworkingUtilsCommand {
     pub fn get_detailed_relay_network_status() -> Self {
         Self::GetDetailedRelayNetworkStatus
     }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::IsRelayPingMeasurementInProgress`] command.
+    pub fn is_relay_ping_measurement_in_progress() -> Self {
+        Self::IsRelayPingMeasurementInProgress
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::GetRelayNetworkConfigStatus`] command.
+    pub fn get_relay_network_config_status() -> Self {
+        Self::GetRelayNetworkConfigStatus
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::GetAnyRelayStatus`] command.
+    pub fn get_any_relay_status() -> Self {
+        Self::GetAnyRelayStatus
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingUtilsCommand::GetRelayDebugMessage`] command.
+    pub fn get_relay_debug_message() -> Self {
+        Self::GetRelayDebugMessage
+    }
 }
 
 /// A successfully submitted Steam Networking Utils operation or synchronous read.
@@ -45,6 +73,26 @@ pub enum SteamworksNetworkingUtilsOperation {
     DetailedRelayNetworkStatusRead {
         /// Owned relay network status snapshot.
         status: SteamworksRelayNetworkStatus,
+    },
+    /// Relay ping measurement state was read.
+    RelayPingMeasurementStateRead {
+        /// Whether Steam is currently measuring relay latency.
+        in_progress: bool,
+    },
+    /// Relay network-config prerequisite availability was read.
+    RelayNetworkConfigStatusRead {
+        /// Network-config prerequisite availability.
+        availability: steamworks::networking_types::NetworkingAvailabilityResult,
+    },
+    /// Any-relay availability was read.
+    AnyRelayStatusRead {
+        /// Availability of at least one Steam Datagram Relay.
+        availability: steamworks::networking_types::NetworkingAvailabilityResult,
+    },
+    /// Relay diagnostic debug message was read.
+    RelayDebugMessageRead {
+        /// Non-localized diagnostic text from Steam.
+        message: String,
     },
     /// A relay network status callback was observed after Steam callbacks were pumped.
     RelayNetworkStatusChanged {

@@ -1271,8 +1271,10 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
         None,
     );
 
-    let command = SteamworksNetworkingUtilsCommand::init_relay_network_access();
-    let operation = SteamworksNetworkingUtilsOperation::RelayNetworkAccessInitialized;
+    let command = SteamworksNetworkingUtilsCommand::get_relay_debug_message();
+    let operation = SteamworksNetworkingUtilsOperation::RelayDebugMessageRead {
+        message: String::new(),
+    };
     let error = SteamworksNetworkingUtilsError::ClientUnavailable;
     let result = SteamworksNetworkingUtilsResult::Err {
         command: command.clone(),
@@ -1287,8 +1289,10 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
         error,
     );
 
-    let command = PreludeNetworkingUtilsCommand::init_relay_network_access();
-    let operation = PreludeNetworkingUtilsOperation::RelayNetworkAccessInitialized;
+    let command = PreludeNetworkingUtilsCommand::get_any_relay_status();
+    let operation = PreludeNetworkingUtilsOperation::AnyRelayStatusRead {
+        availability: Err(steamworks::networking_types::NetworkingAvailabilityError::Unknown),
+    };
     let error = PreludeNetworkingUtilsError::ClientUnavailable;
     let result = PreludeNetworkingUtilsResult::Err {
         command: command.clone(),

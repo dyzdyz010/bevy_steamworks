@@ -87,10 +87,38 @@ fn handle_networking_utils_command(
         }
         SteamworksNetworkingUtilsCommand::GetDetailedRelayNetworkStatus => {
             SteamworksNetworkingUtilsOperation::DetailedRelayNetworkStatusRead {
-                status: SteamworksRelayNetworkStatus::from_steam(
-                    networking_utils.detailed_relay_network_status(),
-                ),
+                status: relay_network_status(&networking_utils),
+            }
+        }
+        SteamworksNetworkingUtilsCommand::IsRelayPingMeasurementInProgress => {
+            let status = relay_network_status(&networking_utils);
+            SteamworksNetworkingUtilsOperation::RelayPingMeasurementStateRead {
+                in_progress: status.ping_measurement_in_progress,
+            }
+        }
+        SteamworksNetworkingUtilsCommand::GetRelayNetworkConfigStatus => {
+            let status = relay_network_status(&networking_utils);
+            SteamworksNetworkingUtilsOperation::RelayNetworkConfigStatusRead {
+                availability: status.network_config,
+            }
+        }
+        SteamworksNetworkingUtilsCommand::GetAnyRelayStatus => {
+            let status = relay_network_status(&networking_utils);
+            SteamworksNetworkingUtilsOperation::AnyRelayStatusRead {
+                availability: status.any_relay,
+            }
+        }
+        SteamworksNetworkingUtilsCommand::GetRelayDebugMessage => {
+            let status = relay_network_status(&networking_utils);
+            SteamworksNetworkingUtilsOperation::RelayDebugMessageRead {
+                message: status.debugging_message,
             }
         }
     })
+}
+
+fn relay_network_status(
+    networking_utils: &steamworks::networking_utils::NetworkingUtils,
+) -> SteamworksRelayNetworkStatus {
+    SteamworksRelayNetworkStatus::from_steam(networking_utils.detailed_relay_network_status())
 }
