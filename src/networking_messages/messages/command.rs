@@ -38,13 +38,13 @@ pub enum SteamworksNetworkingMessagesCommand {
 impl SteamworksNetworkingMessagesCommand {
     /// Creates a [`crate::SteamworksNetworkingMessagesCommand::SendMessage`] command.
     pub fn send_message(
-        peer: SteamworksNetworkingPeer,
+        peer: impl Into<SteamworksNetworkingPeer>,
         send_flags: steamworks::networking_types::SendFlags,
         channel: u32,
         data: impl Into<Vec<u8>>,
     ) -> Self {
         Self::SendMessage {
-            peer,
+            peer: peer.into(),
             send_flags,
             channel,
             data: data.into(),
@@ -75,8 +75,8 @@ impl SteamworksNetworkingMessagesCommand {
     }
 
     /// Creates a [`crate::SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo`] command.
-    pub fn get_session_connection_info(peer: SteamworksNetworkingPeer) -> Self {
-        Self::GetSessionConnectionInfo { peer }
+    pub fn get_session_connection_info(peer: impl Into<SteamworksNetworkingPeer>) -> Self {
+        Self::GetSessionConnectionInfo { peer: peer.into() }
     }
 
     /// Creates a [`crate::SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests`] command.

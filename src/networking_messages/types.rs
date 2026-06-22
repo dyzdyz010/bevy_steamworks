@@ -34,7 +34,8 @@ impl SteamworksNetworkingPeer {
         Self::Identity(identity)
     }
 
-    pub(super) fn to_identity(&self) -> steamworks::networking_types::NetworkingIdentity {
+    /// Converts this high-level peer target into an upstream networking identity.
+    pub fn to_identity(&self) -> steamworks::networking_types::NetworkingIdentity {
         match self {
             Self::SteamId(id) => {
                 steamworks::networking_types::NetworkingIdentity::new_steam_id(*id)
@@ -47,6 +48,24 @@ impl SteamworksNetworkingPeer {
             }
             Self::Identity(identity) => identity.clone(),
         }
+    }
+}
+
+impl From<steamworks::SteamId> for SteamworksNetworkingPeer {
+    fn from(value: steamworks::SteamId) -> Self {
+        Self::steam_id(value)
+    }
+}
+
+impl From<SocketAddr> for SteamworksNetworkingPeer {
+    fn from(value: SocketAddr) -> Self {
+        Self::ip(value)
+    }
+}
+
+impl From<steamworks::networking_types::NetworkingIdentity> for SteamworksNetworkingPeer {
+    fn from(value: steamworks::networking_types::NetworkingIdentity) -> Self {
+        Self::identity(value)
     }
 }
 

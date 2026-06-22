@@ -161,18 +161,38 @@ fn constructors_preserve_inputs() {
     );
     assert_eq!(
         SteamworksNetworkingPeer::identity(identity.clone()),
-        SteamworksNetworkingPeer::Identity(identity)
+        SteamworksNetworkingPeer::Identity(identity.clone())
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::from(steam_id),
+        SteamworksNetworkingPeer::SteamId(steam_id)
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::from(addr),
+        SteamworksNetworkingPeer::Ip(addr)
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::from(identity.clone()),
+        SteamworksNetworkingPeer::Identity(identity.clone())
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::from(steam_id).to_identity(),
+        steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
+    );
+    assert_eq!(
+        SteamworksNetworkingPeer::from(addr).to_identity(),
+        steamworks::networking_types::NetworkingIdentity::new_ip(addr)
     );
 
     assert_eq!(
         SteamworksNetworkingMessagesCommand::send_message(
-            peer.clone(),
+            steam_id,
             steamworks::networking_types::SendFlags::UNRELIABLE,
             7,
             [1, 2, 3],
         ),
         SteamworksNetworkingMessagesCommand::SendMessage {
-            peer: peer.clone(),
+            peer: SteamworksNetworkingPeer::SteamId(steam_id),
             send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
             channel: 7,
             data: vec![1, 2, 3],
@@ -200,8 +220,10 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
-        SteamworksNetworkingMessagesCommand::get_session_connection_info(peer.clone()),
-        SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo { peer }
+        SteamworksNetworkingMessagesCommand::get_session_connection_info(addr),
+        SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo {
+            peer: SteamworksNetworkingPeer::Ip(addr)
+        }
     );
     assert_eq!(
         SteamworksNetworkingMessagesCommand::set_auto_accept_session_requests(false),

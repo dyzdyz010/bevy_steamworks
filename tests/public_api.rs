@@ -47,6 +47,7 @@ use bevy_steamworks::{
         SteamworksNetworkingMessagesPlugin as PreludeNetworkingMessagesPlugin,
         SteamworksNetworkingMessagesResult as PreludeNetworkingMessagesResult,
         SteamworksNetworkingOperation as PreludeNetworkingOperation,
+        SteamworksNetworkingPeer as PreludeNetworkingPeer,
         SteamworksNetworkingPlugin as PreludeNetworkingPlugin,
         SteamworksNetworkingResult as PreludeNetworkingResult,
         SteamworksNetworkingSocketsCommand as PreludeNetworkingSocketsCommand,
@@ -150,25 +151,25 @@ use bevy_steamworks::{
     SteamworksNetworkingCommand, SteamworksNetworkingError, SteamworksNetworkingMessagesCommand,
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
     SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesResult,
-    SteamworksNetworkingOperation, SteamworksNetworkingPlugin, SteamworksNetworkingResult,
-    SteamworksNetworkingSocketsCommand, SteamworksNetworkingSocketsConfigEntry,
-    SteamworksNetworkingSocketsConnectionId, SteamworksNetworkingSocketsConnectionName,
-    SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
-    SteamworksNetworkingSocketsListenEndpoint, SteamworksNetworkingSocketsMessageSendResult,
-    SteamworksNetworkingSocketsOperation, SteamworksNetworkingSocketsOutboundMessage,
-    SteamworksNetworkingSocketsPlugin, SteamworksNetworkingSocketsResult,
-    SteamworksNetworkingUtilsCommand, SteamworksNetworkingUtilsError,
-    SteamworksNetworkingUtilsOperation, SteamworksNetworkingUtilsPlugin,
-    SteamworksNetworkingUtilsResult, SteamworksNotificationPosition, SteamworksPlugin,
-    SteamworksPlugins, SteamworksRemotePlayCommand, SteamworksRemotePlayError,
-    SteamworksRemotePlayOperation, SteamworksRemotePlayPlugin, SteamworksRemotePlayResult,
-    SteamworksRemoteStorageCommand, SteamworksRemoteStorageError,
-    SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileWrite,
-    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageOperation,
-    SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult, SteamworksScreenshotsCommand,
-    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
-    SteamworksServerError, SteamworksServerInitMode,
+    SteamworksNetworkingOperation, SteamworksNetworkingPeer, SteamworksNetworkingPlugin,
+    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
+    SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
+    SteamworksNetworkingSocketsConnectionName, SteamworksNetworkingSocketsConnectionUserData,
+    SteamworksNetworkingSocketsError, SteamworksNetworkingSocketsListenEndpoint,
+    SteamworksNetworkingSocketsMessageSendResult, SteamworksNetworkingSocketsOperation,
+    SteamworksNetworkingSocketsOutboundMessage, SteamworksNetworkingSocketsPlugin,
+    SteamworksNetworkingSocketsResult, SteamworksNetworkingUtilsCommand,
+    SteamworksNetworkingUtilsError, SteamworksNetworkingUtilsOperation,
+    SteamworksNetworkingUtilsPlugin, SteamworksNetworkingUtilsResult,
+    SteamworksNotificationPosition, SteamworksPlugin, SteamworksPlugins,
+    SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
+    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
+    SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
+    SteamworksRemoteStorageFileWrite, SteamworksRemoteStorageFileWritten,
+    SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
+    SteamworksScreenshotsCommand, SteamworksScreenshotsError, SteamworksScreenshotsOperation,
+    SteamworksScreenshotsPlugin, SteamworksScreenshotsResult, SteamworksServerCommand,
+    SteamworksServerConfig, SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
@@ -907,6 +908,7 @@ fn networking_api_is_exported_from_root_and_prelude() {
 fn networking_messages_api_is_exported_from_root_and_prelude() {
     fn accepts_root_exports(
         _plugin: SteamworksNetworkingMessagesPlugin,
+        _peer: SteamworksNetworkingPeer,
         _command: SteamworksNetworkingMessagesCommand,
         _operation: SteamworksNetworkingMessagesOperation,
         _result: SteamworksNetworkingMessagesResult,
@@ -916,6 +918,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
 
     fn accepts_prelude_exports(
         _plugin: PreludeNetworkingMessagesPlugin,
+        _peer: PreludeNetworkingPeer,
         _command: PreludeNetworkingMessagesCommand,
         _operation: PreludeNetworkingMessagesOperation,
         _result: PreludeNetworkingMessagesResult,
@@ -923,7 +926,18 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     ) {
     }
 
-    let command = SteamworksNetworkingMessagesCommand::receive_messages(0, 1);
+    let steam_id = steamworks::SteamId::from_raw(7);
+    let peer = SteamworksNetworkingPeer::from(steam_id);
+    assert_eq!(
+        peer.to_identity(),
+        steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
+    );
+    let command = SteamworksNetworkingMessagesCommand::send_message(
+        steam_id,
+        steamworks::networking_types::SendFlags::RELIABLE,
+        0,
+        b"ping",
+    );
     let operation =
         SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
     let error = SteamworksNetworkingMessagesError::ClientUnavailable;
@@ -934,9 +948,20 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
 
-    accepts_root_exports(plugin, command, operation, result, error);
+    accepts_root_exports(plugin, peer, command, operation, result, error);
 
-    let command = PreludeNetworkingMessagesCommand::receive_messages(0, 1);
+    let steam_id = steamworks::SteamId::from_raw(7);
+    let peer = PreludeNetworkingPeer::from(steam_id);
+    assert_eq!(
+        peer.to_identity(),
+        steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
+    );
+    let command = PreludeNetworkingMessagesCommand::send_message(
+        steam_id,
+        steamworks::networking_types::SendFlags::RELIABLE,
+        0,
+        b"ping",
+    );
     let operation =
         PreludeNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
     let error = PreludeNetworkingMessagesError::ClientUnavailable;
@@ -947,7 +972,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = PreludeNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
 
-    accepts_prelude_exports(plugin, command, operation, result, error);
+    accepts_prelude_exports(plugin, peer, command, operation, result, error);
 }
 
 #[test]
