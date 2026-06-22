@@ -1,0 +1,55 @@
+use super::SteamworksNetworkingUtilsState;
+use crate::networking_utils::{SteamworksNetworkingUtilsError, SteamworksRelayNetworkStatus};
+
+impl SteamworksNetworkingUtilsState {
+    /// Returns the most recent synchronous command error observed by the plugin.
+    pub fn last_error(&self) -> Option<&SteamworksNetworkingUtilsError> {
+        self.last_error.as_ref()
+    }
+
+    /// Returns the most recent relay network availability read through the plugin.
+    pub fn last_relay_network_availability(
+        &self,
+    ) -> Option<&steamworks::networking_types::NetworkingAvailabilityResult> {
+        self.last_relay_network_availability.as_ref()
+    }
+
+    /// Returns the most recent detailed relay network status snapshot.
+    pub fn last_relay_network_status(&self) -> Option<&SteamworksRelayNetworkStatus> {
+        self.last_relay_network_status.as_ref()
+    }
+
+    /// Returns the most recent relay ping-measurement state read through the plugin.
+    pub fn relay_ping_measurement_in_progress(&self) -> Option<bool> {
+        self.last_relay_ping_measurement_in_progress
+    }
+
+    /// Returns the most recent relay network-config prerequisite availability.
+    pub fn last_relay_network_config_availability(
+        &self,
+    ) -> Option<&steamworks::networking_types::NetworkingAvailabilityResult> {
+        self.last_relay_network_config_availability.as_ref()
+    }
+
+    /// Returns the most recent any-relay availability.
+    pub fn last_any_relay_availability(
+        &self,
+    ) -> Option<&steamworks::networking_types::NetworkingAvailabilityResult> {
+        self.last_any_relay_availability.as_ref()
+    }
+
+    /// Returns the most recent relay diagnostic debug message.
+    pub fn last_relay_debugging_message(&self) -> Option<&str> {
+        self.last_relay_debugging_message.as_deref()
+    }
+
+    /// Returns whether relay network access was initialized through this plugin.
+    pub fn relay_network_access_initialized(&self) -> bool {
+        self.relay_network_access_initialized
+    }
+
+    /// Returns how many relay network status callbacks this plugin has observed.
+    pub fn relay_network_status_callback_count(&self) -> u64 {
+        self.relay_network_status_callback_count
+    }
+}
