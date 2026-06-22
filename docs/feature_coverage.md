@@ -17,7 +17,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | Networking messages | Implemented | Send/receive, session connection info, session request/failure callbacks, configurable auto-accept. |
 | Networking sockets | Implemented | Listen/connect, accept/close, single/all event polling, receives, flushes, and teardown, messages, batch sends, poll groups, connection names/user data, lanes, auth helpers, realtime status, client/server ownership tracking. |
 | Networking utils | Implemented | Relay initialization, relay status callbacks, detailed relay diagnostics, ping measurement/config/any-relay/debug-message reads. |
-| Input | Implemented | Init/run/shutdown, controller and action handles, digital/analog data, origins/glyphs/names, motion data, action set activation, binding panel. |
+| Input | Implemented | Init/run/shutdown, controller and action handles, digital/analog data, origins/glyphs/names, cached origin presentation lookup, motion data, action set activation, binding panel. |
 | Screenshots | Implemented | Hook state, trigger, library add, requested/ready callbacks. |
 | Remote Storage | Implemented | Cloud state, files, metadata/existence/persisted/timestamps, read/write/delete/forget, sync platforms, file share. |
 | UGC | Implemented | Subscriptions, item state/download/install info, item downloads, queries, total/ID-only query paths, item create/update/delete, update progress, playtime tracking, game-server workshop init. |

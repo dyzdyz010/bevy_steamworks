@@ -702,6 +702,14 @@ fn input_api_is_exported_from_root_and_prelude() {
     assert!(!bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(0).is_valid());
     assert!(bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1).is_valid());
     assert!(!bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(0).is_valid());
+    let root_origin = bevy_steamworks::SteamworksInputActionOrigin::from_code(1);
+    assert_eq!(root_origin.code(), 1);
+    let root_origin_info = bevy_steamworks::SteamworksInputActionOriginInfo {
+        origin: root_origin,
+        glyph_path: "glyph.svg".to_owned(),
+        name: "A Button".to_owned(),
+    };
+    assert_eq!(root_origin_info.origin, root_origin);
 
     let command = SteamworksInputCommand::init(false);
     let operation = SteamworksInputOperation::Initialized {
@@ -727,7 +735,6 @@ fn input_api_is_exported_from_root_and_prelude() {
         SteamworksInputResult::Ok(SteamworksInputOperation::Shutdown),
         SteamworksInputError::ClientUnavailable,
     );
-
     let command = PreludeInputCommand::init(false);
     let operation = PreludeInputOperation::Initialized {
         explicitly_call_run_frame: false,
@@ -748,6 +755,13 @@ fn input_api_is_exported_from_root_and_prelude() {
         PreludeInputResult::Ok(PreludeInputOperation::FrameRun),
         PreludeInputError::ClientUnavailable,
     );
+    let prelude_origin = bevy_steamworks::prelude::SteamworksInputActionOrigin::from_code(2);
+    let prelude_origin_info = bevy_steamworks::prelude::SteamworksInputActionOriginInfo {
+        origin: prelude_origin,
+        glyph_path: "glyph-b.svg".to_owned(),
+        name: "B Button".to_owned(),
+    };
+    assert_eq!(prelude_origin_info.origin, prelude_origin);
 }
 
 #[test]

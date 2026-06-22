@@ -21,6 +21,8 @@ pub struct SteamworksInputState {
     last_analog_action: Option<SteamworksInputAnalogActionSnapshot>,
     last_digital_action_origins: Option<SteamworksInputDigitalActionOriginsSnapshot>,
     last_analog_action_origins: Option<SteamworksInputAnalogActionOriginsSnapshot>,
+    action_origin_infos: Vec<SteamworksInputActionOriginInfo>,
+    last_action_origin_info: Option<SteamworksInputActionOriginInfo>,
     last_motion: Option<SteamworksInputMotionSnapshot>,
     last_binding_panel_controller: Option<SteamworksInputHandle>,
 }
@@ -72,5 +74,19 @@ pub(super) fn upsert_named_analog_action(
         existing.handle = handle;
     } else {
         handles.push(SteamworksInputNamedAnalogActionHandle { name, handle });
+    }
+}
+
+pub(super) fn upsert_action_origin_info(
+    infos: &mut Vec<SteamworksInputActionOriginInfo>,
+    info: SteamworksInputActionOriginInfo,
+) {
+    if let Some(existing) = infos
+        .iter_mut()
+        .find(|existing| existing.origin == info.origin)
+    {
+        *existing = info;
+    } else {
+        infos.push(info);
     }
 }

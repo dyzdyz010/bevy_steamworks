@@ -1,4 +1,5 @@
 use super::{
+    SteamworksInputActionOrigin, SteamworksInputActionOriginInfo,
     SteamworksInputActionSetActivation, SteamworksInputActionSetHandle,
     SteamworksInputAnalogActionHandle, SteamworksInputAnalogActionOriginsSnapshot,
     SteamworksInputAnalogActionSnapshot, SteamworksInputDigitalActionHandle,
@@ -109,6 +110,26 @@ impl SteamworksInputState {
         &self,
     ) -> Option<&SteamworksInputAnalogActionOriginsSnapshot> {
         self.last_analog_action_origins.as_ref()
+    }
+
+    /// Returns cached action origin presentation data read from origin queries.
+    pub fn action_origin_infos(&self) -> &[SteamworksInputActionOriginInfo] {
+        &self.action_origin_infos
+    }
+
+    /// Returns cached presentation data for one action origin.
+    pub fn action_origin_info(
+        &self,
+        origin: SteamworksInputActionOrigin,
+    ) -> Option<&SteamworksInputActionOriginInfo> {
+        self.action_origin_infos
+            .iter()
+            .find(|info| info.origin == origin)
+    }
+
+    /// Returns the most recent action origin presentation snapshot.
+    pub fn last_action_origin_info(&self) -> Option<&SteamworksInputActionOriginInfo> {
+        self.last_action_origin_info.as_ref()
     }
 
     /// Returns the most recent motion data snapshot.

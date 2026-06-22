@@ -69,12 +69,14 @@ fn constructors_preserve_inputs() {
     let action_set = SteamworksInputActionSetHandle::from_raw(2);
     let digital_action = SteamworksInputDigitalActionHandle::from_raw(3);
     let analog_action = SteamworksInputAnalogActionHandle::from_raw(4);
+    let origin = SteamworksInputActionOrigin::from_code(1);
 
     assert_eq!(controller.raw(), 1);
     assert!(controller.is_valid());
     assert!(action_set.is_valid());
     assert!(digital_action.is_valid());
     assert!(analog_action.is_valid());
+    assert_eq!(origin.code(), 1);
     assert!(!SteamworksInputHandle::from_raw(0).is_valid());
     assert!(!SteamworksInputActionSetHandle::from_raw(0).is_valid());
     assert!(!SteamworksInputDigitalActionHandle::from_raw(0).is_valid());
@@ -276,6 +278,8 @@ fn state_clears_stale_action_data_on_manifest_change_and_shutdown() {
     assert!(state.last_analog_action().is_none());
     assert!(state.last_digital_action_origins().is_none());
     assert!(state.last_analog_action_origins().is_none());
+    assert!(state.action_origin_infos().is_empty());
+    assert!(state.last_action_origin_info().is_none());
     assert!(state.last_motion().is_none());
     assert!(state.last_binding_panel_controller().is_none());
 
@@ -326,6 +330,16 @@ fn state_records_input_operations() {
         origin: SteamworksInputActionOrigin::from_code(7),
         glyph_path: "glyph.svg".to_owned(),
         name: "A Button".to_owned(),
+    };
+    let updated_origin = SteamworksInputActionOriginInfo {
+        origin: origin.origin,
+        glyph_path: "glyph-updated.svg".to_owned(),
+        name: "A Button Updated".to_owned(),
+    };
+    let second_origin = SteamworksInputActionOriginInfo {
+        origin: SteamworksInputActionOrigin::from_code(8),
+        glyph_path: "glyph-b.svg".to_owned(),
+        name: "B Button".to_owned(),
     };
     let motion = SteamworksInputMotionSnapshot {
         controller,
@@ -382,7 +396,7 @@ fn state_records_input_operations() {
         controller,
         action_set,
         action: analog_action,
-        origins: vec![origin.clone()],
+        origins: vec![updated_origin.clone(), second_origin.clone()],
     });
     state.record_operation(&SteamworksInputOperation::MotionDataRead {
         snapshot: motion.clone(),
@@ -425,9 +439,22 @@ fn state_records_input_operations() {
             controller,
             action_set,
             action: analog_action,
-            origins: vec![origin],
+            origins: vec![updated_origin.clone(), second_origin.clone()],
         })
     );
+    assert_eq!(
+        state.action_origin_infos(),
+        &[updated_origin.clone(), second_origin.clone()]
+    );
+    assert_eq!(
+        state.action_origin_info(updated_origin.origin),
+        Some(&updated_origin)
+    );
+    assert_eq!(
+        state.action_origin_info(second_origin.origin),
+        Some(&second_origin)
+    );
+    assert_eq!(state.last_action_origin_info(), Some(&second_origin));
     assert_eq!(state.last_motion(), Some(&motion));
     assert_eq!(state.last_binding_panel_controller(), Some(controller));
 }

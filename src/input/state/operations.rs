@@ -1,6 +1,6 @@
 use super::{
-    upsert_controller, upsert_named_action_set, upsert_named_analog_action,
-    upsert_named_digital_action, SteamworksInputActionSetActivation,
+    upsert_action_origin_info, upsert_controller, upsert_named_action_set,
+    upsert_named_analog_action, upsert_named_digital_action, SteamworksInputActionSetActivation,
     SteamworksInputAnalogActionOriginsSnapshot, SteamworksInputDigitalActionOriginsSnapshot,
     SteamworksInputError, SteamworksInputOperation, SteamworksInputState,
 };
@@ -65,6 +65,10 @@ impl SteamworksInputState {
                 action,
                 origins,
             } => {
+                for origin in origins {
+                    upsert_action_origin_info(&mut self.action_origin_infos, origin.clone());
+                }
+                self.last_action_origin_info = origins.last().cloned();
                 self.last_digital_action_origins =
                     Some(SteamworksInputDigitalActionOriginsSnapshot {
                         controller: *controller,
@@ -79,6 +83,10 @@ impl SteamworksInputState {
                 action,
                 origins,
             } => {
+                for origin in origins {
+                    upsert_action_origin_info(&mut self.action_origin_infos, origin.clone());
+                }
+                self.last_action_origin_info = origins.last().cloned();
                 self.last_analog_action_origins =
                     Some(SteamworksInputAnalogActionOriginsSnapshot {
                         controller: *controller,
@@ -110,6 +118,8 @@ impl SteamworksInputState {
         self.last_analog_action = None;
         self.last_digital_action_origins = None;
         self.last_analog_action_origins = None;
+        self.action_origin_infos.clear();
+        self.last_action_origin_info = None;
         self.last_motion = None;
         self.last_binding_panel_controller = None;
     }
