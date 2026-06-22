@@ -265,6 +265,36 @@ fn state_records_callback_operations_without_unbounded_history() {
         server_index: 2,
         server: server.clone(),
     });
+
+    assert_eq!(
+        state.server_query(query),
+        Some(SteamworksServerQueryInfo {
+            query,
+            kind: SteamworksServerQueryKind::Ping,
+            target,
+        })
+    );
+    assert_eq!(state.server_ping(query), Some(&ping));
+    assert!(state.server_ping_failed(query));
+    assert_eq!(state.server_player_details(query), Some(&player_details));
+    assert!(state.server_player_details_failed(query));
+    assert_eq!(state.server_rules(query), Some(&rules));
+    assert!(state.server_rules_failed(query));
+    assert_eq!(
+        state.server_list_request(request),
+        Some(&SteamworksServerListRequestInfo {
+            request,
+            app_id: steamworks::AppId(480),
+            kind: SteamworksServerListKind::Internet,
+            filters: filters.clone(),
+        })
+    );
+    assert_eq!(state.server_list_count(request), Some(4));
+    assert_eq!(state.server_list_refreshing(request), Some(true));
+    assert_eq!(state.server(request, 0), Some(&server));
+    assert_eq!(state.server(request, 2), Some(&server));
+    assert_eq!(state.server(request, 99), None);
+
     state.record_operation(&SteamworksMatchmakingServersOperation::ServerListReleased { request });
 
     assert_eq!(
@@ -349,6 +379,11 @@ fn state_records_callback_operations_without_unbounded_history() {
         })
     );
     assert_eq!(state.last_released_server_list_request(), Some(request));
+    assert_eq!(state.server_list_request(request), None);
+    assert_eq!(state.server_list_count(request), None);
+    assert_eq!(state.server_list_refreshing(request), None);
+    assert_eq!(state.server(request, 0), None);
+    assert!(state.server_query(query).is_some());
     assert_eq!(state.server_list_release_count(), 1);
     assert_eq!(state.server_response_count(), 1);
     assert_eq!(state.server_failure_count(), 1);

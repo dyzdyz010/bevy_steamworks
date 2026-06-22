@@ -23,6 +23,16 @@ impl SteamworksMatchmakingServersState {
         self.last_server_list_request.as_ref()
     }
 
+    /// Returns a cached server-list request by ID, if it is still owned by this plugin.
+    pub fn server_list_request(
+        &self,
+        request: SteamworksServerListRequestId,
+    ) -> Option<&SteamworksServerListRequestInfo> {
+        self.server_list_requests
+            .iter()
+            .find(|info| info.request == request)
+    }
+
     /// Returns the most recent server-list request released through this plugin.
     pub fn last_released_server_list_request(&self) -> Option<SteamworksServerListRequestId> {
         self.last_released_server_list_request
@@ -48,9 +58,25 @@ impl SteamworksMatchmakingServersState {
         self.last_server_list_count
     }
 
+    /// Returns the latest cached server count for one server-list request.
+    pub fn server_list_count(&self, request: SteamworksServerListRequestId) -> Option<i32> {
+        self.server_list_counts
+            .iter()
+            .find(|count| count.request == request)
+            .map(|count| count.count)
+    }
+
     /// Returns the most recent server-list refreshing state read through this plugin.
     pub fn last_server_list_refreshing(&self) -> Option<SteamworksServerListRefreshing> {
         self.last_server_list_refreshing
+    }
+
+    /// Returns the latest cached refreshing state for one server-list request.
+    pub fn server_list_refreshing(&self, request: SteamworksServerListRequestId) -> Option<bool> {
+        self.server_list_refreshing_states
+            .iter()
+            .find(|refreshing| refreshing.request == request)
+            .map(|refreshing| refreshing.refreshing)
     }
 
     /// Returns the most recent server response callback context.
@@ -73,6 +99,20 @@ impl SteamworksMatchmakingServersState {
         self.last_server.as_ref()
     }
 
+    /// Returns a cached server snapshot by server-list request and server index.
+    pub fn server(
+        &self,
+        request: SteamworksServerListRequestId,
+        server_index: i32,
+    ) -> Option<&SteamworksGameServerItem> {
+        self.servers
+            .iter()
+            .find(|server| {
+                server.index.request == request && server.index.server_index == server_index
+            })
+            .map(|server| &server.server)
+    }
+
     /// Returns the most recent server-list refresh completion response.
     pub fn last_refresh_response(&self) -> Option<SteamworksServerListResponse> {
         self.last_refresh_response
@@ -83,9 +123,25 @@ impl SteamworksMatchmakingServersState {
         self.last_server_query
     }
 
+    /// Returns a cached direct server query context by query ID.
+    pub fn server_query(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryInfo> {
+        self.server_queries
+            .iter()
+            .find(|info| info.query == query)
+            .copied()
+    }
+
     /// Returns the most recent direct server ping response.
     pub fn last_server_ping(&self) -> Option<&SteamworksServerPing> {
         self.last_server_ping.as_ref()
+    }
+
+    /// Returns a cached direct server ping response by query ID.
+    pub fn server_ping(&self, query: SteamworksServerQueryId) -> Option<&SteamworksServerPing> {
+        self.server_pings.iter().find(|ping| ping.query == query)
     }
 
     /// Returns the most recent direct server ping query that failed.
@@ -93,9 +149,24 @@ impl SteamworksMatchmakingServersState {
         self.last_failed_server_ping
     }
 
+    /// Returns whether a direct server ping query has failed.
+    pub fn server_ping_failed(&self, query: SteamworksServerQueryId) -> bool {
+        self.failed_server_pings.contains(&query)
+    }
+
     /// Returns the most recent direct server player-details response.
     pub fn last_server_player_details(&self) -> Option<&SteamworksServerPlayerDetails> {
         self.last_server_player_details.as_ref()
+    }
+
+    /// Returns cached direct server player details by query ID.
+    pub fn server_player_details(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<&SteamworksServerPlayerDetails> {
+        self.server_player_details
+            .iter()
+            .find(|details| details.query == query)
     }
 
     /// Returns the most recent direct server player-details query that failed.
@@ -103,14 +174,29 @@ impl SteamworksMatchmakingServersState {
         self.last_failed_server_player_details
     }
 
+    /// Returns whether a direct player-details query has failed.
+    pub fn server_player_details_failed(&self, query: SteamworksServerQueryId) -> bool {
+        self.failed_server_player_details.contains(&query)
+    }
+
     /// Returns the most recent direct server-rules response.
     pub fn last_server_rules(&self) -> Option<&SteamworksServerRules> {
         self.last_server_rules.as_ref()
     }
 
+    /// Returns cached direct server rules by query ID.
+    pub fn server_rules(&self, query: SteamworksServerQueryId) -> Option<&SteamworksServerRules> {
+        self.server_rules.iter().find(|rules| rules.query == query)
+    }
+
     /// Returns the most recent direct server-rules query that failed.
     pub fn last_failed_server_rules(&self) -> Option<SteamworksServerQueryId> {
         self.last_failed_server_rules
+    }
+
+    /// Returns whether a direct server-rules query has failed.
+    pub fn server_rules_failed(&self, query: SteamworksServerQueryId) -> bool {
+        self.failed_server_rules.contains(&query)
     }
 
     /// Returns how many server-list requests were submitted.
