@@ -83,6 +83,9 @@ use bevy_steamworks::{
         SteamworksRemotePlayOperation as PreludeRemotePlayOperation,
         SteamworksRemotePlayPlugin as PreludeRemotePlayPlugin,
         SteamworksRemotePlayResult as PreludeRemotePlayResult,
+        SteamworksRemotePlaySessionInfo as PreludeRemotePlaySessionInfo,
+        SteamworksRemotePlaySessionSnapshot as PreludeRemotePlaySessionSnapshot,
+        SteamworksRemotePlayState as PreludeRemotePlayState,
         SteamworksRemoteStorageCommand as PreludeRemoteStorageCommand,
         SteamworksRemoteStorageError as PreludeRemoteStorageError,
         SteamworksRemoteStorageFileContents as PreludeRemoteStorageFileContents,
@@ -194,7 +197,8 @@ use bevy_steamworks::{
     SteamworksNetworkingUtilsResult, SteamworksNotificationPosition,
     SteamworksOverlayToStoreAction, SteamworksPlugin, SteamworksPlugins,
     SteamworksRemotePlayCommand, SteamworksRemotePlayError, SteamworksRemotePlayOperation,
-    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemoteStorageCommand,
+    SteamworksRemotePlayPlugin, SteamworksRemotePlayResult, SteamworksRemotePlaySessionInfo,
+    SteamworksRemotePlaySessionSnapshot, SteamworksRemotePlayState, SteamworksRemoteStorageCommand,
     SteamworksRemoteStorageError, SteamworksRemoteStorageFileContents,
     SteamworksRemoteStorageFileReadRequest, SteamworksRemoteStorageFileShareHandle,
     SteamworksRemoteStorageFileShareRequest, SteamworksRemoteStorageFileWrite,
@@ -2104,6 +2108,31 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let session = steamworks::RemotePlaySessionId::from_raw(1);
+    let user = steamworks::SteamId::from_raw(2);
+    let _snapshot = SteamworksRemotePlaySessionSnapshot {
+        user,
+        client_name: Some("Deck".to_owned()),
+        client_form_factor: Some(steamworks::SteamDeviceFormFactor::Computer),
+        client_resolution: Some((1280, 800)),
+    };
+    let _info = SteamworksRemotePlaySessionInfo {
+        session,
+        user,
+        client_name: Some("Deck".to_owned()),
+        client_form_factor: Some(steamworks::SteamDeviceFormFactor::Computer),
+        client_resolution: Some((1280, 800)),
+    };
+    let state = SteamworksRemotePlayState::default();
+    assert!(state.sessions().is_empty());
+    assert!(state.known_sessions().is_empty());
+    assert_eq!(state.known_session(session), None);
+    assert_eq!(state.known_sessions_for_user(user).count(), 0);
+    assert_eq!(state.latest_known_session_for_user(user), None);
+    assert_eq!(state.session_user(session), None);
+    assert_eq!(state.session_client_name(session), None);
+    assert_eq!(state.session_client_form_factor(session), None);
+    assert_eq!(state.session_client_resolution(session), None);
 
     accepts_root_exports(
         SteamworksRemotePlayPlugin::new(),
@@ -2120,6 +2149,29 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let _prelude_snapshot = PreludeRemotePlaySessionSnapshot {
+        user,
+        client_name: Some("Deck".to_owned()),
+        client_form_factor: Some(steamworks::SteamDeviceFormFactor::Computer),
+        client_resolution: Some((1280, 800)),
+    };
+    let _prelude_info = PreludeRemotePlaySessionInfo {
+        session,
+        user,
+        client_name: Some("Deck".to_owned()),
+        client_form_factor: Some(steamworks::SteamDeviceFormFactor::Computer),
+        client_resolution: Some((1280, 800)),
+    };
+    let state = PreludeRemotePlayState::default();
+    assert!(state.sessions().is_empty());
+    assert!(state.known_sessions().is_empty());
+    assert_eq!(state.known_session(session), None);
+    assert_eq!(state.known_sessions_for_user(user).count(), 0);
+    assert_eq!(state.latest_known_session_for_user(user), None);
+    assert_eq!(state.session_user(session), None);
+    assert_eq!(state.session_client_name(session), None);
+    assert_eq!(state.session_client_form_factor(session), None);
+    assert_eq!(state.session_client_resolution(session), None);
 
     accepts_prelude_exports(
         PreludeRemotePlayPlugin::new(),

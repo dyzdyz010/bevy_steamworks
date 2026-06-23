@@ -35,6 +35,62 @@ impl SteamworksRemotePlayState {
             .find(|known| known.session == session)
     }
 
+    /// Returns known ID-based session snapshots for one Steam user.
+    pub fn known_sessions_for_user(
+        &self,
+        user: steamworks::SteamId,
+    ) -> impl Iterator<Item = &SteamworksRemotePlaySessionInfo> + '_ {
+        self.known_sessions
+            .iter()
+            .filter(move |session| session.user == user)
+    }
+
+    /// Returns the most recent known ID-based session snapshot for one Steam user.
+    pub fn latest_known_session_for_user(
+        &self,
+        user: steamworks::SteamId,
+    ) -> Option<&SteamworksRemotePlaySessionInfo> {
+        self.known_sessions
+            .iter()
+            .rev()
+            .find(|session| session.user == user)
+    }
+
+    /// Returns the latest known client name for a session, preserving an expired/no-name session as `Some(None)`.
+    pub fn session_client_name(
+        &self,
+        session: steamworks::RemotePlaySessionId,
+    ) -> Option<Option<&str>> {
+        self.known_session(session)
+            .map(|session| session.client_name.as_deref())
+    }
+
+    /// Returns the latest known client form factor for a session, preserving an unknown/expired form factor as `Some(None)`.
+    pub fn session_client_form_factor(
+        &self,
+        session: steamworks::RemotePlaySessionId,
+    ) -> Option<Option<steamworks::SteamDeviceFormFactor>> {
+        self.known_session(session)
+            .map(|session| session.client_form_factor)
+    }
+
+    /// Returns the latest known client resolution for a session, preserving an expired/no-resolution session as `Some(None)`.
+    pub fn session_client_resolution(
+        &self,
+        session: steamworks::RemotePlaySessionId,
+    ) -> Option<Option<(u32, u32)>> {
+        self.known_session(session)
+            .map(|session| session.client_resolution)
+    }
+
+    /// Returns the latest known Steam user for a session.
+    pub fn session_user(
+        &self,
+        session: steamworks::RemotePlaySessionId,
+    ) -> Option<steamworks::SteamId> {
+        self.known_session(session).map(|session| session.user)
+    }
+
     /// Returns session IDs observed as connected and not yet disconnected.
     ///
     /// This list is callback-driven and only reflects sessions observed while

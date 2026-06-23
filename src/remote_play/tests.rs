@@ -142,6 +142,33 @@ fn state_records_remote_play_operations() {
     assert_eq!(state.known_session(first_session), Some(&updated_info));
     assert!(state.known_session(second_session).is_none());
     assert_eq!(
+        state
+            .known_sessions_for_user(updated_info.user)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![updated_info.clone()]
+    );
+    assert_eq!(
+        state.latest_known_session_for_user(updated_info.user),
+        Some(&updated_info)
+    );
+    assert_eq!(
+        state.latest_known_session_for_user(steamworks::SteamId::from_raw(999)),
+        None
+    );
+    assert_eq!(state.session_user(first_session), Some(updated_info.user));
+    assert_eq!(state.session_user(second_session), None);
+    assert_eq!(
+        state.session_client_name(first_session),
+        Some(Some("Living Room"))
+    );
+    assert_eq!(state.session_client_name(second_session), None);
+    assert_eq!(state.session_client_form_factor(first_session), Some(None));
+    assert_eq!(
+        state.session_client_resolution(first_session),
+        Some(Some((1920, 1080)))
+    );
+    assert_eq!(
         state.observed_connected_sessions(),
         &[first_session, second_session]
     );
@@ -162,6 +189,11 @@ fn state_records_remote_play_operations() {
     assert_eq!(state.observed_connected_sessions(), &[second_session]);
     assert!(!state.is_session_observed_connected(first_session));
     assert!(state.known_session(first_session).is_none());
+    assert_eq!(state.session_user(first_session), None);
+    assert_eq!(state.session_client_name(first_session), None);
+    assert_eq!(state.session_client_form_factor(first_session), None);
+    assert_eq!(state.session_client_resolution(first_session), None);
+    assert_eq!(state.latest_known_session_for_user(updated_info.user), None);
 }
 
 #[test]
