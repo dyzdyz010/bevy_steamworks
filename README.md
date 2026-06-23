@@ -384,7 +384,7 @@ cargo run --example user
 
 ## Utilities and Overlay Helpers
 
-`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, Steam SDK warning logging, overlay notification position, and gamepad text input.
+`SteamworksUtilsPlugin` adds command/result messages for Steam utility queries and lightweight overlay helpers: app id, IP country, Steam UI language, server real time, overlay availability, Big Picture mode, Steam Deck detection, Steam SDK warning logging, overlay notification position, and gamepad text input. Read-only utility queries can use either `SteamworksClient` or `SteamworksServer`; overlay, warning-callback, and gamepad text input commands remain client-only.
 
 ```rust,no_run
 # use bevy::prelude::*;

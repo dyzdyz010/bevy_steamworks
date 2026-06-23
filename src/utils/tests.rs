@@ -39,7 +39,7 @@ fn plugin_name_matches_utils_type_path_for_bevy_tracking() {
 }
 
 #[test]
-fn commands_fail_when_client_is_unavailable() {
+fn read_commands_fail_when_utils_resource_is_unavailable() {
     let mut app = App::new();
 
     app.add_plugins(SteamworksUtilsPlugin::new());

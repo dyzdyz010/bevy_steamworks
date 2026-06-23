@@ -54,7 +54,7 @@ fn networking_messages_plugin_registers_resources_and_messages() {
 }
 
 #[test]
-fn commands_fail_when_client_is_unavailable() {
+fn commands_fail_when_networking_messages_resource_is_unavailable() {
     let mut app = App::new();
 
     app.add_plugins(SteamworksNetworkingMessagesPlugin::new());

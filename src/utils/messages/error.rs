@@ -3,8 +3,12 @@ use thiserror::Error;
 /// Synchronous errors from [`crate::SteamworksUtilsPlugin`].
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum SteamworksUtilsError {
-    /// No [`crate::SteamworksClient`] resource exists.
-    #[error("SteamworksClient resource is not available")]
+    /// No compatible Steamworks resource exists for the requested utility command.
+    ///
+    /// Read-only utility queries can use either [`crate::SteamworksClient`] or
+    /// [`crate::SteamworksServer`]. Overlay, warning-callback, and gamepad text
+    /// input commands still require [`crate::SteamworksClient`].
+    #[error("Steamworks Utils resource is not available for this command")]
     ClientUnavailable,
     /// A string passed to Steam contains an interior NUL byte.
     #[error("Steamworks utils command field {field} contains an interior NUL byte")]
