@@ -132,6 +132,11 @@ impl SteamworksMatchmakingState {
         &self.joined_lobbies
     }
 
+    /// Returns whether this command layer currently considers the lobby joined.
+    pub fn is_lobby_joined(&self, lobby: steamworks::LobbyId) -> bool {
+        self.joined_lobbies.contains(&lobby)
+    }
+
     /// Returns the most recent lobby metadata count read.
     pub fn last_lobby_data_count(&self) -> Option<&SteamworksLobbyDataCount> {
         self.last_lobby_data_count.as_ref()
@@ -174,6 +179,30 @@ impl SteamworksMatchmakingState {
             .find(|value| value.lobby == lobby && value.key.as_str() == key)
     }
 
+    /// Returns the latest known lobby metadata value for a key.
+    ///
+    /// The outer `Option` distinguishes no cached data from cached data. The
+    /// inner `Option` is `None` when a direct read reported no value or a full
+    /// metadata snapshot did not include the key.
+    pub fn lobby_data(
+        &self,
+        lobby: steamworks::LobbyId,
+        key: impl AsRef<str>,
+    ) -> Option<Option<&str>> {
+        let key = key.as_ref();
+        self.lobby_data_value(lobby, key)
+            .map(|value| value.value.as_deref())
+            .or_else(|| {
+                self.all_lobby_data(lobby).map(|entries| {
+                    entries
+                        .entries
+                        .iter()
+                        .find(|(entry_key, _)| entry_key == key)
+                        .map(|(_, value)| value.as_str())
+                })
+            })
+    }
+
     /// Returns the most recent lobby metadata entry read by index.
     pub fn last_lobby_data_entry(&self) -> Option<&SteamworksLobbyDataEntry> {
         self.last_lobby_data_entry.as_ref()
@@ -213,6 +242,22 @@ impl SteamworksMatchmakingState {
         self.all_lobby_data
             .iter()
             .find(|entries| entries.lobby == lobby)
+    }
+
+    /// Returns one value from the latest full lobby metadata snapshot.
+    pub fn all_lobby_data_value(
+        &self,
+        lobby: steamworks::LobbyId,
+        key: impl AsRef<str>,
+    ) -> Option<&str> {
+        let key = key.as_ref();
+        self.all_lobby_data(lobby).and_then(|entries| {
+            entries
+                .entries
+                .iter()
+                .find(|(entry_key, _)| entry_key == key)
+                .map(|(_, value)| value.as_str())
+        })
     }
 
     /// Returns the most recent lobby metadata key set.
@@ -304,6 +349,20 @@ impl SteamworksMatchmakingState {
             .find(|value| value.lobby == lobby && value.user == user && value.key.as_str() == key)
     }
 
+    /// Returns the latest known member metadata value for a lobby/user/key triple.
+    ///
+    /// The outer `Option` distinguishes no cached read from a completed read.
+    /// The inner `Option` is `None` when Steam reported no value for the key.
+    pub fn lobby_member_data(
+        &self,
+        lobby: steamworks::LobbyId,
+        user: steamworks::SteamId,
+        key: impl AsRef<str>,
+    ) -> Option<Option<&str>> {
+        self.lobby_member_data_value(lobby, user, key)
+            .map(|value| value.value.as_deref())
+    }
+
     /// Returns the most recent lobby member limit read.
     pub fn last_lobby_member_limit(&self) -> Option<&SteamworksLobbyMemberLimit> {
         self.last_lobby_member_limit.as_ref()
@@ -324,6 +383,11 @@ impl SteamworksMatchmakingState {
             .find(|limit| limit.lobby == lobby)
     }
 
+    /// Returns the latest known member limit for a lobby, preserving an unknown limit as `Some(None)`.
+    pub fn lobby_member_limit_value(&self, lobby: steamworks::LobbyId) -> Option<Option<usize>> {
+        self.lobby_member_limit(lobby).map(|limit| limit.limit)
+    }
+
     /// Returns the most recent lobby owner read.
     pub fn last_lobby_owner(&self) -> Option<&SteamworksLobbyOwner> {
         self.last_lobby_owner.as_ref()
@@ -337,6 +401,11 @@ impl SteamworksMatchmakingState {
     /// Returns the latest owner snapshot for a lobby.
     pub fn lobby_owner(&self, lobby: steamworks::LobbyId) -> Option<&SteamworksLobbyOwner> {
         self.lobby_owners.iter().find(|owner| owner.lobby == lobby)
+    }
+
+    /// Returns the latest known lobby owner Steam ID.
+    pub fn lobby_owner_id(&self, lobby: steamworks::LobbyId) -> Option<steamworks::SteamId> {
+        self.lobby_owner(lobby).map(|owner| owner.owner)
     }
 
     /// Returns the most recent lobby member count read.
@@ -359,6 +428,11 @@ impl SteamworksMatchmakingState {
             .find(|count| count.lobby == lobby)
     }
 
+    /// Returns the latest known lobby member count.
+    pub fn lobby_member_count_value(&self, lobby: steamworks::LobbyId) -> Option<usize> {
+        self.lobby_member_count(lobby).map(|count| count.count)
+    }
+
     /// Returns the most recent lobby member list read.
     pub fn last_lobby_members(&self) -> Option<&SteamworksLobbyMembers> {
         self.last_lobby_members.as_ref()
@@ -374,6 +448,22 @@ impl SteamworksMatchmakingState {
         self.lobby_member_lists
             .iter()
             .find(|members| members.lobby == lobby)
+    }
+
+    /// Returns the latest known member IDs for a lobby.
+    pub fn lobby_member_ids(&self, lobby: steamworks::LobbyId) -> Option<&[steamworks::SteamId]> {
+        self.lobby_members(lobby)
+            .map(|members| members.members.as_slice())
+    }
+
+    /// Returns whether the latest known member list for a lobby contains a user.
+    pub fn has_lobby_member(
+        &self,
+        lobby: steamworks::LobbyId,
+        user: steamworks::SteamId,
+    ) -> Option<bool> {
+        self.lobby_member_ids(lobby)
+            .map(|members| members.contains(&user))
     }
 
     /// Returns the most recent lobby joinability value set.

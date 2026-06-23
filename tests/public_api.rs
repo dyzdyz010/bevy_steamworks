@@ -1012,13 +1012,22 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.lobby_list_request(1), None);
     assert!(root_state.lobby_list_results().is_empty());
     assert_eq!(root_state.lobby_list_result(1), None);
+    assert!(!root_state.is_lobby_joined(lobby));
     assert!(root_state.lobby_data_values().is_empty());
     assert_eq!(root_state.lobby_data_value(lobby, "mode"), None);
+    assert_eq!(root_state.lobby_data(lobby, "mode"), None);
+    assert_eq!(root_state.all_lobby_data_value(lobby, "mode"), None);
     assert!(root_state.lobby_member_data_values().is_empty());
     assert_eq!(
         root_state.lobby_member_data_value(lobby, user, "rank"),
         None
     );
+    assert_eq!(root_state.lobby_member_data(lobby, user, "rank"), None);
+    assert_eq!(root_state.lobby_member_limit_value(lobby), None);
+    assert_eq!(root_state.lobby_owner_id(lobby), None);
+    assert_eq!(root_state.lobby_member_count_value(lobby), None);
+    assert_eq!(root_state.lobby_member_ids(lobby), None);
+    assert_eq!(root_state.has_lobby_member(lobby, user), None);
     assert_eq!(root_state.lobby_game_server(lobby), None);
     let _root_lobby_list_result = SteamworksLobbyListResult {
         request_id: 1,
@@ -1065,13 +1074,22 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.lobby_list_request(1), None);
     assert!(prelude_state.lobby_list_results().is_empty());
     assert_eq!(prelude_state.lobby_list_result(1), None);
+    assert!(!prelude_state.is_lobby_joined(lobby));
     assert!(prelude_state.lobby_data_values().is_empty());
     assert_eq!(prelude_state.lobby_data_value(lobby, "mode"), None);
+    assert_eq!(prelude_state.lobby_data(lobby, "mode"), None);
+    assert_eq!(prelude_state.all_lobby_data_value(lobby, "mode"), None);
     assert!(prelude_state.lobby_member_data_values().is_empty());
     assert_eq!(
         prelude_state.lobby_member_data_value(lobby, user, "rank"),
         None
     );
+    assert_eq!(prelude_state.lobby_member_data(lobby, user, "rank"), None);
+    assert_eq!(prelude_state.lobby_member_limit_value(lobby), None);
+    assert_eq!(prelude_state.lobby_owner_id(lobby), None);
+    assert_eq!(prelude_state.lobby_member_count_value(lobby), None);
+    assert_eq!(prelude_state.lobby_member_ids(lobby), None);
+    assert_eq!(prelude_state.has_lobby_member(lobby, user), None);
     assert_eq!(prelude_state.lobby_game_server(lobby), None);
     let _prelude_lobby_list_result = PreludeLobbyListResult {
         request_id: 1,

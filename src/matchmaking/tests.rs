@@ -493,6 +493,8 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
     );
     assert_eq!(state.last_left_lobby(), Some(first_lobby));
     assert_eq!(state.joined_lobbies(), &[second_lobby]);
+    assert!(state.is_lobby_joined(second_lobby));
+    assert!(!state.is_lobby_joined(first_lobby));
     assert_eq!(
         state.last_lobby_data_count(),
         Some(&SteamworksLobbyDataCount {
@@ -645,6 +647,10 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.lobby_data_value(second_lobby, "mode"),
         state.last_lobby_data()
     );
+    assert_eq!(state.lobby_data(second_lobby, "mode"), Some(Some("dm")));
+    assert_eq!(state.lobby_data(second_lobby, "map"), Some(Some("arena")));
+    assert_eq!(state.lobby_data(second_lobby, "missing"), Some(None));
+    assert_eq!(state.lobby_data(first_lobby, "mode"), None);
     assert_eq!(
         state.lobby_data_entry(second_lobby, 1),
         state.last_lobby_data_entry()
@@ -653,6 +659,11 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.all_lobby_data(second_lobby),
         state.last_all_lobby_data()
     );
+    assert_eq!(
+        state.all_lobby_data_value(second_lobby, "map"),
+        Some("arena")
+    );
+    assert_eq!(state.all_lobby_data_value(second_lobby, "missing"), None);
     assert_eq!(
         state.lobby_data_set(second_lobby, "mode"),
         state.last_lobby_data_set()
@@ -670,18 +681,36 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.last_lobby_member_data()
     );
     assert_eq!(
+        state.lobby_member_data(second_lobby, user, "rank"),
+        Some(Some("gold"))
+    );
+    assert_eq!(state.lobby_member_data(second_lobby, user, "missing"), None);
+    assert_eq!(
         state.lobby_member_limit(second_lobby),
         state.last_lobby_member_limit()
     );
+    assert_eq!(state.lobby_member_limit_value(second_lobby), Some(Some(8)));
     assert_eq!(state.lobby_owner(second_lobby), state.last_lobby_owner());
+    assert_eq!(state.lobby_owner_id(second_lobby), Some(owner));
     assert_eq!(
         state.lobby_member_count(second_lobby),
         state.last_lobby_member_count()
     );
+    assert_eq!(state.lobby_member_count_value(second_lobby), Some(3));
     assert_eq!(
         state.lobby_members(second_lobby),
         state.last_lobby_members()
     );
+    assert_eq!(
+        state.lobby_member_ids(second_lobby),
+        Some([user, owner].as_slice())
+    );
+    assert_eq!(state.has_lobby_member(second_lobby, user), Some(true));
+    assert_eq!(
+        state.has_lobby_member(second_lobby, steamworks::SteamId::from_raw(55)),
+        Some(false)
+    );
+    assert_eq!(state.has_lobby_member(first_lobby, user), None);
     assert_eq!(
         state.lobby_joinability(second_lobby),
         state.last_lobby_joinability()
