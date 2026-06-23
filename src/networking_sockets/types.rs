@@ -1,5 +1,7 @@
 use std::net::SocketAddr;
 
+mod debug;
+
 /// Opaque ID for a listen socket owned by [`crate::SteamworksNetworkingSocketsPlugin`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SteamworksListenSocketId(u64);
@@ -108,33 +110,6 @@ pub enum SteamworksNetworkingSocketsConfigEntry {
         /// Config value.
         data: String,
     },
-}
-
-impl std::fmt::Debug for SteamworksNetworkingSocketsConfigEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Int32 { value, data } => f
-                .debug_struct("Int32")
-                .field("value", value)
-                .field("data", data)
-                .finish(),
-            Self::Int64 { value, data } => f
-                .debug_struct("Int64")
-                .field("value", value)
-                .field("data", data)
-                .finish(),
-            Self::Float { value, data } => f
-                .debug_struct("Float")
-                .field("value", value)
-                .field("data", data)
-                .finish(),
-            Self::String { value, data } => f
-                .debug_struct("String")
-                .field("value", value)
-                .field("data_len", &data.len())
-                .finish(),
-        }
-    }
 }
 
 impl SteamworksNetworkingSocketsConfigEntry {
@@ -275,18 +250,6 @@ impl SteamworksNetworkingSocketsOutboundMessage {
     }
 }
 
-impl std::fmt::Debug for SteamworksNetworkingSocketsOutboundMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SteamworksNetworkingSocketsOutboundMessage")
-            .field("connection", &self.connection)
-            .field("send_flags", &self.send_flags)
-            .field("channel", &self.channel)
-            .field("data_len", &self.data.len())
-            .field("user_data", &self.user_data)
-            .finish()
-    }
-}
-
 /// Per-message result returned by a batch send command.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingSocketsMessageSendResult {
@@ -338,15 +301,6 @@ pub struct SteamworksNetworkingSocketsConnectionName {
     pub connection: SteamworksNetworkingSocketsConnectionId,
     /// Debug name submitted to Steam.
     pub name: String,
-}
-
-impl std::fmt::Debug for SteamworksNetworkingSocketsConnectionName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SteamworksNetworkingSocketsConnectionName")
-            .field("connection", &self.connection)
-            .field("name_len", &self.name.len())
-            .finish()
-    }
 }
 
 /// Connection close snapshot.
@@ -449,20 +403,6 @@ pub struct SteamworksNetworkingSocketsMessage {
     pub connection_user_data: i64,
 }
 
-impl std::fmt::Debug for SteamworksNetworkingSocketsMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SteamworksNetworkingSocketsMessage")
-            .field("connection", &self.connection)
-            .field("peer", &self.peer)
-            .field("data_len", &self.data.len())
-            .field("channel", &self.channel)
-            .field("send_flags", &self.send_flags)
-            .field("message_number", &self.message_number)
-            .field("connection_user_data", &self.connection_user_data)
-            .finish()
-    }
-}
-
 /// Message batch received from one connection.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksNetworkingSocketsConnectionMessages {
@@ -494,20 +434,6 @@ pub struct SteamworksNetworkingSocketsPollGroupMessage {
     pub message_number: u64,
     /// Connection user data captured by Steam for this message.
     pub connection_user_data: i64,
-}
-
-impl std::fmt::Debug for SteamworksNetworkingSocketsPollGroupMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SteamworksNetworkingSocketsPollGroupMessage")
-            .field("poll_group", &self.poll_group)
-            .field("peer", &self.peer)
-            .field("data_len", &self.data.len())
-            .field("channel", &self.channel)
-            .field("send_flags", &self.send_flags)
-            .field("message_number", &self.message_number)
-            .field("connection_user_data", &self.connection_user_data)
-            .finish()
-    }
 }
 
 /// Message batch received from one poll group.
