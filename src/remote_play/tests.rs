@@ -137,10 +137,29 @@ fn state_records_remote_play_operations() {
         friend,
     });
 
-    assert_eq!(state.sessions(), &[listed_session]);
+    assert_eq!(state.sessions(), std::slice::from_ref(&listed_session));
+    assert_eq!(state.session_count(), 1);
+    assert_eq!(
+        state
+            .sessions_for_user(listed_session.user)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![listed_session.clone()]
+    );
+    assert_eq!(
+        state.latest_session_for_user(listed_session.user),
+        Some(&listed_session)
+    );
+    assert_eq!(
+        state.latest_session_for_user(steamworks::SteamId::from_raw(999)),
+        None
+    );
     assert_eq!(state.known_sessions(), std::slice::from_ref(&updated_info));
+    assert_eq!(state.known_session_count(), 1);
     assert_eq!(state.known_session(first_session), Some(&updated_info));
+    assert!(state.has_known_session(first_session));
     assert!(state.known_session(second_session).is_none());
+    assert!(!state.has_known_session(second_session));
     assert_eq!(
         state
             .known_sessions_for_user(updated_info.user)
@@ -172,6 +191,7 @@ fn state_records_remote_play_operations() {
         state.observed_connected_sessions(),
         &[first_session, second_session]
     );
+    assert_eq!(state.observed_connected_session_count(), 2);
     assert!(state.is_session_observed_connected(first_session));
     assert_eq!(
         state.last_submitted_invite(),
@@ -187,8 +207,11 @@ fn state_records_remote_play_operations() {
     });
 
     assert_eq!(state.observed_connected_sessions(), &[second_session]);
+    assert_eq!(state.observed_connected_session_count(), 1);
     assert!(!state.is_session_observed_connected(first_session));
+    assert!(!state.has_known_session(first_session));
     assert!(state.known_session(first_session).is_none());
+    assert_eq!(state.known_session_count(), 0);
     assert_eq!(state.session_user(first_session), None);
     assert_eq!(state.session_client_name(first_session), None);
     assert_eq!(state.session_client_form_factor(first_session), None);

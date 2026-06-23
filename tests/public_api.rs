@@ -2348,14 +2348,20 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
     };
     let state = SteamworksRemotePlayState::default();
     assert!(state.sessions().is_empty());
+    assert_eq!(state.session_count(), 0);
+    assert_eq!(state.sessions_for_user(user).count(), 0);
+    assert_eq!(state.latest_session_for_user(user), None);
     assert!(state.known_sessions().is_empty());
+    assert_eq!(state.known_session_count(), 0);
     assert_eq!(state.known_session(session), None);
+    assert!(!state.has_known_session(session));
     assert_eq!(state.known_sessions_for_user(user).count(), 0);
     assert_eq!(state.latest_known_session_for_user(user), None);
     assert_eq!(state.session_user(session), None);
     assert_eq!(state.session_client_name(session), None);
     assert_eq!(state.session_client_form_factor(session), None);
     assert_eq!(state.session_client_resolution(session), None);
+    assert_eq!(state.observed_connected_session_count(), 0);
 
     accepts_root_exports(
         SteamworksRemotePlayPlugin::new(),
@@ -2387,14 +2393,20 @@ fn remote_play_api_is_exported_from_root_and_prelude() {
     };
     let state = PreludeRemotePlayState::default();
     assert!(state.sessions().is_empty());
+    assert_eq!(state.session_count(), 0);
+    assert_eq!(state.sessions_for_user(user).count(), 0);
+    assert_eq!(state.latest_session_for_user(user), None);
     assert!(state.known_sessions().is_empty());
+    assert_eq!(state.known_session_count(), 0);
     assert_eq!(state.known_session(session), None);
+    assert!(!state.has_known_session(session));
     assert_eq!(state.known_sessions_for_user(user).count(), 0);
     assert_eq!(state.latest_known_session_for_user(user), None);
     assert_eq!(state.session_user(session), None);
     assert_eq!(state.session_client_name(session), None);
     assert_eq!(state.session_client_form_factor(session), None);
     assert_eq!(state.session_client_resolution(session), None);
+    assert_eq!(state.observed_connected_session_count(), 0);
 
     accepts_prelude_exports(
         PreludeRemotePlayPlugin::new(),
