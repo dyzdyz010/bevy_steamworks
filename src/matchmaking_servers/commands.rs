@@ -62,19 +62,20 @@ pub(super) fn process_matchmaking_servers_commands(
     };
 
     for command in commands.drain() {
-        let request = match &command {
-            SteamworksMatchmakingServersCommand::RequestServerList { .. } => {
-                Some(state.next_request_id())
+        let (request, query) = match command_ids_after_validation(&command, &mut state) {
+            Ok(ids) => ids,
+            Err(error) => {
+                state.record_error(error.clone());
+                state.sync_request_count(requests.len());
+                tracing::error!(
+                    target: "bevy_steamworks",
+                    command = ?command,
+                    error = %error,
+                    "Steamworks matchmaking servers command failed"
+                );
+                results.write(SteamworksMatchmakingServersResult::Err { command, error });
+                continue;
             }
-            _ => None,
-        };
-        let query = match &command {
-            SteamworksMatchmakingServersCommand::PingServer { .. }
-            | SteamworksMatchmakingServersCommand::QueryPlayerDetails { .. }
-            | SteamworksMatchmakingServersCommand::QueryServerRules { .. } => {
-                Some(state.next_query_id())
-            }
-            _ => None,
         };
 
         match handle_matchmaking_servers_command(
@@ -108,6 +109,36 @@ pub(super) fn process_matchmaking_servers_commands(
             }
         }
     }
+}
+
+fn command_ids_after_validation(
+    command: &SteamworksMatchmakingServersCommand,
+    state: &mut SteamworksMatchmakingServersState,
+) -> Result<
+    (
+        Option<SteamworksServerListRequestId>,
+        Option<SteamworksServerQueryId>,
+    ),
+    SteamworksMatchmakingServersError,
+> {
+    validate_command(command)?;
+
+    let request = match command {
+        SteamworksMatchmakingServersCommand::RequestServerList { .. } => {
+            Some(state.next_request_id())
+        }
+        _ => None,
+    };
+    let query = match command {
+        SteamworksMatchmakingServersCommand::PingServer { .. }
+        | SteamworksMatchmakingServersCommand::QueryPlayerDetails { .. }
+        | SteamworksMatchmakingServersCommand::QueryServerRules { .. } => {
+            Some(state.next_query_id())
+        }
+        _ => None,
+    };
+
+    Ok((request, query))
 }
 
 fn handle_matchmaking_servers_command(
@@ -324,4 +355,53 @@ fn request_handle(
     requests
         .get(request)
         .ok_or(SteamworksMatchmakingServersError::ServerListRequestNotFound { request })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv4Addr;
+
+    use super::*;
+
+    #[test]
+    fn invalid_server_list_request_does_not_consume_request_id() {
+        let mut state = SteamworksMatchmakingServersState::default();
+        let command = SteamworksMatchmakingServersCommand::RequestServerList {
+            app_id: steamworks::AppId(480),
+            kind: SteamworksServerListKind::Lan,
+            filters: SteamworksServerListFilters::new().with("map", "arena"),
+        };
+
+        assert_eq!(
+            command_ids_after_validation(&command, &mut state),
+            Err(SteamworksMatchmakingServersError::LanFiltersUnsupported)
+        );
+        assert_eq!(state.next_request_id().raw(), 0);
+    }
+
+    #[test]
+    fn valid_request_and_query_commands_allocate_predictable_ids() {
+        let mut state = SteamworksMatchmakingServersState::default();
+
+        let (request, query) = command_ids_after_validation(
+            &SteamworksMatchmakingServersCommand::request_internet_server_list(
+                480,
+                SteamworksServerListFilters::new(),
+            ),
+            &mut state,
+        )
+        .expect("valid server-list request should allocate an id");
+        assert_eq!(request.map(SteamworksServerListRequestId::raw), Some(0));
+        assert_eq!(query, None);
+
+        let (request, query) = command_ids_after_validation(
+            &SteamworksMatchmakingServersCommand::ping_server(Ipv4Addr::LOCALHOST, 27015),
+            &mut state,
+        )
+        .expect("valid direct query should allocate an id");
+        assert_eq!(request, None);
+        assert_eq!(query.map(SteamworksServerQueryId::raw), Some(0));
+        assert_eq!(state.next_request_id().raw(), 1);
+        assert_eq!(state.next_query_id().raw(), 1);
+    }
 }
