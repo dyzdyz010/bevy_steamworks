@@ -1568,7 +1568,7 @@ fn state_records_operations_without_unbounded_message_history() {
     });
     let poll_group_message = SteamworksNetworkingSocketsPollGroupMessage {
         poll_group: poll_group_id(),
-        peer,
+        peer: peer.clone(),
         data: vec![9],
         channel: 1,
         send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
@@ -1637,6 +1637,15 @@ fn state_records_operations_without_unbounded_message_history() {
         connection: connection_id(),
         name: "player-1".to_owned(),
     });
+    assert_eq!(
+        state.connection_state(connection_id()),
+        Some(steamworks::networking_types::NetworkingConnectionState::Connected)
+    );
+    assert_eq!(state.connection_remote(connection_id()), Some(Some(&peer)));
+    assert_eq!(state.connection_user_data(connection_id()), Some(123));
+    assert_eq!(state.connection_name(connection_id()), Some("player-1"));
+    assert_eq!(state.connection_ping(connection_id()), Some(42));
+    assert_eq!(state.connection_quality(connection_id()), Some((0.95, 0.9)));
     state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionClosed {
         connection: connection_id(),
         close_succeeded: false,
@@ -1748,6 +1757,44 @@ fn state_records_operations_without_unbounded_message_history() {
         })
     );
     assert_eq!(state.last_closed_poll_group(), Some(poll_group_id()));
+    assert_eq!(state.connection_state(connection_id()), None);
+    assert_eq!(state.connection_remote(connection_id()), None);
+}
+
+#[test]
+fn connection_state_falls_back_to_realtime_status() {
+    let mut state = SteamworksNetworkingSocketsState::default();
+
+    state.record_operation(
+        &SteamworksNetworkingSocketsOperation::RealtimeConnectionStatusRead {
+            status: SteamworksNetworkingSocketsRealtimeStatus {
+                connection: connection_id(),
+                connection_state:
+                    steamworks::networking_types::NetworkingConnectionState::Connecting,
+                ping: 12,
+                connection_quality_local: 0.75,
+                connection_quality_remote: 0.5,
+                out_packets_per_sec: 0.0,
+                out_bytes_per_sec: 0.0,
+                in_packets_per_sec: 0.0,
+                in_bytes_per_sec: 0.0,
+                send_rate_bytes_per_sec: 0,
+                pending_unreliable: 0,
+                pending_reliable: 0,
+                sent_unacked_reliable: 0,
+                queued_send_bytes: 0,
+                lanes: Vec::new(),
+            },
+        },
+    );
+
+    assert_eq!(
+        state.connection_state(connection_id()),
+        Some(steamworks::networking_types::NetworkingConnectionState::Connecting)
+    );
+    assert_eq!(state.connection_ping(connection_id()), Some(12));
+    assert_eq!(state.connection_quality(connection_id()), Some((0.75, 0.5)));
+    assert_eq!(state.connection_remote(connection_id()), None);
 }
 
 #[test]
