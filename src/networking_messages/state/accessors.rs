@@ -15,6 +15,11 @@ impl SteamworksNetworkingMessagesState {
         &self.received_messages
     }
 
+    /// Returns bounded received message snapshots in observation order across batches.
+    pub fn recent_received_messages(&self) -> &[SteamworksNetworkingMessage] {
+        &self.recent_received_messages
+    }
+
     /// Returns the most recent received message from the latest receive batch.
     pub fn last_received_message(&self) -> Option<&SteamworksNetworkingMessage> {
         self.received_messages.last()
@@ -30,6 +35,16 @@ impl SteamworksNetworkingMessagesState {
             .filter(move |message| message.channel == channel)
     }
 
+    /// Returns bounded received message snapshots on one channel across batches.
+    pub fn recent_received_messages_on_channel(
+        &self,
+        channel: i32,
+    ) -> impl Iterator<Item = &SteamworksNetworkingMessage> + '_ {
+        self.recent_received_messages
+            .iter()
+            .filter(move |message| message.channel == channel)
+    }
+
     /// Returns received messages from the latest receive batch sent by one peer.
     pub fn received_messages_from_peer<'a>(
         &'a self,
@@ -40,12 +55,33 @@ impl SteamworksNetworkingMessagesState {
             .filter(move |message| &message.peer == peer)
     }
 
+    /// Returns bounded received message snapshots from one peer across batches.
+    pub fn recent_received_messages_from_peer<'a>(
+        &'a self,
+        peer: &'a steamworks::networking_types::NetworkingIdentity,
+    ) -> impl Iterator<Item = &'a SteamworksNetworkingMessage> + 'a {
+        self.recent_received_messages
+            .iter()
+            .filter(move |message| &message.peer == peer)
+    }
+
     /// Returns the most recent message from one peer in the latest receive batch.
     pub fn last_received_message_from_peer(
         &self,
         peer: &steamworks::networking_types::NetworkingIdentity,
     ) -> Option<&SteamworksNetworkingMessage> {
         self.received_messages
+            .iter()
+            .rev()
+            .find(|message| &message.peer == peer)
+    }
+
+    /// Returns the most recent received message from one peer across retained batches.
+    pub fn last_recent_received_message_from_peer(
+        &self,
+        peer: &steamworks::networking_types::NetworkingIdentity,
+    ) -> Option<&SteamworksNetworkingMessage> {
+        self.recent_received_messages
             .iter()
             .rev()
             .find(|message| &message.peer == peer)

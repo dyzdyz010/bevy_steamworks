@@ -1233,10 +1233,22 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
     let state = SteamworksNetworkingMessagesState::default();
+    assert!(state.recent_received_messages().is_empty());
     assert_eq!(state.last_received_message(), None);
     assert_eq!(
         state.last_received_message_from_peer(&peer.to_identity()),
         None
+    );
+    assert_eq!(
+        state.last_recent_received_message_from_peer(&peer.to_identity()),
+        None
+    );
+    assert_eq!(state.recent_received_messages_on_channel(0).count(), 0);
+    assert_eq!(
+        state
+            .recent_received_messages_from_peer(&peer.to_identity())
+            .count(),
+        0
     );
     assert!(state.session_requests().is_empty());
     assert_eq!(state.session_request(&peer.to_identity()), None);
@@ -1267,10 +1279,22 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = PreludeNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
     let state = PreludeNetworkingMessagesState::default();
+    assert!(state.recent_received_messages().is_empty());
     assert_eq!(state.last_received_message(), None);
     assert_eq!(
         state.last_received_message_from_peer(&peer.to_identity()),
         None
+    );
+    assert_eq!(
+        state.last_recent_received_message_from_peer(&peer.to_identity()),
+        None
+    );
+    assert_eq!(state.recent_received_messages_on_channel(0).count(), 0);
+    assert_eq!(
+        state
+            .recent_received_messages_from_peer(&peer.to_identity())
+            .count(),
+        0
     );
     assert!(state.session_requests().is_empty());
     assert_eq!(state.session_request(&peer.to_identity()), None);

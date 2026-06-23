@@ -273,7 +273,7 @@ fn state_records_operations_without_unbounded_message_history() {
 
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
         channel: 0,
-        messages: vec![first],
+        messages: vec![first.clone()],
     });
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
         channel: 0,
@@ -307,6 +307,10 @@ fn state_records_operations_without_unbounded_message_history() {
     );
 
     assert_eq!(state.received_messages(), &[second.clone(), third.clone()]);
+    assert_eq!(
+        state.recent_received_messages(),
+        &[first.clone(), second.clone(), third.clone()]
+    );
     assert_eq!(state.last_received_message(), Some(&third));
     assert_eq!(
         state
@@ -317,12 +321,30 @@ fn state_records_operations_without_unbounded_message_history() {
     );
     assert_eq!(
         state
+            .recent_received_messages_on_channel(0)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![first.clone(), second.clone()]
+    );
+    assert_eq!(
+        state
             .received_messages_from_peer(&peer)
             .cloned()
             .collect::<Vec<_>>(),
         vec![second.clone()]
     );
+    assert_eq!(
+        state
+            .recent_received_messages_from_peer(&peer)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![first.clone(), second.clone()]
+    );
     assert_eq!(state.last_received_message_from_peer(&peer), Some(&second));
+    assert_eq!(
+        state.last_recent_received_message_from_peer(&peer),
+        Some(&second)
+    );
     assert_eq!(state.received_count(), 3);
     assert_eq!(state.sent_count(), 1);
     assert_eq!(state.session_request_count(), 1);
@@ -401,4 +423,44 @@ fn session_callback_caches_are_bounded() {
         })
     );
     assert!(state.session_failure(&second_remote).is_some());
+}
+
+#[test]
+fn recent_received_message_cache_is_bounded() {
+    let mut state = SteamworksNetworkingMessagesState::new(true);
+
+    for raw in 1..=(super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT as u64 + 1) {
+        state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
+            channel: raw as u32,
+            messages: vec![SteamworksNetworkingMessage {
+                peer: steamworks::networking_types::NetworkingIdentity::new_steam_id(
+                    steamworks::SteamId::from_raw(raw),
+                ),
+                data: vec![raw as u8],
+                channel: raw as i32,
+                send_flags: steamworks::networking_types::SendFlags::RELIABLE,
+                message_number: raw,
+                connection_user_data: raw as i64,
+            }],
+        });
+    }
+
+    assert_eq!(
+        state.recent_received_messages().len(),
+        super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT
+    );
+    assert_eq!(
+        state
+            .recent_received_messages()
+            .first()
+            .map(|message| message.message_number),
+        Some(2)
+    );
+    assert_eq!(
+        state
+            .received_messages()
+            .first()
+            .map(|message| message.message_number),
+        Some(super::state::STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT as u64 + 1)
+    );
 }

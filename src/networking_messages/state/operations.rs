@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use super::{
-    push_bounded_session_failure, push_bounded_session_request, SteamworksNetworkingMessagesState,
+    push_bounded_received_messages, push_bounded_session_failure, push_bounded_session_request,
+    SteamworksNetworkingMessagesState,
 };
 use crate::networking_messages::{
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
@@ -28,6 +29,7 @@ impl SteamworksNetworkingMessagesState {
                 self.received_count = self
                     .received_count
                     .saturating_add(messages.len().try_into().unwrap_or(u64::MAX));
+                push_bounded_received_messages(&mut self.recent_received_messages, messages);
                 self.received_messages.clone_from(messages);
             }
             SteamworksNetworkingMessagesOperation::SessionConnectionInfoRead { info, .. } => {

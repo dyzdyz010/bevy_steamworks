@@ -17,6 +17,7 @@ pub(in crate::networking_messages) const STEAMWORKS_NETWORKING_MESSAGES_STATE_CA
 pub struct SteamworksNetworkingMessagesState {
     last_error: Option<SteamworksNetworkingMessagesError>,
     received_messages: Vec<SteamworksNetworkingMessage>,
+    recent_received_messages: Vec<SteamworksNetworkingMessage>,
     last_connection_info: Option<SteamworksNetworkingMessagesConnectionInfo>,
     session_requests: Vec<SteamworksNetworkingMessagesSessionRequestInfo>,
     session_failures: Vec<SteamworksNetworkingMessagesConnectionInfo>,
@@ -43,6 +44,7 @@ impl SteamworksNetworkingMessagesState {
         Self {
             last_error: None,
             received_messages: Vec::new(),
+            recent_received_messages: Vec::new(),
             last_connection_info: None,
             session_requests: Vec::new(),
             session_failures: Vec::new(),
@@ -65,6 +67,14 @@ pub(super) fn push_bounded_session_request(
 ) {
     requests.push(request);
     trim_oldest(requests, STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT);
+}
+
+pub(super) fn push_bounded_received_messages(
+    recent: &mut Vec<SteamworksNetworkingMessage>,
+    messages: &[SteamworksNetworkingMessage],
+) {
+    recent.extend_from_slice(messages);
+    trim_oldest(recent, STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT);
 }
 
 pub(super) fn push_bounded_session_failure(
