@@ -1945,10 +1945,26 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
         bevy_steamworks::SteamworksNetworkingUtilsState::default(),
         None,
     );
+    let root_state = bevy_steamworks::SteamworksNetworkingUtilsState::default();
+    assert_eq!(root_state.relay_network_availability(), None);
+    assert_eq!(root_state.relay_network_availability_error(), None);
+    assert_eq!(root_state.relay_network_available(), None);
+    assert_eq!(root_state.relay_network_pending(), None);
+    assert_eq!(root_state.relay_network_unavailable(), None);
+    assert_eq!(root_state.relay_network_config_available(), None);
+    assert_eq!(root_state.any_relay_available(), None);
     accepts_prelude_state_status(
         bevy_steamworks::prelude::SteamworksNetworkingUtilsState::default(),
         None,
     );
+    let prelude_state = bevy_steamworks::prelude::SteamworksNetworkingUtilsState::default();
+    assert_eq!(prelude_state.relay_network_availability(), None);
+    assert_eq!(prelude_state.relay_network_availability_error(), None);
+    assert_eq!(prelude_state.relay_network_available(), None);
+    assert_eq!(prelude_state.relay_network_pending(), None);
+    assert_eq!(prelude_state.relay_network_unavailable(), None);
+    assert_eq!(prelude_state.relay_network_config_available(), None);
+    assert_eq!(prelude_state.any_relay_available(), None);
 
     let command = SteamworksNetworkingUtilsCommand::get_relay_debug_message();
     let operation = SteamworksNetworkingUtilsOperation::RelayDebugMessageRead {

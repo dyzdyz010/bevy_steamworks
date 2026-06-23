@@ -17,6 +17,31 @@ pub struct SteamworksRelayNetworkStatus {
 }
 
 impl SteamworksRelayNetworkStatus {
+    /// Returns whether the summary relay status is current and usable.
+    pub fn relay_network_available(&self) -> bool {
+        availability_is_current(&self.availability)
+    }
+
+    /// Returns whether the summary relay status is still being acquired.
+    pub fn relay_network_pending(&self) -> bool {
+        availability_is_pending(&self.availability)
+    }
+
+    /// Returns whether the summary relay status currently reports an error.
+    pub fn relay_network_unavailable(&self) -> bool {
+        self.availability.is_err()
+    }
+
+    /// Returns whether the relay network-config prerequisite is current.
+    pub fn network_config_available(&self) -> bool {
+        availability_is_current(&self.network_config)
+    }
+
+    /// Returns whether at least one Steam Datagram Relay is current.
+    pub fn any_relay_available(&self) -> bool {
+        availability_is_current(&self.any_relay)
+    }
+
     pub(super) fn from_steam(status: steamworks::networking_utils::RelayNetworkStatus) -> Self {
         Self {
             availability: status.availability(),
@@ -26,4 +51,25 @@ impl SteamworksRelayNetworkStatus {
             debugging_message: status.debugging_message().to_owned(),
         }
     }
+}
+
+fn availability_is_current(
+    availability: &steamworks::networking_types::NetworkingAvailabilityResult,
+) -> bool {
+    matches!(
+        availability,
+        Ok(steamworks::networking_types::NetworkingAvailability::Current)
+    )
+}
+
+fn availability_is_pending(
+    availability: &steamworks::networking_types::NetworkingAvailabilityResult,
+) -> bool {
+    matches!(
+        availability,
+        Ok(
+            steamworks::networking_types::NetworkingAvailability::Waiting
+                | steamworks::networking_types::NetworkingAvailability::Attempting
+        ) | Err(steamworks::networking_types::NetworkingAvailabilityError::Retrying)
+    )
 }
