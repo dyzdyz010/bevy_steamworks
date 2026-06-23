@@ -659,6 +659,14 @@ fn state_records_operations_without_unbounded_query_history() {
     assert_eq!(state.item_details(), &[second_detail.clone()]);
     assert_eq!(state.item_detail(item), Some(&second_detail));
     assert_eq!(
+        state.item_creator_app_id(item),
+        Some(Some(steamworks::AppId(480)))
+    );
+    assert_eq!(
+        state.item_consumer_app_id(item),
+        Some(Some(steamworks::AppId(480)))
+    );
+    assert_eq!(
         state.item_state(item),
         Some(&SteamworksUgcItemStateInfo {
             item,
@@ -741,6 +749,8 @@ fn state_records_operations_without_unbounded_query_history() {
     assert!(state.subscribed_items().is_empty());
     assert!(state.item_details().is_empty());
     assert_eq!(state.item_detail(item), None);
+    assert_eq!(state.item_creator_app_id(item), None);
+    assert_eq!(state.item_consumer_app_id(item), None);
     assert_eq!(state.item_state(item), None);
     assert_eq!(state.item_download_info(item), None);
     assert_eq!(state.item_install_info(item), None);

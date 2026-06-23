@@ -34,6 +34,23 @@ impl SteamworksUgcState {
             .find(|details| details.published_file_id == item)
     }
 
+    /// Returns a cached Workshop item's creator app ID, preserving a read with no value as `Some(None)`.
+    pub fn item_creator_app_id(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<Option<steamworks::AppId>> {
+        self.item_detail(item).map(|details| details.creator_app_id)
+    }
+
+    /// Returns a cached Workshop item's consumer app ID, preserving a read with no value as `Some(None)`.
+    pub fn item_consumer_app_id(
+        &self,
+        item: steamworks::PublishedFileId,
+    ) -> Option<Option<steamworks::AppId>> {
+        self.item_detail(item)
+            .map(|details| details.consumer_app_id)
+    }
+
     /// Returns the most recent UGC query result set.
     pub fn last_query(&self) -> Option<&SteamworksUgcQueryResults> {
         self.last_query.as_ref()

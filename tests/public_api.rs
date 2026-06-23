@@ -2672,6 +2672,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     let root_state = SteamworksUgcState::default();
     assert!(root_state.item_details().is_empty());
     assert_eq!(root_state.item_detail(item), None);
+    assert_eq!(root_state.item_creator_app_id(item), None);
+    assert_eq!(root_state.item_consumer_app_id(item), None);
     assert_eq!(root_state.item_state(item), None);
     assert_eq!(root_state.item_download_info(item), None);
     assert_eq!(root_state.item_install_info(item), None);
@@ -2828,6 +2830,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     let prelude_state = PreludeUgcState::default();
     assert!(prelude_state.item_details().is_empty());
     assert_eq!(prelude_state.item_detail(item), None);
+    assert_eq!(prelude_state.item_creator_app_id(item), None);
+    assert_eq!(prelude_state.item_consumer_app_id(item), None);
     assert_eq!(prelude_state.item_state(item), None);
     assert_eq!(prelude_state.item_download_info(item), None);
     assert_eq!(prelude_state.item_install_info(item), None);
