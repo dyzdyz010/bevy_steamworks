@@ -372,6 +372,7 @@ fn full_plugin_group_api_is_exported_from_root_and_prelude() {
     );
     assert!(!plugins.runs_callbacks());
     assert_eq!(plugins.core_plugin().init_mode(), plugins.init_mode());
+    let _restart: fn(steamworks::AppId) -> bool = SteamworksPlugins::restart_app_if_necessary;
     accepts_root_exports(plugins);
 
     let plugins = PreludePlugins::app_id(480)
@@ -384,6 +385,7 @@ fn full_plugin_group_api_is_exported_from_root_and_prelude() {
     );
     assert!(!plugins.runs_callbacks());
     assert_eq!(plugins.core_plugin().init_mode(), plugins.init_mode());
+    let _prelude_restart: fn(steamworks::AppId) -> bool = PreludePlugins::restart_app_if_necessary;
     accepts_prelude_exports(plugins);
 
     let _ = SteamworksPlugins::manual()

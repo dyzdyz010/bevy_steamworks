@@ -87,6 +87,15 @@ impl Default for SteamworksPlugins {
 }
 
 impl SteamworksPlugins {
+    /// Returns true if the app should exit because Steam is relaunching it.
+    ///
+    /// This forwards to [`SteamworksPlugin::restart_app_if_necessary`] so apps
+    /// using the full plugin group can keep launch checks on the same entry
+    /// point they use for setup. Call it before adding [`SteamworksPlugins`].
+    pub fn restart_app_if_necessary(app_id: impl Into<AppId>) -> bool {
+        SteamworksPlugin::restart_app_if_necessary(app_id)
+    }
+
     /// Creates a plugin group that initializes Steamworks from the environment.
     ///
     /// This uses [`steamworks::Client::init`] through [`SteamworksPlugin`].

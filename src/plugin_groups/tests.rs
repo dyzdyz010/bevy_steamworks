@@ -251,6 +251,7 @@ fn plugins_group_exposes_core_lifecycle_configuration() {
     let plugins = SteamworksPlugins::app_id(480)
         .log_and_continue()
         .run_callbacks(false);
+    let _restart: fn(AppId) -> bool = SteamworksPlugins::restart_app_if_necessary;
 
     assert_eq!(plugins.init_mode(), SteamworksInitMode::AppId(AppId(480)));
     assert_eq!(plugins.core_plugin().init_mode(), plugins.init_mode());
