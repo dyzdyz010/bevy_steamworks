@@ -1,5 +1,6 @@
 use bevy_app::{App, Plugin};
 use bevy_ecs::message::Messages;
+use std::net::Ipv4Addr;
 
 use crate::SteamworksEvent;
 
@@ -186,7 +187,16 @@ fn state_records_operations_without_unbounded_packet_history() {
     };
     let session_state = SteamworksP2pSessionStateResult {
         user: user(),
-        state: None,
+        state: Some(SteamworksP2pSessionState {
+            connection_active: true,
+            connecting: false,
+            error: steamworks::P2PSessionError::None,
+            using_relay: true,
+            bytes_queued_for_send: 12,
+            packets_queued_for_send: 2,
+            remote_ip: Some(Ipv4Addr::LOCALHOST),
+            remote_port: Some(27015),
+        }),
     };
 
     state.record_operation(&SteamworksNetworkingOperation::SessionAccepted { user: user() });
@@ -232,12 +242,33 @@ fn state_records_operations_without_unbounded_packet_history() {
     assert_eq!(state.last_accepted_session(), Some(user()));
     assert_eq!(state.last_session_state(), Some(&session_state));
     assert_eq!(state.session_states(), &[session_state.clone()]);
+    assert_eq!(state.session_state_count(), 1);
     assert_eq!(state.session_state(user()), Some(&session_state));
+    assert!(state.has_session_state(user()));
+    assert_eq!(
+        state.p2p_session_state(user()),
+        Some(session_state.state.as_ref())
+    );
+    assert_eq!(state.session_active(user()), Some(true));
+    assert_eq!(state.session_connecting(user()), Some(false));
+    assert_eq!(state.session_using_relay(user()), Some(true));
+    assert_eq!(
+        state.session_error(user()),
+        Some(steamworks::P2PSessionError::None)
+    );
+    assert_eq!(state.session_bytes_queued_for_send(user()), Some(12));
+    assert_eq!(state.session_packets_queued_for_send(user()), Some(2));
+    assert_eq!(
+        state.session_remote_ip(user()),
+        Some(Some(Ipv4Addr::LOCALHOST))
+    );
+    assert_eq!(state.session_remote_port(user()), Some(Some(27015)));
     assert_eq!(state.received_count(), 3);
     assert_eq!(
         state.received_packets(),
         &[first.clone(), second.clone(), third.clone()]
     );
+    assert_eq!(state.cached_received_packet_count(), 3);
     assert_eq!(
         state
             .received_packets_from(user())
@@ -245,6 +276,7 @@ fn state_records_operations_without_unbounded_packet_history() {
             .collect::<Vec<_>>(),
         vec![first.clone(), second.clone()]
     );
+    assert_eq!(state.received_packet_count_from(user()), 2);
     assert_eq!(
         state
             .received_packets_on_channel(1)
@@ -252,8 +284,11 @@ fn state_records_operations_without_unbounded_packet_history() {
             .collect::<Vec<_>>(),
         vec![third.clone()]
     );
+    assert_eq!(state.received_packet_count_on_channel(1), 1);
     assert_eq!(state.last_packet_from(user()), Some(&second));
+    assert_eq!(state.last_packet_bytes_from(user()), Some(2));
     assert_eq!(state.last_packet_on_channel(1), Some(&third));
+    assert_eq!(state.last_packet_bytes_on_channel(1), Some(1));
     assert_eq!(state.sent_count(), 1);
     assert_eq!(
         state.last_sent_packet(),
@@ -264,9 +299,20 @@ fn state_records_operations_without_unbounded_packet_history() {
             bytes: 3,
         })
     );
+    assert_eq!(state.last_sent_packet_remote(), Some(user()));
+    assert_eq!(
+        state.last_sent_packet_send_type(),
+        Some(SteamworksP2pSendType::Reliable)
+    );
+    assert_eq!(state.last_sent_packet_channel(), Some(0));
+    assert_eq!(state.last_sent_packet_bytes(), Some(3));
     assert_eq!(state.empty_read_count(), 1);
     assert_eq!(state.last_empty_read_channel(), Some(7));
     assert_eq!(state.last_packet(), Some(&third));
+    assert_eq!(state.last_packet_remote(), Some(other_user()));
+    assert_eq!(state.last_packet_channel(), Some(1));
+    assert_eq!(state.last_packet_bytes(), Some(1));
+    assert_eq!(state.last_packet_data(), Some([4].as_slice()));
     assert_eq!(
         state.last_packet_availability(),
         Some(&SteamworksP2pPacketAvailability {
@@ -274,6 +320,7 @@ fn state_records_operations_without_unbounded_packet_history() {
             bytes: Some(2),
         })
     );
+    assert_eq!(state.packet_availability_count(), 1);
     assert_eq!(
         state.packet_availability(0),
         Some(&SteamworksP2pPacketAvailability {
@@ -281,9 +328,13 @@ fn state_records_operations_without_unbounded_packet_history() {
             bytes: Some(2),
         })
     );
+    assert_eq!(state.packet_available_bytes(0), Some(Some(2)));
+    assert_eq!(state.packet_available(0), Some(true));
+    assert_eq!(state.packet_available(9), None);
     assert_eq!(state.session_request_count(), 1);
     assert_eq!(state.last_session_request(), Some(user()));
     assert_eq!(state.session_requests(), &[user()]);
+    assert_eq!(state.cached_session_request_count(), 1);
     assert!(state.has_session_request(user()));
     assert_eq!(state.session_connect_failure_count(), 1);
     assert_eq!(
@@ -293,6 +344,7 @@ fn state_records_operations_without_unbounded_packet_history() {
             error: steamworks::P2PSessionError::NoRightsToApp,
         })
     );
+    assert_eq!(state.cached_session_connect_failure_count(), 1);
     assert_eq!(
         state.session_connect_failure(user()),
         Some(SteamworksP2pSessionConnectFailure {
@@ -300,12 +352,19 @@ fn state_records_operations_without_unbounded_packet_history() {
             error: steamworks::P2PSessionError::NoRightsToApp,
         })
     );
+    assert!(state.has_session_connect_failure(user()));
+    assert_eq!(
+        state.session_connect_failure_error(user()),
+        Some(steamworks::P2PSessionError::NoRightsToApp)
+    );
 
     state.record_operation(&SteamworksNetworkingOperation::SessionClosed { user: user() });
 
     assert_eq!(state.last_closed_session(), Some(user()));
     assert!(state.last_session_state().is_none());
     assert_eq!(state.session_state(user()), None);
+    assert_eq!(state.p2p_session_state(user()), None);
+    assert_eq!(state.session_active(user()), None);
 }
 
 #[test]
