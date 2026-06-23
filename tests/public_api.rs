@@ -1897,14 +1897,19 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.file_read_request(0), None);
     assert!(root_state.file_contents().is_empty());
     assert_eq!(root_state.file_contents_by_request(0), None);
+    assert_eq!(root_state.file_contents_by_name("save.dat"), None);
+    assert_eq!(root_state.file_data("save.dat"), None);
     assert!(root_state.file_write_requests().is_empty());
     assert_eq!(root_state.file_write_request(0), None);
     assert!(root_state.file_writes().is_empty());
     assert_eq!(root_state.file_write(0), None);
+    assert_eq!(root_state.file_write_by_name("save.dat"), None);
     assert!(root_state.file_share_requests().is_empty());
     assert_eq!(root_state.file_share_request(0), None);
     assert!(root_state.shared_files().is_empty());
     assert_eq!(root_state.shared_file(0), None);
+    assert_eq!(root_state.shared_file_by_name("save.dat"), None);
+    assert_eq!(root_state.shared_file_handle("save.dat"), None);
     let _read_request = SteamworksRemoteStorageFileReadRequest {
         request_id: 0,
         name: "save.dat".to_owned(),
@@ -2000,14 +2005,19 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.file_read_request(0), None);
     assert!(prelude_state.file_contents().is_empty());
     assert_eq!(prelude_state.file_contents_by_request(0), None);
+    assert_eq!(prelude_state.file_contents_by_name("save.dat"), None);
+    assert_eq!(prelude_state.file_data("save.dat"), None);
     assert!(prelude_state.file_write_requests().is_empty());
     assert_eq!(prelude_state.file_write_request(0), None);
     assert!(prelude_state.file_writes().is_empty());
     assert_eq!(prelude_state.file_write(0), None);
+    assert_eq!(prelude_state.file_write_by_name("save.dat"), None);
     assert!(prelude_state.file_share_requests().is_empty());
     assert_eq!(prelude_state.file_share_request(0), None);
     assert!(prelude_state.shared_files().is_empty());
     assert_eq!(prelude_state.shared_file(0), None);
+    assert_eq!(prelude_state.shared_file_by_name("save.dat"), None);
+    assert_eq!(prelude_state.shared_file_handle("save.dat"), None);
     let _prelude_read_request = PreludeRemoteStorageFileReadRequest {
         request_id: 0,
         name: "save.dat".to_owned(),

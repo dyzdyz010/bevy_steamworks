@@ -327,6 +327,17 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         })
     );
     assert_eq!(
+        state.file_contents_by_name("save.dat"),
+        Some(&SteamworksRemoteStorageFileContents {
+            request_id: 2,
+            name: "save.dat".to_owned(),
+            data: b"payload".to_vec(),
+        })
+    );
+    assert_eq!(state.file_contents_by_name("missing.dat"), None);
+    assert_eq!(state.file_data("save.dat"), Some(b"payload".as_slice()));
+    assert_eq!(state.file_data("missing.dat"), None);
+    assert_eq!(
         state.file_write_request(3),
         Some(&SteamworksRemoteStorageFileWriteRequest {
             request_id: 3,
@@ -350,6 +361,15 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             bytes: 7,
         })
     );
+    assert_eq!(
+        state.file_write_by_name("save2.dat"),
+        Some(&SteamworksRemoteStorageFileWritten {
+            request_id: 3,
+            name: "save2.dat".to_owned(),
+            bytes: 7,
+        })
+    );
+    assert_eq!(state.file_write_by_name("missing.dat"), None);
     assert_eq!(state.read_count(), 1);
     assert_eq!(state.write_count(), 1);
     assert_eq!(
@@ -402,6 +422,94 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             name: "save2.dat".to_owned(),
             handle: SteamworksRemoteStorageFileShareHandle::from_raw(12),
         })
+    );
+    assert_eq!(
+        state.shared_file_by_name("save.dat"),
+        Some(&SteamworksRemoteStorageSharedFile {
+            request_id: 0,
+            name: "save.dat".to_owned(),
+            handle: SteamworksRemoteStorageFileShareHandle::from_raw(11),
+        })
+    );
+    assert_eq!(
+        state.shared_file_by_name("save2.dat"),
+        Some(&SteamworksRemoteStorageSharedFile {
+            request_id: 1,
+            name: "save2.dat".to_owned(),
+            handle: SteamworksRemoteStorageFileShareHandle::from_raw(12),
+        })
+    );
+    assert_eq!(state.shared_file_by_name("missing.dat"), None);
+    assert_eq!(
+        state.shared_file_handle("save2.dat"),
+        Some(SteamworksRemoteStorageFileShareHandle::from_raw(12))
+    );
+    assert_eq!(state.shared_file_handle("missing.dat"), None);
+}
+
+#[test]
+fn file_name_lookups_return_latest_matching_result() {
+    let mut state = SteamworksRemoteStorageState::default();
+
+    state.record_operation(&SteamworksRemoteStorageOperation::FileRead {
+        contents: SteamworksRemoteStorageFileContents {
+            request_id: 1,
+            name: "save.dat".to_owned(),
+            data: b"old".to_vec(),
+        },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileRead {
+        contents: SteamworksRemoteStorageFileContents {
+            request_id: 2,
+            name: "save.dat".to_owned(),
+            data: b"new".to_vec(),
+        },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
+        written: SteamworksRemoteStorageFileWritten {
+            request_id: 3,
+            name: "save.dat".to_owned(),
+            bytes: 3,
+        },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileWritten {
+        written: SteamworksRemoteStorageFileWritten {
+            request_id: 4,
+            name: "save.dat".to_owned(),
+            bytes: 4,
+        },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileShared {
+        shared_file: SteamworksRemoteStorageSharedFile {
+            request_id: 5,
+            name: "save.dat".to_owned(),
+            handle: SteamworksRemoteStorageFileShareHandle::from_raw(5),
+        },
+    });
+    state.record_operation(&SteamworksRemoteStorageOperation::FileShared {
+        shared_file: SteamworksRemoteStorageSharedFile {
+            request_id: 6,
+            name: "save.dat".to_owned(),
+            handle: SteamworksRemoteStorageFileShareHandle::from_raw(6),
+        },
+    });
+
+    assert_eq!(
+        state
+            .file_contents_by_name("save.dat")
+            .map(|contents| contents.request_id),
+        Some(2)
+    );
+    assert_eq!(state.file_data("save.dat"), Some(b"new".as_slice()));
+    assert_eq!(
+        state
+            .file_write_by_name("save.dat")
+            .map(|written| written.request_id),
+        Some(4)
+    );
+    assert_eq!(
+        state.shared_file_handle("save.dat"),
+        Some(SteamworksRemoteStorageFileShareHandle::from_raw(6))
     );
 }
 

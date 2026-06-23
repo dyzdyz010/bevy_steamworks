@@ -2,9 +2,10 @@ use super::SteamworksRemoteStorageState;
 use crate::remote_storage::{
     SteamworksRemoteStorageCloudInfo, SteamworksRemoteStorageError,
     SteamworksRemoteStorageFileContents, SteamworksRemoteStorageFileInfo,
-    SteamworksRemoteStorageFileReadRequest, SteamworksRemoteStorageFileShareRequest,
-    SteamworksRemoteStorageFileSummary, SteamworksRemoteStorageFileWriteRequest,
-    SteamworksRemoteStorageFileWritten, SteamworksRemoteStorageSharedFile,
+    SteamworksRemoteStorageFileReadRequest, SteamworksRemoteStorageFileShareHandle,
+    SteamworksRemoteStorageFileShareRequest, SteamworksRemoteStorageFileSummary,
+    SteamworksRemoteStorageFileWriteRequest, SteamworksRemoteStorageFileWritten,
+    SteamworksRemoteStorageSharedFile,
 };
 
 impl SteamworksRemoteStorageState {
@@ -163,6 +164,23 @@ impl SteamworksRemoteStorageState {
             .find(|contents| contents.request_id == request_id)
     }
 
+    /// Returns the most recent completed file read payload for a file name.
+    pub fn file_contents_by_name(
+        &self,
+        name: &str,
+    ) -> Option<&SteamworksRemoteStorageFileContents> {
+        self.file_contents
+            .iter()
+            .rev()
+            .find(|contents| contents.name == name)
+    }
+
+    /// Returns the most recent completed file read bytes for a file name.
+    pub fn file_data(&self, name: &str) -> Option<&[u8]> {
+        self.file_contents_by_name(name)
+            .map(|contents| contents.data.as_slice())
+    }
+
     /// Returns the most recent file write completed through the plugin.
     pub fn last_file_written(&self) -> Option<&SteamworksRemoteStorageFileWritten> {
         self.last_file_written.as_ref()
@@ -180,6 +198,14 @@ impl SteamworksRemoteStorageState {
             .find(|written| written.request_id == request_id)
     }
 
+    /// Returns the most recent completed file write snapshot for a file name.
+    pub fn file_write_by_name(&self, name: &str) -> Option<&SteamworksRemoteStorageFileWritten> {
+        self.file_writes
+            .iter()
+            .rev()
+            .find(|written| written.name == name)
+    }
+
     /// Returns the most recent file share completed through the plugin.
     pub fn last_shared_file(&self) -> Option<&SteamworksRemoteStorageSharedFile> {
         self.last_shared_file.as_ref()
@@ -195,6 +221,20 @@ impl SteamworksRemoteStorageState {
         self.shared_files
             .iter()
             .find(|shared_file| shared_file.request_id == request_id)
+    }
+
+    /// Returns the most recent completed file share snapshot for a file name.
+    pub fn shared_file_by_name(&self, name: &str) -> Option<&SteamworksRemoteStorageSharedFile> {
+        self.shared_files
+            .iter()
+            .rev()
+            .find(|shared_file| shared_file.name == name)
+    }
+
+    /// Returns the most recent shared-file handle for a file name.
+    pub fn shared_file_handle(&self, name: &str) -> Option<SteamworksRemoteStorageFileShareHandle> {
+        self.shared_file_by_name(name)
+            .map(|shared_file| shared_file.handle)
     }
 
     /// Returns the number of completed file reads observed through the plugin.
