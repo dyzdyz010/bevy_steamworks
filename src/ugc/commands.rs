@@ -55,7 +55,25 @@ pub(super) fn process_ugc_commands(
             continue;
         }
 
-        let request_id = async_command_request_id(&command, &mut state);
+        let request_id = match async_command_request_id_after_availability(
+            &command,
+            &mut state,
+            io.client.is_some(),
+        ) {
+            Ok(request_id) => request_id,
+            Err(error) => {
+                state.record_error(error.clone());
+                state.sync_active_item_updates(&io.update_watches);
+                tracing::error!(
+                    target: "bevy_steamworks",
+                    command = ?command,
+                    error = %error,
+                    "Steamworks UGC command failed"
+                );
+                results.write(SteamworksUgcResult::Err { command, error });
+                continue;
+            }
+        };
         match handle_ugc_command(
             io.client.as_deref(),
             io.server.as_deref(),
@@ -120,6 +138,25 @@ fn async_command_request_id(
             | SteamworksUgcCommand::StopPlaytimeTrackingForAllItems
     )
     .then(|| state.next_request_id())
+}
+
+fn async_command_request_id_after_availability(
+    command: &SteamworksUgcCommand,
+    state: &mut SteamworksUgcState,
+    client_available: bool,
+) -> Result<Option<u64>, SteamworksUgcError> {
+    if command_requires_client(command) && !client_available {
+        return Err(SteamworksUgcError::ClientUnavailable);
+    }
+
+    Ok(async_command_request_id(command, state))
+}
+
+fn command_requires_client(command: &SteamworksUgcCommand) -> bool {
+    !matches!(
+        command,
+        SteamworksUgcCommand::InitWorkshopForGameServer { .. }
+    )
 }
 
 fn handle_ugc_command(
@@ -333,6 +370,40 @@ mod tests {
             ),
             Some(4)
         );
+    }
+
+    #[test]
+    fn unavailable_client_commands_do_not_consume_request_ids() {
+        let mut state = SteamworksUgcState::default();
+        let query = SteamworksUgcQuery::item(steamworks::PublishedFileId(1));
+
+        assert_eq!(
+            async_command_request_id_after_availability(
+                &SteamworksUgcCommand::query(query),
+                &mut state,
+                false,
+            ),
+            Err(SteamworksUgcError::ClientUnavailable)
+        );
+        assert_eq!(state.next_request_id(), 0);
+    }
+
+    #[test]
+    fn server_only_commands_do_not_require_client_or_consume_request_ids() {
+        let mut state = SteamworksUgcState::default();
+
+        assert_eq!(
+            async_command_request_id_after_availability(
+                &SteamworksUgcCommand::init_workshop_for_game_server(
+                    steamworks::AppId(480),
+                    "workshop_server",
+                ),
+                &mut state,
+                false,
+            ),
+            Ok(None)
+        );
+        assert_eq!(state.next_request_id(), 0);
     }
 
     #[test]
