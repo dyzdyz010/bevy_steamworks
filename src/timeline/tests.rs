@@ -98,6 +98,7 @@ fn state_tracks_events_and_count_without_unbounded_history() {
         duration: state_description.duration,
     });
     assert_eq!(state.state_description(), Some(&state_description));
+    assert!(state.has_state_description());
     assert_eq!(state.state_description_text(), Some("boss phase"));
     assert_eq!(
         state.state_description_duration(),
@@ -108,6 +109,7 @@ fn state_tracks_events_and_count_without_unbounded_history() {
         duration: Duration::ZERO,
     });
     assert_eq!(state.state_description(), None);
+    assert!(!state.has_state_description());
     assert_eq!(state.state_description_text(), None);
     assert_eq!(state.state_description_duration(), None);
 
@@ -117,9 +119,33 @@ fn state_tracks_events_and_count_without_unbounded_history() {
     });
 
     assert_eq!(state.event_count(), 2);
+    assert!(state.has_events());
+    assert_eq!(state.cached_event_count(), 2);
     assert_eq!(state.last_event(), Some(&second));
+    assert_eq!(
+        state
+            .events_with_icon("second")
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![second.clone()]
+    );
     assert_eq!(state.last_event_with_icon("first"), state.events().first());
     assert_eq!(state.last_event_with_icon("missing"), None);
+    assert_eq!(
+        state
+            .events_with_clip_priority(SteamworksTimelineEventClipPriority::Featured)
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![second.clone()]
+    );
+    assert_eq!(
+        state.last_event_with_clip_priority(SteamworksTimelineEventClipPriority::Featured),
+        Some(&second)
+    );
+    assert_eq!(
+        state.last_event_with_clip_priority(SteamworksTimelineEventClipPriority::None),
+        None
+    );
     assert_eq!(state.last_event_icon(), Some("second"));
     assert_eq!(state.last_event_title(), Some("second title"));
     assert_eq!(state.last_event_description(), Some("second description"));

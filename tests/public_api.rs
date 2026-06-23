@@ -135,6 +135,7 @@ use bevy_steamworks::{
         SteamworksSubmittedScreenshot as PreludeSubmittedScreenshot,
         SteamworksSystem as PreludeSystem, SteamworksTimelineCommand as PreludeTimelineCommand,
         SteamworksTimelineError as PreludeTimelineError,
+        SteamworksTimelineEventClipPriority as PreludeTimelineEventClipPriority,
         SteamworksTimelineGameMode as PreludeTimelineGameMode,
         SteamworksTimelineOperation as PreludeTimelineOperation,
         SteamworksTimelinePlugin as PreludeTimelinePlugin,
@@ -226,11 +227,11 @@ use bevy_steamworks::{
     SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
     SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
     SteamworksSubmittedScreenshot, SteamworksSystem, SteamworksTimelineCommand,
-    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
-    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksTimelineState,
-    SteamworksUgcCommand, SteamworksUgcContentDescriptor, SteamworksUgcDownloadItemResult,
-    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
-    SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+    SteamworksTimelineError, SteamworksTimelineEventClipPriority, SteamworksTimelineGameMode,
+    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
+    SteamworksTimelineState, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
+    SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
+    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
     SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
@@ -2587,11 +2588,25 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         error,
     );
     let root_state = SteamworksTimelineState::default();
+    assert!(!root_state.has_state_description());
     assert_eq!(root_state.state_description_text(), None);
     assert_eq!(root_state.state_description_duration(), None);
     assert!(root_state.events().is_empty());
+    assert!(!root_state.has_events());
+    assert_eq!(root_state.cached_event_count(), 0);
+    assert_eq!(root_state.events_with_icon("boss").count(), 0);
     assert_eq!(root_state.last_event(), None);
     assert_eq!(root_state.last_event_with_icon("boss"), None);
+    assert_eq!(
+        root_state
+            .events_with_clip_priority(SteamworksTimelineEventClipPriority::Featured)
+            .count(),
+        0
+    );
+    assert_eq!(
+        root_state.last_event_with_clip_priority(SteamworksTimelineEventClipPriority::Featured),
+        None
+    );
     assert_eq!(root_state.last_event_icon(), None);
     assert_eq!(root_state.last_event_title(), None);
     assert_eq!(root_state.last_event_description(), None);
@@ -2619,11 +2634,25 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         error,
     );
     let prelude_state = PreludeTimelineState::default();
+    assert!(!prelude_state.has_state_description());
     assert_eq!(prelude_state.state_description_text(), None);
     assert_eq!(prelude_state.state_description_duration(), None);
     assert!(prelude_state.events().is_empty());
+    assert!(!prelude_state.has_events());
+    assert_eq!(prelude_state.cached_event_count(), 0);
+    assert_eq!(prelude_state.events_with_icon("boss").count(), 0);
     assert_eq!(prelude_state.last_event(), None);
     assert_eq!(prelude_state.last_event_with_icon("boss"), None);
+    assert_eq!(
+        prelude_state
+            .events_with_clip_priority(PreludeTimelineEventClipPriority::Featured)
+            .count(),
+        0
+    );
+    assert_eq!(
+        prelude_state.last_event_with_clip_priority(PreludeTimelineEventClipPriority::Featured),
+        None
+    );
     assert_eq!(prelude_state.last_event_icon(), None);
     assert_eq!(prelude_state.last_event_title(), None);
     assert_eq!(prelude_state.last_event_description(), None);

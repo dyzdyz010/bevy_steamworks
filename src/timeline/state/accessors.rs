@@ -21,6 +21,11 @@ impl SteamworksTimelineState {
         self.state_description.as_ref()
     }
 
+    /// Returns whether a Timeline state description is currently tracked.
+    pub fn has_state_description(&self) -> bool {
+        self.state_description.is_some()
+    }
+
     /// Returns the current Timeline state description text tracked by the plugin.
     pub fn state_description_text(&self) -> Option<&str> {
         self.state_description()
@@ -38,9 +43,28 @@ impl SteamworksTimelineState {
         &self.events
     }
 
+    /// Returns whether any Timeline events are currently retained in the bounded cache.
+    pub fn has_events(&self) -> bool {
+        !self.events.is_empty()
+    }
+
+    /// Returns how many Timeline events are currently retained in the bounded cache.
+    pub fn cached_event_count(&self) -> usize {
+        self.events.len()
+    }
+
     /// Returns the most recent Timeline event submitted through the plugin.
     pub fn last_event(&self) -> Option<&SteamworksTimelineEventInfo> {
         self.last_event.as_ref()
+    }
+
+    /// Returns retained Timeline events matching an icon name.
+    pub fn events_with_icon(
+        &self,
+        icon: impl Into<String>,
+    ) -> impl Iterator<Item = &SteamworksTimelineEventInfo> + '_ {
+        let icon = icon.into();
+        self.events.iter().filter(move |event| event.icon == icon)
     }
 
     /// Returns the most recent Timeline event with the given icon.
@@ -50,6 +74,27 @@ impl SteamworksTimelineState {
     ) -> Option<&SteamworksTimelineEventInfo> {
         let icon = icon.as_ref();
         self.events.iter().rev().find(|event| event.icon == icon)
+    }
+
+    /// Returns retained Timeline events with a specific clip priority.
+    pub fn events_with_clip_priority(
+        &self,
+        clip_priority: SteamworksTimelineEventClipPriority,
+    ) -> impl Iterator<Item = &SteamworksTimelineEventInfo> + '_ {
+        self.events
+            .iter()
+            .filter(move |event| event.clip_priority == clip_priority)
+    }
+
+    /// Returns the most recent Timeline event with a specific clip priority.
+    pub fn last_event_with_clip_priority(
+        &self,
+        clip_priority: SteamworksTimelineEventClipPriority,
+    ) -> Option<&SteamworksTimelineEventInfo> {
+        self.events
+            .iter()
+            .rev()
+            .find(|event| event.clip_priority == clip_priority)
     }
 
     /// Returns the most recent Timeline event icon.
