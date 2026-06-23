@@ -1490,27 +1490,52 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = SteamworksNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
     let state = SteamworksNetworkingMessagesState::default();
+    let identity = peer.to_identity();
+    assert_eq!(state.received_message_count(), 0);
     assert!(state.recent_received_messages().is_empty());
+    assert_eq!(state.recent_received_message_count(), 0);
     assert_eq!(state.last_received_message(), None);
+    assert_eq!(state.last_received_message_peer(), None);
+    assert_eq!(state.last_received_message_channel(), None);
+    assert_eq!(state.last_received_message_bytes(), None);
+    assert_eq!(state.last_received_message_data(), None);
+    assert_eq!(state.received_message_count_on_channel(0), 0);
+    assert_eq!(state.recent_received_message_count_on_channel(0), 0);
+    assert_eq!(state.last_received_message_on_channel(0), None);
+    assert_eq!(state.last_recent_received_message_on_channel(0), None);
+    assert_eq!(state.received_message_count_from_peer(&identity), 0);
+    assert_eq!(state.recent_received_message_count_from_peer(&identity), 0);
+    assert_eq!(state.last_received_message_from_peer(&identity), None);
     assert_eq!(
-        state.last_received_message_from_peer(&peer.to_identity()),
+        state.last_recent_received_message_from_peer(&identity),
         None
     );
     assert_eq!(
-        state.last_recent_received_message_from_peer(&peer.to_identity()),
+        state.last_recent_received_message_bytes_from_peer(&identity),
         None
     );
+    assert_eq!(state.last_connection_state(), None);
+    assert_eq!(state.last_connection_remote(), None);
+    assert_eq!(state.last_connection_user_data(), None);
+    assert_eq!(state.last_connection_end_reason(), None);
+    assert_eq!(state.last_connection_ping(), None);
+    assert_eq!(state.last_connection_quality(), None);
     assert_eq!(state.recent_received_messages_on_channel(0).count(), 0);
     assert_eq!(
-        state
-            .recent_received_messages_from_peer(&peer.to_identity())
-            .count(),
+        state.recent_received_messages_from_peer(&identity).count(),
         0
     );
     assert!(state.session_requests().is_empty());
-    assert_eq!(state.session_request(&peer.to_identity()), None);
+    assert_eq!(state.cached_session_request_count(), 0);
+    assert_eq!(state.session_request(&identity), None);
+    assert!(!state.has_session_request(&identity));
+    assert_eq!(state.session_request_accepted(&identity), None);
     assert!(state.session_failures().is_empty());
-    assert_eq!(state.session_failure(&peer.to_identity()), None);
+    assert_eq!(state.cached_session_failure_count(), 0);
+    assert_eq!(state.session_failure(&identity), None);
+    assert!(!state.has_session_failure(&identity));
+    assert_eq!(state.session_failure_state(&identity), None);
+    assert_eq!(state.session_failure_end_reason(&identity), None);
 
     accepts_root_exports(plugin, peer, command, operation, result, error, state);
 
@@ -1536,27 +1561,52 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     let plugin = PreludeNetworkingMessagesPlugin::new().auto_accept_session_requests(false);
     assert!(!plugin.auto_accepts_session_requests());
     let state = PreludeNetworkingMessagesState::default();
+    let identity = peer.to_identity();
+    assert_eq!(state.received_message_count(), 0);
     assert!(state.recent_received_messages().is_empty());
+    assert_eq!(state.recent_received_message_count(), 0);
     assert_eq!(state.last_received_message(), None);
+    assert_eq!(state.last_received_message_peer(), None);
+    assert_eq!(state.last_received_message_channel(), None);
+    assert_eq!(state.last_received_message_bytes(), None);
+    assert_eq!(state.last_received_message_data(), None);
+    assert_eq!(state.received_message_count_on_channel(0), 0);
+    assert_eq!(state.recent_received_message_count_on_channel(0), 0);
+    assert_eq!(state.last_received_message_on_channel(0), None);
+    assert_eq!(state.last_recent_received_message_on_channel(0), None);
+    assert_eq!(state.received_message_count_from_peer(&identity), 0);
+    assert_eq!(state.recent_received_message_count_from_peer(&identity), 0);
+    assert_eq!(state.last_received_message_from_peer(&identity), None);
     assert_eq!(
-        state.last_received_message_from_peer(&peer.to_identity()),
+        state.last_recent_received_message_from_peer(&identity),
         None
     );
     assert_eq!(
-        state.last_recent_received_message_from_peer(&peer.to_identity()),
+        state.last_recent_received_message_bytes_from_peer(&identity),
         None
     );
+    assert_eq!(state.last_connection_state(), None);
+    assert_eq!(state.last_connection_remote(), None);
+    assert_eq!(state.last_connection_user_data(), None);
+    assert_eq!(state.last_connection_end_reason(), None);
+    assert_eq!(state.last_connection_ping(), None);
+    assert_eq!(state.last_connection_quality(), None);
     assert_eq!(state.recent_received_messages_on_channel(0).count(), 0);
     assert_eq!(
-        state
-            .recent_received_messages_from_peer(&peer.to_identity())
-            .count(),
+        state.recent_received_messages_from_peer(&identity).count(),
         0
     );
     assert!(state.session_requests().is_empty());
-    assert_eq!(state.session_request(&peer.to_identity()), None);
+    assert_eq!(state.cached_session_request_count(), 0);
+    assert_eq!(state.session_request(&identity), None);
+    assert!(!state.has_session_request(&identity));
+    assert_eq!(state.session_request_accepted(&identity), None);
     assert!(state.session_failures().is_empty());
-    assert_eq!(state.session_failure(&peer.to_identity()), None);
+    assert_eq!(state.cached_session_failure_count(), 0);
+    assert_eq!(state.session_failure(&identity), None);
+    assert!(!state.has_session_failure(&identity));
+    assert_eq!(state.session_failure_state(&identity), None);
+    assert_eq!(state.session_failure_end_reason(&identity), None);
 
     accepts_prelude_exports(plugin, peer, command, operation, result, error, state);
 }

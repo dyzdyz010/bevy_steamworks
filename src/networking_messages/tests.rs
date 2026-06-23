@@ -286,6 +286,31 @@ fn state_records_operations_without_unbounded_message_history() {
         bytes: 3,
     });
     state.record_operation(
+        &SteamworksNetworkingMessagesOperation::SessionConnectionInfoRead {
+            peer: SteamworksNetworkingPeer::identity(peer.clone()),
+            info: SteamworksNetworkingMessagesConnectionInfo {
+                state: steamworks::networking_types::NetworkingConnectionState::Connected,
+                remote: Some(peer.clone()),
+                user_data: Some(9),
+                end_reason: None,
+                realtime: Some(SteamworksNetworkingMessagesRealtimeInfo {
+                    connection_state:
+                        steamworks::networking_types::NetworkingConnectionState::Connected,
+                    ping: 42,
+                    connection_quality_local: 0.9,
+                    connection_quality_remote: 0.8,
+                    out_packets_per_sec: 1.0,
+                    out_bytes_per_sec: 2.0,
+                    in_packets_per_sec: 3.0,
+                    in_bytes_per_sec: 4.0,
+                    send_rate_bytes_per_sec: 1024,
+                    pending_unreliable: 5,
+                    pending_reliable: 6,
+                }),
+            },
+        },
+    );
+    state.record_operation(
         &SteamworksNetworkingMessagesOperation::SessionRequestReceived {
             request: SteamworksNetworkingMessagesSessionRequestInfo {
                 remote: peer.clone(),
@@ -307,11 +332,17 @@ fn state_records_operations_without_unbounded_message_history() {
     );
 
     assert_eq!(state.received_messages(), &[second.clone(), third.clone()]);
+    assert_eq!(state.received_message_count(), 2);
     assert_eq!(
         state.recent_received_messages(),
         &[first.clone(), second.clone(), third.clone()]
     );
+    assert_eq!(state.recent_received_message_count(), 3);
     assert_eq!(state.last_received_message(), Some(&third));
+    assert_eq!(state.last_received_message_peer(), Some(&other_peer));
+    assert_eq!(state.last_received_message_channel(), Some(1));
+    assert_eq!(state.last_received_message_bytes(), Some(1));
+    assert_eq!(state.last_received_message_data(), Some([3].as_slice()));
     assert_eq!(
         state
             .received_messages_on_channel(0)
@@ -319,12 +350,19 @@ fn state_records_operations_without_unbounded_message_history() {
             .collect::<Vec<_>>(),
         vec![second.clone()]
     );
+    assert_eq!(state.received_message_count_on_channel(0), 1);
     assert_eq!(
         state
             .recent_received_messages_on_channel(0)
             .cloned()
             .collect::<Vec<_>>(),
         vec![first.clone(), second.clone()]
+    );
+    assert_eq!(state.recent_received_message_count_on_channel(0), 2);
+    assert_eq!(state.last_received_message_on_channel(1), Some(&third));
+    assert_eq!(
+        state.last_recent_received_message_on_channel(0),
+        Some(&second)
     );
     assert_eq!(
         state
@@ -333,6 +371,7 @@ fn state_records_operations_without_unbounded_message_history() {
             .collect::<Vec<_>>(),
         vec![second.clone()]
     );
+    assert_eq!(state.received_message_count_from_peer(&peer), 1);
     assert_eq!(
         state
             .recent_received_messages_from_peer(&peer)
@@ -340,15 +379,30 @@ fn state_records_operations_without_unbounded_message_history() {
             .collect::<Vec<_>>(),
         vec![first.clone(), second.clone()]
     );
+    assert_eq!(state.recent_received_message_count_from_peer(&peer), 2);
     assert_eq!(state.last_received_message_from_peer(&peer), Some(&second));
     assert_eq!(
         state.last_recent_received_message_from_peer(&peer),
         Some(&second)
     );
+    assert_eq!(
+        state.last_recent_received_message_bytes_from_peer(&peer),
+        Some(1)
+    );
+    assert_eq!(
+        state.last_connection_state(),
+        Some(steamworks::networking_types::NetworkingConnectionState::Connected)
+    );
+    assert_eq!(state.last_connection_remote(), Some(Some(&peer)));
+    assert_eq!(state.last_connection_user_data(), Some(Some(9)));
+    assert_eq!(state.last_connection_end_reason(), Some(None));
+    assert_eq!(state.last_connection_ping(), Some(42));
+    assert_eq!(state.last_connection_quality(), Some((0.9, 0.8)));
     assert_eq!(state.received_count(), 3);
     assert_eq!(state.sent_count(), 1);
     assert_eq!(state.session_request_count(), 1);
     assert_eq!(state.session_requests().len(), 1);
+    assert_eq!(state.cached_session_request_count(), 1);
     assert_eq!(
         state.session_request(&peer),
         Some(&SteamworksNetworkingMessagesSessionRequestInfo {
@@ -356,18 +410,27 @@ fn state_records_operations_without_unbounded_message_history() {
             accepted: true,
         })
     );
+    assert!(state.has_session_request(&peer));
+    assert_eq!(state.session_request_accepted(&peer), Some(true));
     assert_eq!(state.session_failure_count(), 1);
     assert_eq!(state.session_failures().len(), 1);
+    assert_eq!(state.cached_session_failure_count(), 1);
     assert_eq!(
         state.session_failure(&peer),
         Some(&SteamworksNetworkingMessagesConnectionInfo {
             state: steamworks::networking_types::NetworkingConnectionState::ProblemDetectedLocally,
-            remote: Some(peer),
+            remote: Some(peer.clone()),
             user_data: Some(7),
             end_reason: None,
             realtime: None,
         })
     );
+    assert!(state.has_session_failure(&peer));
+    assert_eq!(
+        state.session_failure_state(&peer),
+        Some(steamworks::networking_types::NetworkingConnectionState::ProblemDetectedLocally)
+    );
+    assert_eq!(state.session_failure_end_reason(&peer), Some(None));
     assert!(!state.auto_accept_session_requests());
 }
 
