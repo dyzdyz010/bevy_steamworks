@@ -274,6 +274,7 @@ fn core_api_is_exported_from_root_and_prelude() {
         SteamworksFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let _restart: fn(steamworks::AppId) -> bool = SteamworksPlugin::restart_app_if_necessary;
     accepts_root_exports(
         plugin,
         SteamworksCallbackRegistry::default(),
@@ -292,6 +293,7 @@ fn core_api_is_exported_from_root_and_prelude() {
         PreludeFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let _prelude_restart: fn(steamworks::AppId) -> bool = PreludePlugin::restart_app_if_necessary;
     accepts_prelude_exports(
         plugin,
         PreludeCallbackRegistry::default(),

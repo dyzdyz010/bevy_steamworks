@@ -28,6 +28,16 @@ impl SteamworksPlugin {
         Self::with_mode(SteamworksInitMode::Automatic)
     }
 
+    /// Returns true if the app should exit because Steam is relaunching it.
+    ///
+    /// This wraps [`steamworks::restart_app_if_necessary`] for callers that want
+    /// the common Steam launch check to live next to the plugin entry point.
+    /// Call it before adding [`SteamworksPlugin`] or initializing
+    /// [`SteamworksClient`].
+    pub fn restart_app_if_necessary(app_id: impl Into<AppId>) -> bool {
+        steamworks::restart_app_if_necessary(app_id.into())
+    }
+
     /// Creates a plugin that initializes Steamworks with a specific app id.
     ///
     /// This uses [`steamworks::Client::init_app`] when the plugin is built.

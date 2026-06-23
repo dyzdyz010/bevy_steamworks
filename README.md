@@ -23,6 +23,10 @@ use bevy::prelude::*;
 use bevy_steamworks::prelude::*;
 
 fn main() {
+    if SteamworksPlugin::restart_app_if_necessary(480) {
+        return;
+    }
+
     App::new()
         .add_plugins(SteamworksPlugins::app_id(480))
         .add_plugins(DefaultPlugins)
@@ -30,7 +34,7 @@ fn main() {
 }
 ```
 
-`480` is Valve's Spacewar sample app id. Real games should use the app id assigned by Valve.
+`480` is Valve's Spacewar sample app id. Real games should use the app id assigned by Valve. `SteamworksPlugin::restart_app_if_necessary(...)` wraps Steam's launch check and should run before Steamworks initialization; return from `main` when it asks Steam to relaunch the app.
 
 `SteamworksPlugins` inserts `SteamworksClient` as a Bevy resource, automatically runs Steam callbacks in `SteamworksSystem::RunCallbacks` during Bevy's `First` schedule, and installs every default client-side high-level feature plugin: apps, friends, input, matchmaking, server browser queries, legacy P2P networking, networking messages, networking sockets, networking utils, Remote Play, Remote Storage, screenshots, stats, timeline, UGC, user, and utils.
 
