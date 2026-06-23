@@ -609,14 +609,16 @@ fn state_records_operations_without_unbounded_query_history() {
     state.record_operation(&SteamworksUgcOperation::ItemStateRead {
         info: SteamworksUgcItemStateInfo {
             item,
-            state: steamworks::ItemState::SUBSCRIBED,
+            state: steamworks::ItemState::SUBSCRIBED
+                | steamworks::ItemState::INSTALLED
+                | steamworks::ItemState::DOWNLOADING,
         },
     });
     state.record_operation(&SteamworksUgcOperation::ItemDownloadInfoRead {
         info: SteamworksUgcItemDownloadInfoResult {
             item,
             info: Some(SteamworksUgcItemDownloadInfo {
-                downloaded_bytes: 10,
+                downloaded_bytes: 50,
                 total_bytes: 100,
             }),
         },
@@ -709,23 +711,46 @@ fn state_records_operations_without_unbounded_query_history() {
     );
     assert_eq!(state.item_key_value_tag(item, "mode"), Some(Some("arena")));
     assert_eq!(state.item_key_value_tag(item, "missing"), Some(None));
+    assert_eq!(state.subscribed_item_count(), 1);
+    assert!(state.is_item_subscribed(item));
+    assert!(!state.is_item_subscribed(steamworks::PublishedFileId(999)));
     assert_eq!(
         state.item_state(item),
         Some(&SteamworksUgcItemStateInfo {
             item,
-            state: steamworks::ItemState::SUBSCRIBED,
+            state: steamworks::ItemState::SUBSCRIBED
+                | steamworks::ItemState::INSTALLED
+                | steamworks::ItemState::DOWNLOADING,
         })
     );
+    assert_eq!(
+        state.item_state_flags(item),
+        Some(
+            steamworks::ItemState::SUBSCRIBED
+                | steamworks::ItemState::INSTALLED
+                | steamworks::ItemState::DOWNLOADING,
+        )
+    );
+    assert_eq!(state.item_state_subscribed(item), Some(true));
+    assert_eq!(state.item_state_installed(item), Some(true));
+    assert_eq!(state.item_state_downloading(item), Some(true));
+    assert_eq!(state.item_state_needs_update(item), Some(false));
+    assert_eq!(state.item_state_download_pending(item), Some(false));
     assert_eq!(
         state.item_download_info(item),
         Some(&SteamworksUgcItemDownloadInfoResult {
             item,
             info: Some(SteamworksUgcItemDownloadInfo {
-                downloaded_bytes: 10,
+                downloaded_bytes: 50,
                 total_bytes: 100,
             }),
         })
     );
+    assert_eq!(state.item_download_info_available(item), Some(true));
+    assert_eq!(state.item_downloaded_bytes(item), Some(Some(50)));
+    assert_eq!(state.item_download_total_bytes(item), Some(Some(100)));
+    assert_eq!(state.item_download_progress(item), Some(Some(0.5)));
+    assert_eq!(state.item_download_complete(item), Some(Some(false)));
     assert_eq!(
         state.item_install_info(item),
         Some(&SteamworksUgcItemInstallInfoResult {
@@ -737,6 +762,10 @@ fn state_records_operations_without_unbounded_query_history() {
             }),
         })
     );
+    assert_eq!(state.item_install_info_available(item), Some(true));
+    assert_eq!(state.item_install_folder(item), Some(Some("workshop/item")));
+    assert_eq!(state.item_size_on_disk(item), Some(Some(2048)));
+    assert_eq!(state.item_install_timestamp(item), Some(Some(1234)));
     assert_eq!(
         state.download_item_result(item),
         Some(&SteamworksUgcDownloadItemResult {
@@ -764,6 +793,16 @@ fn state_records_operations_without_unbounded_query_history() {
     assert_eq!(state.query_requests().len(), 4);
     assert_eq!(state.query_results().len(), 2);
     assert_eq!(
+        state.query_result_items(1),
+        Some([second_detail.clone()].as_slice())
+    );
+    assert_eq!(state.query_result_item_count(1), Some(1));
+    assert_eq!(state.query_result_total_count(1), Some(2));
+    assert_eq!(state.query_result_was_cached(1), Some(true));
+    assert_eq!(state.last_query_item_count(), Some(1));
+    assert_eq!(state.last_query_total_count(), Some(2));
+    assert_eq!(state.last_query_was_cached(), Some(true));
+    assert_eq!(
         state.query_total_result(2),
         Some(&SteamworksUgcQueryTotalResult {
             request_id: 2,
@@ -771,6 +810,7 @@ fn state_records_operations_without_unbounded_query_history() {
             total: SteamworksUgcQueryTotal { total_results: 42 },
         })
     );
+    assert_eq!(state.query_total_count(2), Some(42));
     assert_eq!(
         state.query_ids_result(3),
         Some(&SteamworksUgcQueryIdsResult {
@@ -779,6 +819,9 @@ fn state_records_operations_without_unbounded_query_history() {
             ids: SteamworksUgcQueryIds { items: vec![item] },
         })
     );
+    assert_eq!(state.query_ids_items(3), Some([item].as_slice()));
+    assert_eq!(state.query_ids_item_count(3), Some(1));
+    assert_eq!(state.last_query_ids_count(), Some(1));
 
     state.record_operation(&SteamworksUgcOperation::ItemDeleted {
         request_id: 3,
@@ -809,8 +852,14 @@ fn state_records_operations_without_unbounded_query_history() {
     assert_eq!(state.item_key_value_tags(item), None);
     assert_eq!(state.item_key_value_tag(item, "mode"), None);
     assert_eq!(state.item_state(item), None);
+    assert_eq!(state.item_state_flags(item), None);
+    assert_eq!(state.item_state_subscribed(item), None);
     assert_eq!(state.item_download_info(item), None);
+    assert_eq!(state.item_download_info_available(item), None);
+    assert_eq!(state.item_download_progress(item), None);
     assert_eq!(state.item_install_info(item), None);
+    assert_eq!(state.item_install_info_available(item), None);
+    assert_eq!(state.item_install_folder(item), None);
     assert_eq!(state.download_item_result(item), None);
     assert_eq!(state.last_query(), Some(&second));
     assert_eq!(
@@ -825,7 +874,9 @@ fn state_records_operations_without_unbounded_query_history() {
         state.last_item_state(),
         Some(&SteamworksUgcItemStateInfo {
             item,
-            state: steamworks::ItemState::SUBSCRIBED,
+            state: steamworks::ItemState::SUBSCRIBED
+                | steamworks::ItemState::INSTALLED
+                | steamworks::ItemState::DOWNLOADING,
         })
     );
     assert_eq!(state.submitted_downloads(), 1);

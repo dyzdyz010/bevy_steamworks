@@ -3233,6 +3233,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     let _query_options = SteamworksUgcQueryOptions::new().with_additional_previews(true);
     let _item_detail = root_item_detail(item);
     let root_state = SteamworksUgcState::default();
+    assert_eq!(root_state.subscribed_item_count(), 0);
+    assert!(!root_state.is_item_subscribed(item));
     assert!(root_state.item_details().is_empty());
     assert_eq!(root_state.item_detail(item), None);
     assert_eq!(root_state.item_creator_app_id(item), None);
@@ -3252,8 +3254,27 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.item_key_value_tags(item), None);
     assert_eq!(root_state.item_key_value_tag(item, "mode"), None);
     assert_eq!(root_state.item_state(item), None);
+    assert_eq!(root_state.item_state_flags(item), None);
+    assert_eq!(
+        root_state.item_state_contains(item, steamworks::ItemState::SUBSCRIBED),
+        None
+    );
+    assert_eq!(root_state.item_state_subscribed(item), None);
+    assert_eq!(root_state.item_state_installed(item), None);
+    assert_eq!(root_state.item_state_needs_update(item), None);
+    assert_eq!(root_state.item_state_downloading(item), None);
+    assert_eq!(root_state.item_state_download_pending(item), None);
     assert_eq!(root_state.item_download_info(item), None);
+    assert_eq!(root_state.item_download_info_available(item), None);
+    assert_eq!(root_state.item_downloaded_bytes(item), None);
+    assert_eq!(root_state.item_download_total_bytes(item), None);
+    assert_eq!(root_state.item_download_progress(item), None);
+    assert_eq!(root_state.item_download_complete(item), None);
     assert_eq!(root_state.item_install_info(item), None);
+    assert_eq!(root_state.item_install_info_available(item), None);
+    assert_eq!(root_state.item_install_folder(item), None);
+    assert_eq!(root_state.item_size_on_disk(item), None);
+    assert_eq!(root_state.item_install_timestamp(item), None);
     assert!(root_state.download_item_results().is_empty());
     assert_eq!(root_state.download_item_result(item), None);
     assert_eq!(root_state.download_item_failed(item), None);
@@ -3261,10 +3282,21 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.query_request(0), None);
     assert!(root_state.query_results().is_empty());
     assert_eq!(root_state.query_result(0), None);
+    assert_eq!(root_state.query_result_items(0), None);
+    assert_eq!(root_state.query_result_item_count(0), None);
+    assert_eq!(root_state.query_result_total_count(0), None);
+    assert_eq!(root_state.query_result_was_cached(0), None);
+    assert_eq!(root_state.last_query_item_count(), None);
+    assert_eq!(root_state.last_query_total_count(), None);
+    assert_eq!(root_state.last_query_was_cached(), None);
     assert!(root_state.query_total_results().is_empty());
     assert_eq!(root_state.query_total_result(0), None);
+    assert_eq!(root_state.query_total_count(0), None);
     assert!(root_state.query_ids_results().is_empty());
     assert_eq!(root_state.query_ids_result(0), None);
+    assert_eq!(root_state.query_ids_items(0), None);
+    assert_eq!(root_state.query_ids_item_count(0), None);
+    assert_eq!(root_state.last_query_ids_count(), None);
     let _query_request = SteamworksUgcQueryRequest {
         request_id: 0,
         query: query.clone(),
@@ -3405,6 +3437,8 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     let _prelude_query_options = PreludeUgcQueryOptions::new().with_additional_previews(true);
     let _prelude_item_detail = prelude_item_detail(item);
     let prelude_state = PreludeUgcState::default();
+    assert_eq!(prelude_state.subscribed_item_count(), 0);
+    assert!(!prelude_state.is_item_subscribed(item));
     assert!(prelude_state.item_details().is_empty());
     assert_eq!(prelude_state.item_detail(item), None);
     assert_eq!(prelude_state.item_creator_app_id(item), None);
@@ -3424,8 +3458,27 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.item_key_value_tags(item), None);
     assert_eq!(prelude_state.item_key_value_tag(item, "mode"), None);
     assert_eq!(prelude_state.item_state(item), None);
+    assert_eq!(prelude_state.item_state_flags(item), None);
+    assert_eq!(
+        prelude_state.item_state_contains(item, steamworks::ItemState::SUBSCRIBED),
+        None
+    );
+    assert_eq!(prelude_state.item_state_subscribed(item), None);
+    assert_eq!(prelude_state.item_state_installed(item), None);
+    assert_eq!(prelude_state.item_state_needs_update(item), None);
+    assert_eq!(prelude_state.item_state_downloading(item), None);
+    assert_eq!(prelude_state.item_state_download_pending(item), None);
     assert_eq!(prelude_state.item_download_info(item), None);
+    assert_eq!(prelude_state.item_download_info_available(item), None);
+    assert_eq!(prelude_state.item_downloaded_bytes(item), None);
+    assert_eq!(prelude_state.item_download_total_bytes(item), None);
+    assert_eq!(prelude_state.item_download_progress(item), None);
+    assert_eq!(prelude_state.item_download_complete(item), None);
     assert_eq!(prelude_state.item_install_info(item), None);
+    assert_eq!(prelude_state.item_install_info_available(item), None);
+    assert_eq!(prelude_state.item_install_folder(item), None);
+    assert_eq!(prelude_state.item_size_on_disk(item), None);
+    assert_eq!(prelude_state.item_install_timestamp(item), None);
     assert!(prelude_state.download_item_results().is_empty());
     assert_eq!(prelude_state.download_item_result(item), None);
     assert_eq!(prelude_state.download_item_failed(item), None);
@@ -3433,10 +3486,21 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.query_request(0), None);
     assert!(prelude_state.query_results().is_empty());
     assert_eq!(prelude_state.query_result(0), None);
+    assert_eq!(prelude_state.query_result_items(0), None);
+    assert_eq!(prelude_state.query_result_item_count(0), None);
+    assert_eq!(prelude_state.query_result_total_count(0), None);
+    assert_eq!(prelude_state.query_result_was_cached(0), None);
+    assert_eq!(prelude_state.last_query_item_count(), None);
+    assert_eq!(prelude_state.last_query_total_count(), None);
+    assert_eq!(prelude_state.last_query_was_cached(), None);
     assert!(prelude_state.query_total_results().is_empty());
     assert_eq!(prelude_state.query_total_result(0), None);
+    assert_eq!(prelude_state.query_total_count(0), None);
     assert!(prelude_state.query_ids_results().is_empty());
     assert_eq!(prelude_state.query_ids_result(0), None);
+    assert_eq!(prelude_state.query_ids_items(0), None);
+    assert_eq!(prelude_state.query_ids_item_count(0), None);
+    assert_eq!(prelude_state.last_query_ids_count(), None);
     let _prelude_query_request = PreludeUgcQueryRequest {
         request_id: 0,
         query: prelude_query.clone(),
