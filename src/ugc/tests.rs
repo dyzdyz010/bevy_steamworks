@@ -41,7 +41,10 @@ fn test_item_details(
         num_children: 0,
         preview_url: Some("https://example.invalid/preview.png".to_owned()),
         content_descriptors: vec![SteamworksUgcContentDescriptor::AnyMatureContent],
-        statistics: Vec::new(),
+        statistics: vec![SteamworksUgcStatistic {
+            statistic: steamworks::UGCStatisticType::Subscriptions,
+            value: 7,
+        }],
         metadata: Some(b"metadata".to_vec()),
         children: Some(Vec::new()),
         key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
@@ -666,6 +669,46 @@ fn state_records_operations_without_unbounded_query_history() {
         state.item_consumer_app_id(item),
         Some(Some(steamworks::AppId(480)))
     );
+    assert_eq!(state.item_title(item), Some("Second title"));
+    assert_eq!(state.item_description(item), Some("Description"));
+    assert_eq!(state.item_tags(item), Some(["tag".to_owned()].as_slice()));
+    assert_eq!(
+        state.item_preview_url(item),
+        Some(Some("https://example.invalid/preview.png"))
+    );
+    assert_eq!(
+        state.item_content_descriptors(item),
+        Some([SteamworksUgcContentDescriptor::AnyMatureContent].as_slice())
+    );
+    assert_eq!(
+        state.item_statistics(item),
+        Some(
+            [SteamworksUgcStatistic {
+                statistic: steamworks::UGCStatisticType::Subscriptions,
+                value: 7,
+            }]
+            .as_slice()
+        )
+    );
+    assert_eq!(
+        state.item_statistic(item, steamworks::UGCStatisticType::Subscriptions),
+        Some(Some(7))
+    );
+    assert_eq!(
+        state.item_statistic(item, steamworks::UGCStatisticType::Favorites),
+        Some(None)
+    );
+    assert_eq!(
+        state.item_metadata(item),
+        Some(Some(b"metadata".as_slice()))
+    );
+    assert_eq!(state.item_children(item), Some(Some([].as_slice())));
+    assert_eq!(
+        state.item_key_value_tags(item),
+        Some([("mode".to_owned(), "arena".to_owned())].as_slice())
+    );
+    assert_eq!(state.item_key_value_tag(item, "mode"), Some(Some("arena")));
+    assert_eq!(state.item_key_value_tag(item, "missing"), Some(None));
     assert_eq!(
         state.item_state(item),
         Some(&SteamworksUgcItemStateInfo {
@@ -751,6 +794,20 @@ fn state_records_operations_without_unbounded_query_history() {
     assert_eq!(state.item_detail(item), None);
     assert_eq!(state.item_creator_app_id(item), None);
     assert_eq!(state.item_consumer_app_id(item), None);
+    assert_eq!(state.item_title(item), None);
+    assert_eq!(state.item_description(item), None);
+    assert_eq!(state.item_tags(item), None);
+    assert_eq!(state.item_preview_url(item), None);
+    assert_eq!(state.item_content_descriptors(item), None);
+    assert_eq!(state.item_statistics(item), None);
+    assert_eq!(
+        state.item_statistic(item, steamworks::UGCStatisticType::Subscriptions),
+        None
+    );
+    assert_eq!(state.item_metadata(item), None);
+    assert_eq!(state.item_children(item), None);
+    assert_eq!(state.item_key_value_tags(item), None);
+    assert_eq!(state.item_key_value_tag(item, "mode"), None);
     assert_eq!(state.item_state(item), None);
     assert_eq!(state.item_download_info(item), None);
     assert_eq!(state.item_install_info(item), None);

@@ -150,6 +150,7 @@ use bevy_steamworks::{
         SteamworksUgcQueryTotal as PreludeUgcQueryTotal,
         SteamworksUgcQueryTotalResult as PreludeUgcQueryTotalResult,
         SteamworksUgcResult as PreludeUgcResult, SteamworksUgcState as PreludeUgcState,
+        SteamworksUgcStatistic as PreludeUgcStatistic,
         SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
@@ -220,7 +221,7 @@ use bevy_steamworks::{
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
     SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
     SteamworksUgcQueryResult, SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
-    SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState,
+    SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic,
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
     SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
     SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
@@ -2594,7 +2595,10 @@ fn ugc_api_is_exported_from_root_and_prelude() {
             num_children: 0,
             preview_url: Some("https://example.invalid/preview.png".to_owned()),
             content_descriptors: vec![SteamworksUgcContentDescriptor::AnyMatureContent],
-            statistics: Vec::new(),
+            statistics: vec![SteamworksUgcStatistic {
+                statistic: steamworks::UGCStatisticType::Subscriptions,
+                value: 7,
+            }],
             metadata: Some(b"metadata".to_vec()),
             children: Some(Vec::new()),
             key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
@@ -2627,7 +2631,10 @@ fn ugc_api_is_exported_from_root_and_prelude() {
             num_children: 0,
             preview_url: Some("https://example.invalid/preview.png".to_owned()),
             content_descriptors: vec![PreludeUgcContentDescriptor::AnyMatureContent],
-            statistics: Vec::new(),
+            statistics: vec![PreludeUgcStatistic {
+                statistic: steamworks::UGCStatisticType::Subscriptions,
+                value: 7,
+            }],
             metadata: Some(b"metadata".to_vec()),
             children: Some(Vec::new()),
             key_value_tags: vec![("mode".to_owned(), "arena".to_owned())],
@@ -2674,6 +2681,20 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.item_detail(item), None);
     assert_eq!(root_state.item_creator_app_id(item), None);
     assert_eq!(root_state.item_consumer_app_id(item), None);
+    assert_eq!(root_state.item_title(item), None);
+    assert_eq!(root_state.item_description(item), None);
+    assert_eq!(root_state.item_tags(item), None);
+    assert_eq!(root_state.item_preview_url(item), None);
+    assert_eq!(root_state.item_content_descriptors(item), None);
+    assert_eq!(root_state.item_statistics(item), None);
+    assert_eq!(
+        root_state.item_statistic(item, steamworks::UGCStatisticType::Subscriptions),
+        None
+    );
+    assert_eq!(root_state.item_metadata(item), None);
+    assert_eq!(root_state.item_children(item), None);
+    assert_eq!(root_state.item_key_value_tags(item), None);
+    assert_eq!(root_state.item_key_value_tag(item, "mode"), None);
     assert_eq!(root_state.item_state(item), None);
     assert_eq!(root_state.item_download_info(item), None);
     assert_eq!(root_state.item_install_info(item), None);
@@ -2832,6 +2853,20 @@ fn ugc_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.item_detail(item), None);
     assert_eq!(prelude_state.item_creator_app_id(item), None);
     assert_eq!(prelude_state.item_consumer_app_id(item), None);
+    assert_eq!(prelude_state.item_title(item), None);
+    assert_eq!(prelude_state.item_description(item), None);
+    assert_eq!(prelude_state.item_tags(item), None);
+    assert_eq!(prelude_state.item_preview_url(item), None);
+    assert_eq!(prelude_state.item_content_descriptors(item), None);
+    assert_eq!(prelude_state.item_statistics(item), None);
+    assert_eq!(
+        prelude_state.item_statistic(item, steamworks::UGCStatisticType::Subscriptions),
+        None
+    );
+    assert_eq!(prelude_state.item_metadata(item), None);
+    assert_eq!(prelude_state.item_children(item), None);
+    assert_eq!(prelude_state.item_key_value_tags(item), None);
+    assert_eq!(prelude_state.item_key_value_tag(item, "mode"), None);
     assert_eq!(prelude_state.item_state(item), None);
     assert_eq!(prelude_state.item_download_info(item), None);
     assert_eq!(prelude_state.item_install_info(item), None);
