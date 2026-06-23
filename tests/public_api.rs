@@ -112,6 +112,7 @@ use bevy_steamworks::{
         SteamworksScreenshotsState as PreludeScreenshotsState,
         SteamworksServerCommand as PreludeServerCommand,
         SteamworksServerConfig as PreludeServerConfig, SteamworksServerError as PreludeServerError,
+        SteamworksServerFeaturePlugins as PreludeServerFeaturePlugins,
         SteamworksServerInitMode as PreludeServerInitMode,
         SteamworksServerIssuedAuthSessionTicketForIdentity as PreludeServerIssuedAuthSessionTicketForIdentity,
         SteamworksServerListFilters as PreludeServerListFilters,
@@ -122,6 +123,7 @@ use bevy_steamworks::{
         SteamworksServerPlayerDetails as PreludeServerPlayerDetails,
         SteamworksServerPlayerInfo as PreludeServerPlayerInfo,
         SteamworksServerPlugin as PreludeServerPlugin,
+        SteamworksServerPlugins as PreludeServerPlugins,
         SteamworksServerQueryId as PreludeServerQueryId,
         SteamworksServerQueryInfo as PreludeServerQueryInfo,
         SteamworksServerQueryKind as PreludeServerQueryKind,
@@ -217,13 +219,13 @@ use bevy_steamworks::{
     SteamworksScreenshotReadyError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
     SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
     SteamworksScreenshotsState, SteamworksServerCommand, SteamworksServerConfig,
-    SteamworksServerError, SteamworksServerInitMode,
+    SteamworksServerError, SteamworksServerFeaturePlugins, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
     SteamworksServerPing, SteamworksServerPlayerDetails, SteamworksServerPlayerInfo,
-    SteamworksServerPlugin, SteamworksServerQueryId, SteamworksServerQueryInfo,
-    SteamworksServerQueryKind, SteamworksServerQueryTarget, SteamworksServerResult,
-    SteamworksServerRule, SteamworksServerRules, SteamworksServerState,
+    SteamworksServerPlugin, SteamworksServerPlugins, SteamworksServerQueryId,
+    SteamworksServerQueryInfo, SteamworksServerQueryKind, SteamworksServerQueryTarget,
+    SteamworksServerResult, SteamworksServerRule, SteamworksServerRules, SteamworksServerState,
     SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
     SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
     SteamworksSubmittedScreenshot, SteamworksSystem, SteamworksTimelineCommand,
@@ -686,6 +688,8 @@ fn friends_api_is_exported_from_root_and_prelude() {
 fn game_server_api_is_exported_from_root_and_prelude() {
     fn accepts_root_exports(
         _plugin: SteamworksServerPlugin,
+        _feature_plugins: SteamworksServerFeaturePlugins,
+        _plugins: SteamworksServerPlugins,
         _command: SteamworksServerCommand,
         _operation: SteamworksServerOperation,
         _result: SteamworksServerResult,
@@ -696,6 +700,8 @@ fn game_server_api_is_exported_from_root_and_prelude() {
 
     fn accepts_prelude_exports(
         _plugin: PreludeServerPlugin,
+        _feature_plugins: PreludeServerFeaturePlugins,
+        _plugins: PreludeServerPlugins,
         _command: PreludeServerCommand,
         _operation: PreludeServerOperation,
         _result: PreludeServerResult,
@@ -730,6 +736,27 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         SteamworksFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let plugins = SteamworksServerPlugins::manual()
+        .feature_plugins(SteamworksServerFeaturePlugins::new())
+        .log_and_continue()
+        .run_callbacks(false);
+    assert!(matches!(
+        plugins.init_mode(),
+        SteamworksServerInitMode::Manual
+    ));
+    assert_eq!(
+        plugins.failure_policy_setting(),
+        SteamworksFailurePolicy::LogAndContinue
+    );
+    assert!(!plugins.runs_callbacks());
+    assert_eq!(
+        plugins.core_plugin().runs_callbacks(),
+        plugins.runs_callbacks()
+    );
+    let _ = SteamworksServerPlugins::manual()
+        .feature_plugins(SteamworksServerFeaturePlugins::new())
+        .build()
+        .disable::<SteamworksUgcPlugin>();
     let source = SteamAPIInitError::NoSteamClient("offline".into());
     let unavailable = SteamworksServerUnavailable::InitFailed {
         config: SteamworksServerConfig::new(
@@ -789,7 +816,16 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.client_group_officer(user, group), None);
     assert_eq!(root_state.key_value("map"), None);
 
-    accepts_root_exports(plugin, command, operation, result, error, unavailable);
+    accepts_root_exports(
+        plugin,
+        SteamworksServerFeaturePlugins::new(),
+        plugins,
+        command,
+        operation,
+        result,
+        error,
+        unavailable,
+    );
 
     let command = PreludeServerCommand::enable_heartbeats(true);
     let operation = PreludeServerOperation::HeartbeatsEnabled { active: true };
@@ -814,6 +850,24 @@ fn game_server_api_is_exported_from_root_and_prelude() {
         PreludeFailurePolicy::LogAndContinue
     );
     assert!(!plugin.runs_callbacks());
+    let plugins = PreludeServerPlugins::manual()
+        .feature_plugins(PreludeServerFeaturePlugins::new())
+        .log_and_continue()
+        .run_callbacks(false);
+    assert!(matches!(plugins.init_mode(), PreludeServerInitMode::Manual));
+    assert_eq!(
+        plugins.failure_policy_setting(),
+        PreludeFailurePolicy::LogAndContinue
+    );
+    assert!(!plugins.runs_callbacks());
+    assert_eq!(
+        plugins.core_plugin().runs_callbacks(),
+        plugins.runs_callbacks()
+    );
+    let _ = PreludeServerPlugins::manual()
+        .feature_plugins(PreludeServerFeaturePlugins::new())
+        .build()
+        .disable::<PreludeUgcPlugin>();
     let unavailable = PreludeServerUnavailable::InvalidString { field: "version" };
     assert!(!unavailable.is_init_failed());
     assert!(!unavailable.is_manual_server_missing());
@@ -861,7 +915,16 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.client_group_officer(user, group), None);
     assert_eq!(prelude_state.key_value("map"), None);
 
-    accepts_prelude_exports(plugin, command, operation, result, error, unavailable);
+    accepts_prelude_exports(
+        plugin,
+        PreludeServerFeaturePlugins::new(),
+        plugins,
+        command,
+        operation,
+        result,
+        error,
+        unavailable,
+    );
 }
 
 #[test]

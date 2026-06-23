@@ -8,8 +8,8 @@ use crate::{
     SteamworksMatchmakingServersPlugin, SteamworksNetworkingMessagesPlugin,
     SteamworksNetworkingPlugin, SteamworksNetworkingSocketsPlugin, SteamworksNetworkingUtilsPlugin,
     SteamworksPlugin, SteamworksRemotePlayPlugin, SteamworksRemoteStoragePlugin,
-    SteamworksScreenshotsPlugin, SteamworksStatsPlugin, SteamworksTimelinePlugin,
-    SteamworksUgcPlugin, SteamworksUserPlugin, SteamworksUtilsPlugin,
+    SteamworksScreenshotsPlugin, SteamworksServerPlugin, SteamworksStatsPlugin,
+    SteamworksTimelinePlugin, SteamworksUgcPlugin, SteamworksUserPlugin, SteamworksUtilsPlugin,
 };
 
 #[cfg(test)]
@@ -54,6 +54,38 @@ impl PluginGroup for SteamworksClientPlugins {
             .add(SteamworksTimelinePlugin::new())
             .add(SteamworksUgcPlugin::new())
             .add(SteamworksUserPlugin::new())
+            .add(SteamworksUtilsPlugin::new())
+    }
+}
+
+/// Installs high-level feature plugins useful for Steam Game Server processes.
+///
+/// This group does not initialize Steam Game Server. Add
+/// [`SteamworksServerPlugin`] separately, or use [`SteamworksServerPlugins`]
+/// for the lifecycle plus these feature plugins.
+///
+/// The installed plugins are the server-compatible command layers for legacy
+/// networking, networking messages, networking sockets, read-only utils, and
+/// UGC game-server Workshop initialization. Some commands inside those plugins
+/// are still client-only and will return their normal unavailable-resource
+/// errors if used without a [`crate::SteamworksClient`].
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SteamworksServerFeaturePlugins;
+
+impl SteamworksServerFeaturePlugins {
+    /// Creates the default server-side feature plugin collection.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl PluginGroup for SteamworksServerFeaturePlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(SteamworksNetworkingPlugin::new())
+            .add(SteamworksNetworkingMessagesPlugin::new())
+            .add(SteamworksNetworkingSocketsPlugin::new())
+            .add(SteamworksUgcPlugin::new())
             .add(SteamworksUtilsPlugin::new())
     }
 }
@@ -207,5 +239,130 @@ impl PluginGroup for SteamworksPlugins {
         PluginGroupBuilder::start::<Self>()
             .add(self.core)
             .add_group(self.client_plugins)
+    }
+}
+
+/// A Bevy plugin group that installs Steam Game Server initialization and the
+/// default server-compatible high-level feature plugins.
+///
+/// This is the shortest path for dedicated server builds that want Steam Game
+/// Server lifecycle, command/result messages, networking, server-safe utility
+/// reads, and game-server Workshop initialization:
+///
+/// ```rust,no_run
+/// # use bevy_app::prelude::*;
+/// # use bevy_steamworks::prelude::*;
+/// # use std::net::Ipv4Addr;
+/// App::new().add_plugins(SteamworksServerPlugins::new(
+///     SteamworksServerConfig::new(
+///         Ipv4Addr::UNSPECIFIED,
+///         27015,
+///         steamworks::QUERY_PORT_SHARED,
+///         steamworks::ServerMode::Authentication,
+///         "1.0.0",
+///     ),
+/// ));
+/// ```
+pub struct SteamworksServerPlugins {
+    core: SteamworksServerPlugin,
+    feature_plugins: SteamworksServerFeaturePlugins,
+}
+
+impl SteamworksServerPlugins {
+    /// Creates a plugin group that initializes Steam Game Server from a config.
+    pub fn new(config: crate::SteamworksServerConfig) -> Self {
+        Self::from_plugin(SteamworksServerPlugin::new(config))
+    }
+
+    /// Creates a plugin group that does not initialize Steam Game Server.
+    ///
+    /// Use this when another layer inserts [`crate::SteamworksServer`] before
+    /// the app runs, or for tests that only need message/resource setup.
+    pub fn manual() -> Self {
+        Self::from_plugin(SteamworksServerPlugin::manual())
+    }
+
+    /// Initializes Steam Game Server immediately and wraps it in the full
+    /// default server feature plugin group.
+    pub fn init(
+        config: crate::SteamworksServerConfig,
+    ) -> Result<Self, crate::SteamworksServerUnavailable> {
+        SteamworksServerPlugin::init(config).map(Self::from_plugin)
+    }
+
+    /// Creates a plugin group from an already initialized Steam Game Server.
+    pub fn from_server(server: steamworks::Server) -> Self {
+        Self::from_plugin(SteamworksServerPlugin::from_server(server))
+    }
+
+    /// Creates a plugin group from an already configured [`SteamworksServerPlugin`].
+    pub fn from_plugin(plugin: SteamworksServerPlugin) -> Self {
+        Self {
+            core: plugin,
+            feature_plugins: SteamworksServerFeaturePlugins::new(),
+        }
+    }
+
+    /// Replaces the server-side feature plugin collection.
+    pub fn feature_plugins(mut self, feature_plugins: SteamworksServerFeaturePlugins) -> Self {
+        self.feature_plugins = feature_plugins;
+        self
+    }
+
+    /// Sets the initialization failure policy.
+    pub fn failure_policy(mut self, policy: SteamworksFailurePolicy) -> Self {
+        self.core = self.core.failure_policy(policy);
+        self
+    }
+
+    /// Keeps the Bevy app running when Steam Game Server cannot be initialized.
+    pub fn log_and_continue(self) -> Self {
+        self.failure_policy(SteamworksFailurePolicy::LogAndContinue)
+    }
+
+    /// Sets whether the plugin group should automatically run Steam Game Server callbacks.
+    pub fn run_callbacks(mut self, run_callbacks: bool) -> Self {
+        self.core = self.core.run_callbacks(run_callbacks);
+        self
+    }
+
+    /// Returns the configured core Steam Game Server lifecycle plugin.
+    pub fn core_plugin(&self) -> &SteamworksServerPlugin {
+        &self.core
+    }
+
+    /// Returns how the core plugin will create or locate Steam Game Server.
+    pub fn init_mode(&self) -> &crate::SteamworksServerInitMode {
+        self.core.init_mode()
+    }
+
+    /// Returns how the core plugin reacts when Steam Game Server cannot be initialized.
+    pub fn failure_policy_setting(&self) -> SteamworksFailurePolicy {
+        self.core.failure_policy_setting()
+    }
+
+    /// Returns true when the core plugin will automatically run Steam Game Server callbacks.
+    pub fn runs_callbacks(&self) -> bool {
+        self.core.runs_callbacks()
+    }
+}
+
+impl From<SteamworksServerPlugin> for SteamworksServerPlugins {
+    fn from(plugin: SteamworksServerPlugin) -> Self {
+        Self::from_plugin(plugin)
+    }
+}
+
+impl From<steamworks::Server> for SteamworksServerPlugins {
+    fn from(server: steamworks::Server) -> Self {
+        Self::from_server(server)
+    }
+}
+
+impl PluginGroup for SteamworksServerPlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(self.core)
+            .add_group(self.feature_plugins)
     }
 }

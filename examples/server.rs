@@ -71,7 +71,7 @@ fn main() {
     App::new()
         .insert_resource(FramesRemaining(120))
         .add_plugins(
-            SteamworksServerPlugin::new(SteamworksServerConfig::new(
+            SteamworksServerPlugins::new(SteamworksServerConfig::new(
                 Ipv4Addr::UNSPECIFIED,
                 27015,
                 27016,

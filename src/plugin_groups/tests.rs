@@ -17,7 +17,8 @@ use crate::{
     SteamworksRemotePlayCommand, SteamworksRemotePlayResult, SteamworksRemotePlayState,
     SteamworksRemoteStorageCommand, SteamworksRemoteStorageResult, SteamworksRemoteStorageState,
     SteamworksScreenshotsCommand, SteamworksScreenshotsResult, SteamworksScreenshotsState,
-    SteamworksServer, SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsPlugin,
+    SteamworksServer, SteamworksServerCommand, SteamworksServerInitMode, SteamworksServerState,
+    SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsPlugin,
     SteamworksStatsResult, SteamworksStatsSettings, SteamworksStatsState,
     SteamworksTimelineCommand, SteamworksTimelineResult, SteamworksTimelineState,
     SteamworksUgcCommand, SteamworksUgcResult, SteamworksUgcState, SteamworksUnavailable,
@@ -202,6 +203,61 @@ fn client_plugins_group_can_disable_individual_feature_plugins() {
 }
 
 #[test]
+fn server_feature_plugins_register_server_compatible_resources_and_messages() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksServerFeaturePlugins::new());
+
+    assert!(app.world().contains_resource::<SteamworksNetworkingState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingMessagesState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingSocketsState>());
+    assert!(app.world().contains_resource::<SteamworksUgcState>());
+    assert!(app.world().contains_resource::<SteamworksUtilsState>());
+
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingMessagesCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingSocketsCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksUgcCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksUtilsCommand>>());
+
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingResult>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingMessagesResult>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingSocketsResult>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksUgcResult>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksUtilsResult>>());
+
+    assert!(!app.world().contains_resource::<SteamworksServerState>());
+    assert!(!app.world().contains_resource::<SteamworksServer>());
+    assert!(!app.world().contains_resource::<crate::SteamworksClient>());
+
+    app.update();
+}
+
+#[test]
 fn plugins_group_can_continue_without_client_and_register_default_features() {
     let mut app = App::new();
 
@@ -225,6 +281,38 @@ fn plugins_group_can_continue_without_client_and_register_default_features() {
     assert!(!app
         .world()
         .contains_resource::<SteamworksServerUnavailable>());
+
+    app.update();
+}
+
+#[test]
+fn server_plugins_group_can_continue_without_server_and_register_server_features() {
+    let mut app = App::new();
+
+    app.add_plugins(SteamworksServerPlugins::manual().log_and_continue());
+
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksServerUnavailable>());
+    assert!(app.world().contains_resource::<SteamworksServerState>());
+    assert!(app.world().contains_resource::<SteamworksNetworkingState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingMessagesState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingSocketsState>());
+    assert!(app.world().contains_resource::<SteamworksUgcState>());
+    assert!(app.world().contains_resource::<SteamworksUtilsState>());
+    assert!(app.world().contains_resource::<Messages<SteamworksEvent>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksServerCommand>>());
+    assert!(app
+        .world()
+        .contains_resource::<Messages<SteamworksNetworkingSocketsCommand>>());
+    assert!(!app.world().contains_resource::<SteamworksServer>());
+    assert!(!app.world().contains_resource::<crate::SteamworksClient>());
 
     app.update();
 }
@@ -268,6 +356,54 @@ fn plugins_group_exposes_core_lifecycle_configuration() {
         plugins.core_plugin().runs_callbacks(),
         plugins.runs_callbacks()
     );
+}
+
+#[test]
+fn server_plugins_group_exposes_core_lifecycle_configuration() {
+    let plugins = SteamworksServerPlugins::manual()
+        .log_and_continue()
+        .run_callbacks(false);
+
+    assert!(matches!(
+        plugins.init_mode(),
+        SteamworksServerInitMode::Manual
+    ));
+    assert_eq!(
+        plugins.failure_policy_setting(),
+        SteamworksFailurePolicy::LogAndContinue
+    );
+    assert_eq!(
+        plugins.core_plugin().failure_policy_setting(),
+        plugins.failure_policy_setting()
+    );
+    assert!(!plugins.runs_callbacks());
+    assert_eq!(
+        plugins.core_plugin().runs_callbacks(),
+        plugins.runs_callbacks()
+    );
+}
+
+#[test]
+fn server_plugins_group_can_disable_individual_feature_plugins() {
+    let mut app = App::new();
+
+    app.add_plugins(
+        SteamworksServerPlugins::manual()
+            .log_and_continue()
+            .build()
+            .disable::<SteamworksNetworkingPlugin>(),
+    );
+
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksServerUnavailable>());
+    assert!(app.world().contains_resource::<SteamworksServerState>());
+    assert!(!app.world().contains_resource::<SteamworksNetworkingState>());
+    assert!(app
+        .world()
+        .contains_resource::<SteamworksNetworkingSocketsState>());
+
+    app.update();
 }
 
 #[test]

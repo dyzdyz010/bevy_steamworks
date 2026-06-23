@@ -59,7 +59,10 @@ pub use networking::*;
 pub use networking_messages::*;
 pub use networking_sockets::*;
 pub use networking_utils::*;
-pub use plugin_groups::{SteamworksClientPlugins, SteamworksPlugins};
+pub use plugin_groups::{
+    SteamworksClientPlugins, SteamworksPlugins, SteamworksServerFeaturePlugins,
+    SteamworksServerPlugins,
+};
 pub use registry::SteamworksCallbackRegistry;
 pub use remote_play::*;
 pub use remote_storage::*;

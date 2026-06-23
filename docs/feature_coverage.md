@@ -6,7 +6,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 
 | Area | Status | Notes |
 |:-----|:-------|:------|
-| Client lifecycle | Implemented | `SteamworksPlugin`, `SteamworksPlugins`, fail-fast by default, `LogAndContinue` diagnostics, callback pump in `SteamworksSystem::RunCallbacks`. |
+| Client lifecycle | Implemented | `SteamworksPlugin`, `SteamworksPlugins`, `SteamworksClientPlugins`, fail-fast by default, `LogAndContinue` diagnostics, callback pump in `SteamworksSystem::RunCallbacks`. |
 | Apps | Implemented | Subscription, install/DLC checks, ownership, languages, beta, launch command/query params with bounded lookup caches, URL launch callback. |
 | Friends | Implemented | Persona/friend snapshots with bounded lookup caches, coplay, user info requests, rich presence, overlays, invites, played-with, relationship checks, avatars, callbacks. |
 | User | Implemented | Steam ID, level, logged-on state, auth session tickets, Web API tickets, remote ticket validation, license checks, relevant callbacks. |
@@ -23,7 +23,7 @@ This crate exposes Steamworks through Bevy resources, commands, results, and cal
 | UGC | Implemented | Subscriptions, item state/download/install info with bounded per-item caches, item downloads, queries, total/ID-only query paths, item create/update/delete, update progress, playtime tracking, game-server workshop init. |
 | Remote Play | Implemented | Session lists, ID-based session reads with bounded caches, invites, connect/disconnect callbacks. |
 | Timeline | Implemented | Game mode, state descriptions, events. |
-| Game server | Implemented | Server lifecycle plugin, auth tickets, remote ticket validation, shared query packets, product/description/data, logon, advertisement/heartbeats, server browser metadata. |
+| Game server | Implemented | Server lifecycle plugin, `SteamworksServerPlugins`, `SteamworksServerFeaturePlugins`, auth tickets, remote ticket validation, shared query packets, product/description/data, logon, advertisement/heartbeats, server browser metadata. |
 
 ## Upstream-Safe Limits
 
