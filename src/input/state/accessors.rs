@@ -6,7 +6,7 @@ use super::{
     SteamworksInputDigitalActionOriginsSnapshot, SteamworksInputDigitalActionSnapshot,
     SteamworksInputError, SteamworksInputHandle, SteamworksInputMotionSnapshot,
     SteamworksInputNamedActionSetHandle, SteamworksInputNamedAnalogActionHandle,
-    SteamworksInputNamedDigitalActionHandle, SteamworksInputState,
+    SteamworksInputNamedDigitalActionHandle, SteamworksInputSourceMode, SteamworksInputState,
 };
 use crate::SteamworksInputControllerInfo;
 
@@ -125,6 +125,26 @@ impl SteamworksInputState {
             .find(|snapshot| snapshot.controller == controller && snapshot.action == action)
     }
 
+    /// Returns whether a cached digital action is currently pressed.
+    pub fn digital_action_pressed(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputDigitalActionHandle,
+    ) -> Option<bool> {
+        self.digital_action_data(controller, action)
+            .map(|snapshot| snapshot.data.state)
+    }
+
+    /// Returns whether a cached digital action is active in the current action set.
+    pub fn digital_action_active(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputDigitalActionHandle,
+    ) -> Option<bool> {
+        self.digital_action_data(controller, action)
+            .map(|snapshot| snapshot.data.active)
+    }
+
     /// Returns the most recent analog action data snapshot.
     pub fn last_analog_action(&self) -> Option<&SteamworksInputAnalogActionSnapshot> {
         self.last_analog_action.as_ref()
@@ -144,6 +164,36 @@ impl SteamworksInputState {
         self.analog_action_snapshots
             .iter()
             .find(|snapshot| snapshot.controller == controller && snapshot.action == action)
+    }
+
+    /// Returns the cached analog action source mode.
+    pub fn analog_action_mode(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<SteamworksInputSourceMode> {
+        self.analog_action_data(controller, action)
+            .map(|snapshot| snapshot.data.mode)
+    }
+
+    /// Returns the cached analog action x/y values.
+    pub fn analog_action_vector(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<(f32, f32)> {
+        self.analog_action_data(controller, action)
+            .map(|snapshot| (snapshot.data.x, snapshot.data.y))
+    }
+
+    /// Returns whether a cached analog action is active in the current action set.
+    pub fn analog_action_active(
+        &self,
+        controller: SteamworksInputHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<bool> {
+        self.analog_action_data(controller, action)
+            .map(|snapshot| snapshot.data.active)
     }
 
     /// Returns the most recent digital action origin snapshot.
@@ -240,6 +290,30 @@ impl SteamworksInputState {
         self.motion_snapshots
             .iter()
             .find(|snapshot| snapshot.controller == controller)
+    }
+
+    /// Returns the cached rotation quaternion for a controller.
+    pub fn motion_rotation_quaternion(
+        &self,
+        controller: SteamworksInputHandle,
+    ) -> Option<[f32; 4]> {
+        self.motion(controller)
+            .map(|snapshot| snapshot.data.rotation_quaternion)
+    }
+
+    /// Returns the cached position acceleration for a controller.
+    pub fn motion_position_acceleration(
+        &self,
+        controller: SteamworksInputHandle,
+    ) -> Option<[f32; 3]> {
+        self.motion(controller)
+            .map(|snapshot| snapshot.data.position_acceleration)
+    }
+
+    /// Returns the cached rotation velocity for a controller.
+    pub fn motion_rotation_velocity(&self, controller: SteamworksInputHandle) -> Option<[f32; 3]> {
+        self.motion(controller)
+            .map(|snapshot| snapshot.data.rotation_velocity)
     }
 
     /// Returns the most recent controller for which the binding panel was shown.

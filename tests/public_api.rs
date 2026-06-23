@@ -797,6 +797,20 @@ fn input_api_is_exported_from_root_and_prelude() {
             bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1),
         )
         .is_none());
+    assert_eq!(
+        root_state.digital_action_pressed(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        root_state.digital_action_active(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
     assert!(root_state.analog_action_data_snapshots().is_empty());
     assert!(root_state
         .analog_action_data(
@@ -804,6 +818,27 @@ fn input_api_is_exported_from_root_and_prelude() {
             bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
         )
         .is_none());
+    assert_eq!(
+        root_state.analog_action_mode(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        root_state.analog_action_vector(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        root_state.analog_action_active(
+            bevy_steamworks::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
     assert!(root_state.digital_action_origin_snapshots().is_empty());
     assert!(root_state
         .digital_action_origins(
@@ -824,6 +859,19 @@ fn input_api_is_exported_from_root_and_prelude() {
     assert!(root_state
         .motion(bevy_steamworks::SteamworksInputHandle::from_raw(1))
         .is_none());
+    assert_eq!(
+        root_state.motion_rotation_quaternion(bevy_steamworks::SteamworksInputHandle::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        root_state
+            .motion_position_acceleration(bevy_steamworks::SteamworksInputHandle::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        root_state.motion_rotation_velocity(bevy_steamworks::SteamworksInputHandle::from_raw(1)),
+        None
+    );
 
     let command = SteamworksInputCommand::init(false);
     let operation = SteamworksInputOperation::Initialized {
@@ -882,6 +930,25 @@ fn input_api_is_exported_from_root_and_prelude() {
     assert!(prelude_state.digital_action_origin_snapshots().is_empty());
     assert!(prelude_state.analog_action_origin_snapshots().is_empty());
     assert!(prelude_state.motion_snapshots().is_empty());
+    assert_eq!(
+        prelude_state.digital_action_pressed(
+            bevy_steamworks::prelude::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::prelude::SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        prelude_state.analog_action_vector(
+            bevy_steamworks::prelude::SteamworksInputHandle::from_raw(1),
+            bevy_steamworks::prelude::SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        prelude_state
+            .motion_rotation_velocity(bevy_steamworks::prelude::SteamworksInputHandle::from_raw(1)),
+        None
+    );
 }
 
 #[test]

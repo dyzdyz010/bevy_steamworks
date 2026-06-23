@@ -442,6 +442,14 @@ fn state_records_input_operations() {
         Some(&digital_snapshot)
     );
     assert_eq!(
+        state.digital_action_pressed(controller, digital_action),
+        Some(true)
+    );
+    assert_eq!(
+        state.digital_action_active(controller, digital_action),
+        Some(true)
+    );
+    assert_eq!(
         state.digital_action_data_snapshots(),
         &[digital_snapshot.clone()]
     );
@@ -449,6 +457,18 @@ fn state_records_input_operations() {
     assert_eq!(
         state.analog_action_data(controller, analog_action),
         Some(&analog_snapshot)
+    );
+    assert_eq!(
+        state.analog_action_mode(controller, analog_action),
+        Some(SteamworksInputSourceMode::JoystickMove)
+    );
+    assert_eq!(
+        state.analog_action_vector(controller, analog_action),
+        Some((0.25, -0.5))
+    );
+    assert_eq!(
+        state.analog_action_active(controller, analog_action),
+        Some(true)
     );
     assert_eq!(
         state.analog_action_data_snapshots(),
@@ -507,6 +527,18 @@ fn state_records_input_operations() {
     assert_eq!(state.last_action_origin_info(), Some(&second_origin));
     assert_eq!(state.last_motion(), Some(&motion));
     assert_eq!(state.motion(controller), Some(&motion));
+    assert_eq!(
+        state.motion_rotation_quaternion(controller),
+        Some([0.0, 0.0, 0.0, 1.0])
+    );
+    assert_eq!(
+        state.motion_position_acceleration(controller),
+        Some([1.0, 2.0, 3.0])
+    );
+    assert_eq!(
+        state.motion_rotation_velocity(controller),
+        Some([4.0, 5.0, 6.0])
+    );
     assert_eq!(state.motion_snapshots(), &[motion]);
     assert_eq!(state.last_binding_panel_controller(), Some(controller));
 }
@@ -663,7 +695,35 @@ fn input_state_caches_are_bounded() {
         None
     );
     assert_eq!(
+        state.digital_action_pressed(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.digital_action_active(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputDigitalActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
         state.analog_action_data(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.analog_action_vector(
+            SteamworksInputHandle::from_raw(1),
+            SteamworksInputAnalogActionHandle::from_raw(1),
+        ),
+        None
+    );
+    assert_eq!(
+        state.analog_action_active(
             SteamworksInputHandle::from_raw(1),
             SteamworksInputAnalogActionHandle::from_raw(1),
         ),
@@ -686,6 +746,18 @@ fn input_state_caches_are_bounded() {
         None
     );
     assert_eq!(state.motion(SteamworksInputHandle::from_raw(1)), None);
+    assert_eq!(
+        state.motion_rotation_quaternion(SteamworksInputHandle::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.motion_position_acceleration(SteamworksInputHandle::from_raw(1)),
+        None
+    );
+    assert_eq!(
+        state.motion_rotation_velocity(SteamworksInputHandle::from_raw(1)),
+        None
+    );
 
     assert!(state
         .controller(SteamworksInputHandle::from_raw(2))
@@ -718,12 +790,40 @@ fn input_state_caches_are_bounded() {
             SteamworksInputDigitalActionHandle::from_raw(2),
         )
         .is_some());
+    assert_eq!(
+        state.digital_action_pressed(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputDigitalActionHandle::from_raw(2),
+        ),
+        Some(true)
+    );
+    assert_eq!(
+        state.digital_action_active(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputDigitalActionHandle::from_raw(2),
+        ),
+        Some(true)
+    );
     assert!(state
         .analog_action_data(
             SteamworksInputHandle::from_raw(2),
             SteamworksInputAnalogActionHandle::from_raw(2),
         )
         .is_some());
+    assert_eq!(
+        state.analog_action_mode(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputAnalogActionHandle::from_raw(2),
+        ),
+        Some(SteamworksInputSourceMode::JoystickMove)
+    );
+    assert_eq!(
+        state.analog_action_vector(
+            SteamworksInputHandle::from_raw(2),
+            SteamworksInputAnalogActionHandle::from_raw(2),
+        ),
+        Some((2.0, -2.0))
+    );
     assert!(state
         .digital_action_origins(
             SteamworksInputHandle::from_raw(2),
@@ -739,4 +839,8 @@ fn input_state_caches_are_bounded() {
         )
         .is_some());
     assert!(state.motion(SteamworksInputHandle::from_raw(2)).is_some());
+    assert_eq!(
+        state.motion_position_acceleration(SteamworksInputHandle::from_raw(2)),
+        Some([2.0, 0.0, 0.0])
+    );
 }
