@@ -2416,6 +2416,27 @@ fn stats_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(root_state.leaderboard_entries(root_leaderboard), None);
+    let root_user = steamworks::SteamId::from_raw(1);
+    assert_eq!(
+        root_state.leaderboard_entry_by_user(root_leaderboard, root_user),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_entry_by_rank(root_leaderboard, 1),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_score_by_user(root_leaderboard, root_user),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_rank_by_user(root_leaderboard, root_user),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_entry_details(root_leaderboard, root_user),
+        None
+    );
     let _root_achievement: Option<bevy_steamworks::SteamworksAchievementInfo> = None;
     let _root_achievement_icon: Option<bevy_steamworks::SteamworksAchievementIcon> = None;
     let _root_achievement_icon_status: bevy_steamworks::SteamworksAchievementIconStatus =
@@ -2486,6 +2507,27 @@ fn stats_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(prelude_state.leaderboard_entries(prelude_leaderboard), None);
+    let prelude_user = steamworks::SteamId::from_raw(1);
+    assert_eq!(
+        prelude_state.leaderboard_entry_by_user(prelude_leaderboard, prelude_user),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_entry_by_rank(prelude_leaderboard, 1),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_score_by_user(prelude_leaderboard, prelude_user),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_rank_by_user(prelude_leaderboard, prelude_user),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_entry_details(prelude_leaderboard, prelude_user),
+        None
+    );
     let _prelude_achievement: Option<bevy_steamworks::prelude::SteamworksAchievementInfo> = None;
     let _prelude_achievement_icon: Option<bevy_steamworks::prelude::SteamworksAchievementIcon> =
         None;

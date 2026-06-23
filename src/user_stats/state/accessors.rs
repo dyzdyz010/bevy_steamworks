@@ -359,6 +359,59 @@ impl SteamworksStatsState {
             .map(|result| result.entries.as_slice())
     }
 
+    /// Returns a cached downloaded leaderboard entry for one Steam user.
+    pub fn leaderboard_entry_by_user(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+        user: steamworks::SteamId,
+    ) -> Option<&SteamworksLeaderboardEntry> {
+        self.leaderboard_entries(leaderboard)
+            .and_then(|entries| entries.iter().find(|entry| entry.user == user))
+    }
+
+    /// Returns a cached downloaded leaderboard entry for one global rank.
+    pub fn leaderboard_entry_by_rank(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+        global_rank: i32,
+    ) -> Option<&SteamworksLeaderboardEntry> {
+        self.leaderboard_entries(leaderboard).and_then(|entries| {
+            entries
+                .iter()
+                .find(|entry| entry.global_rank == global_rank)
+        })
+    }
+
+    /// Returns the cached score for one Steam user on a leaderboard.
+    pub fn leaderboard_score_by_user(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+        user: steamworks::SteamId,
+    ) -> Option<i32> {
+        self.leaderboard_entry_by_user(leaderboard, user)
+            .map(|entry| entry.score)
+    }
+
+    /// Returns the cached global rank for one Steam user on a leaderboard.
+    pub fn leaderboard_rank_by_user(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+        user: steamworks::SteamId,
+    ) -> Option<i32> {
+        self.leaderboard_entry_by_user(leaderboard, user)
+            .map(|entry| entry.global_rank)
+    }
+
+    /// Returns the cached detail integers for one Steam user on a leaderboard.
+    pub fn leaderboard_entry_details(
+        &self,
+        leaderboard: SteamworksLeaderboardId,
+        user: steamworks::SteamId,
+    ) -> Option<&[i32]> {
+        self.leaderboard_entry_by_user(leaderboard, user)
+            .map(|entry| entry.details.as_slice())
+    }
+
     /// Returns the most recent leaderboard ID forgotten by this plugin.
     pub fn last_forgotten_leaderboard(&self) -> Option<SteamworksLeaderboardId> {
         self.last_forgotten_leaderboard

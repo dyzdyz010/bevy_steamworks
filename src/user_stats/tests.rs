@@ -732,6 +732,31 @@ fn leaderboard_state_records_latest_info_and_entries() {
         state.leaderboard_entries(leaderboard),
         Some(&[entry.clone()][..])
     );
+    assert_eq!(
+        state.leaderboard_entry_by_user(leaderboard, entry.user),
+        Some(&entry)
+    );
+    assert_eq!(
+        state.leaderboard_entry_by_user(leaderboard, steamworks::SteamId::from_raw(456)),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_entry_by_rank(leaderboard, 1),
+        Some(&entry)
+    );
+    assert_eq!(state.leaderboard_entry_by_rank(leaderboard, 2), None);
+    assert_eq!(
+        state.leaderboard_score_by_user(leaderboard, entry.user),
+        Some(9000)
+    );
+    assert_eq!(
+        state.leaderboard_rank_by_user(leaderboard, entry.user),
+        Some(1)
+    );
+    assert_eq!(
+        state.leaderboard_entry_details(leaderboard, entry.user),
+        Some([7, 8].as_slice())
+    );
     state.record_operation(&SteamworksStatsOperation::LeaderboardForgotten { leaderboard });
     assert_eq!(state.leaderboard_id("daily_score"), None);
     assert_eq!(
@@ -812,6 +837,23 @@ fn leaderboard_state_records_latest_info_and_entries() {
     );
     assert_eq!(state.leaderboard_entries_download_result(leaderboard), None);
     assert_eq!(state.leaderboard_entries(leaderboard), None);
+    assert_eq!(
+        state.leaderboard_entry_by_user(leaderboard, entry.user),
+        None
+    );
+    assert_eq!(state.leaderboard_entry_by_rank(leaderboard, 1), None);
+    assert_eq!(
+        state.leaderboard_score_by_user(leaderboard, entry.user),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_rank_by_user(leaderboard, entry.user),
+        None
+    );
+    assert_eq!(
+        state.leaderboard_entry_details(leaderboard, entry.user),
+        None
+    );
 }
 
 #[test]
