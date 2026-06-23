@@ -19,14 +19,41 @@ impl SteamworksRemoteStorageState {
         self.cloud_info.as_ref()
     }
 
+    /// Returns the most recent app-level Steam Cloud enabled state.
+    pub fn cloud_enabled_for_app(&self) -> Option<bool> {
+        self.cloud_info.as_ref().map(|info| info.app_enabled)
+    }
+
+    /// Returns the most recent account-level Steam Cloud enabled state.
+    pub fn cloud_enabled_for_account(&self) -> Option<bool> {
+        self.cloud_info.as_ref().map(|info| info.account_enabled)
+    }
+
+    /// Returns whether both app and account Steam Cloud are currently known enabled.
+    pub fn cloud_available(&self) -> Option<bool> {
+        self.cloud_info
+            .as_ref()
+            .map(|info| info.app_enabled && info.account_enabled)
+    }
+
     /// Returns the most recent Steam Cloud file list.
     pub fn files(&self) -> &[SteamworksRemoteStorageFileSummary] {
         &self.files
     }
 
+    /// Returns names from the most recent Steam Cloud file list.
+    pub fn file_names(&self) -> impl Iterator<Item = &str> + '_ {
+        self.files.iter().map(|file| file.name.as_str())
+    }
+
     /// Returns a listed file summary by name, if present in the latest file list or write cache.
     pub fn file_summary(&self, name: &str) -> Option<&SteamworksRemoteStorageFileSummary> {
         self.files.iter().find(|file| file.name == name)
+    }
+
+    /// Returns a listed file size by name.
+    pub fn file_size(&self, name: &str) -> Option<u64> {
+        self.file_summary(name).map(|file| file.size_bytes)
     }
 
     /// Returns cached full metadata for one file.
@@ -181,6 +208,24 @@ impl SteamworksRemoteStorageState {
             .map(|contents| contents.data.as_slice())
     }
 
+    /// Returns completed file read bytes for a request ID.
+    pub fn file_data_by_request(&self, request_id: u64) -> Option<&[u8]> {
+        self.file_contents_by_request(request_id)
+            .map(|contents| contents.data.as_slice())
+    }
+
+    /// Returns the number of bytes read for the most recent completed read of a file.
+    pub fn file_read_bytes(&self, name: &str) -> Option<usize> {
+        self.file_contents_by_name(name)
+            .map(SteamworksRemoteStorageFileContents::bytes)
+    }
+
+    /// Returns the number of bytes read for a completed read request ID.
+    pub fn file_read_bytes_by_request(&self, request_id: u64) -> Option<usize> {
+        self.file_contents_by_request(request_id)
+            .map(SteamworksRemoteStorageFileContents::bytes)
+    }
+
     /// Returns the most recent file write completed through the plugin.
     pub fn last_file_written(&self) -> Option<&SteamworksRemoteStorageFileWritten> {
         self.last_file_written.as_ref()
@@ -198,12 +243,22 @@ impl SteamworksRemoteStorageState {
             .find(|written| written.request_id == request_id)
     }
 
+    /// Returns the number of bytes accepted for a completed write request ID.
+    pub fn file_write_bytes(&self, request_id: u64) -> Option<usize> {
+        self.file_write(request_id).map(|written| written.bytes)
+    }
+
     /// Returns the most recent completed file write snapshot for a file name.
     pub fn file_write_by_name(&self, name: &str) -> Option<&SteamworksRemoteStorageFileWritten> {
         self.file_writes
             .iter()
             .rev()
             .find(|written| written.name == name)
+    }
+
+    /// Returns the number of bytes accepted for the most recent completed write of a file.
+    pub fn file_write_bytes_by_name(&self, name: &str) -> Option<usize> {
+        self.file_write_by_name(name).map(|written| written.bytes)
     }
 
     /// Returns the most recent file share completed through the plugin.
@@ -235,6 +290,16 @@ impl SteamworksRemoteStorageState {
     pub fn shared_file_handle(&self, name: &str) -> Option<SteamworksRemoteStorageFileShareHandle> {
         self.shared_file_by_name(name)
             .map(|shared_file| shared_file.handle)
+    }
+
+    /// Returns whether a completed share result is cached for a file name.
+    pub fn has_shared_file(&self, name: &str) -> bool {
+        self.shared_file_by_name(name).is_some()
+    }
+
+    /// Returns the raw Steam shared-file handle value for a file name.
+    pub fn shared_file_handle_raw(&self, name: &str) -> Option<u64> {
+        self.shared_file_handle(name).map(|handle| handle.raw())
     }
 
     /// Returns the number of completed file reads observed through the plugin.

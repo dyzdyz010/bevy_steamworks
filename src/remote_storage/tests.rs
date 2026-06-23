@@ -248,9 +248,16 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             account_enabled: false,
         })
     );
+    assert_eq!(state.cloud_enabled_for_app(), Some(true));
+    assert_eq!(state.cloud_enabled_for_account(), Some(false));
+    assert_eq!(state.cloud_available(), Some(false));
     assert_eq!(
         state.last_file_info().map(|info| info.sync_platforms),
         Some(platforms)
+    );
+    assert_eq!(
+        state.file_names().collect::<Vec<_>>(),
+        vec!["save.dat", "save2.dat"]
     );
     assert_eq!(
         state.file_summary("save.dat"),
@@ -259,6 +266,8 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             size_bytes: 10,
         })
     );
+    assert_eq!(state.file_size("save.dat"), Some(10));
+    assert_eq!(state.file_size("missing.dat"), None);
     assert_eq!(state.file_summary("missing.dat"), None);
     assert_eq!(
         state.file_info("save.dat"),
@@ -336,7 +345,11 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
     );
     assert_eq!(state.file_contents_by_name("missing.dat"), None);
     assert_eq!(state.file_data("save.dat"), Some(b"payload".as_slice()));
+    assert_eq!(state.file_data_by_request(2), Some(b"payload".as_slice()));
     assert_eq!(state.file_data("missing.dat"), None);
+    assert_eq!(state.file_read_bytes("save.dat"), Some(7));
+    assert_eq!(state.file_read_bytes_by_request(2), Some(7));
+    assert_eq!(state.file_read_bytes("missing.dat"), None);
     assert_eq!(
         state.file_write_request(3),
         Some(&SteamworksRemoteStorageFileWriteRequest {
@@ -361,6 +374,7 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             bytes: 7,
         })
     );
+    assert_eq!(state.file_write_bytes(3), Some(7));
     assert_eq!(
         state.file_write_by_name("save2.dat"),
         Some(&SteamworksRemoteStorageFileWritten {
@@ -369,7 +383,9 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
             bytes: 7,
         })
     );
+    assert_eq!(state.file_write_bytes_by_name("save2.dat"), Some(7));
     assert_eq!(state.file_write_by_name("missing.dat"), None);
+    assert_eq!(state.file_write_bytes_by_name("missing.dat"), None);
     assert_eq!(state.read_count(), 1);
     assert_eq!(state.write_count(), 1);
     assert_eq!(
@@ -444,7 +460,11 @@ fn state_records_remote_storage_operations_without_unbounded_share_history() {
         state.shared_file_handle("save2.dat"),
         Some(SteamworksRemoteStorageFileShareHandle::from_raw(12))
     );
+    assert!(state.has_shared_file("save2.dat"));
+    assert_eq!(state.shared_file_handle_raw("save2.dat"), Some(12));
     assert_eq!(state.shared_file_handle("missing.dat"), None);
+    assert!(!state.has_shared_file("missing.dat"));
+    assert_eq!(state.shared_file_handle_raw("missing.dat"), None);
 }
 
 #[test]

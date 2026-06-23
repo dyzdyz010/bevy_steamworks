@@ -2077,23 +2077,38 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
 
     let write = SteamworksRemoteStorageFileWrite::new("save.dat", b"payload".to_vec());
     let root_state = SteamworksRemoteStorageState::default();
+    assert_eq!(root_state.cloud_enabled_for_app(), None);
+    assert_eq!(root_state.cloud_enabled_for_account(), None);
+    assert_eq!(root_state.cloud_available(), None);
+    assert_eq!(
+        root_state.file_names().collect::<Vec<_>>(),
+        Vec::<&str>::new()
+    );
+    assert_eq!(root_state.file_size("save.dat"), None);
     assert!(root_state.file_read_requests().is_empty());
     assert_eq!(root_state.file_read_request(0), None);
     assert!(root_state.file_contents().is_empty());
     assert_eq!(root_state.file_contents_by_request(0), None);
     assert_eq!(root_state.file_contents_by_name("save.dat"), None);
     assert_eq!(root_state.file_data("save.dat"), None);
+    assert_eq!(root_state.file_data_by_request(0), None);
+    assert_eq!(root_state.file_read_bytes("save.dat"), None);
+    assert_eq!(root_state.file_read_bytes_by_request(0), None);
     assert!(root_state.file_write_requests().is_empty());
     assert_eq!(root_state.file_write_request(0), None);
     assert!(root_state.file_writes().is_empty());
     assert_eq!(root_state.file_write(0), None);
+    assert_eq!(root_state.file_write_bytes(0), None);
     assert_eq!(root_state.file_write_by_name("save.dat"), None);
+    assert_eq!(root_state.file_write_bytes_by_name("save.dat"), None);
     assert!(root_state.file_share_requests().is_empty());
     assert_eq!(root_state.file_share_request(0), None);
     assert!(root_state.shared_files().is_empty());
     assert_eq!(root_state.shared_file(0), None);
     assert_eq!(root_state.shared_file_by_name("save.dat"), None);
     assert_eq!(root_state.shared_file_handle("save.dat"), None);
+    assert!(!root_state.has_shared_file("save.dat"));
+    assert_eq!(root_state.shared_file_handle_raw("save.dat"), None);
     let _read_request = SteamworksRemoteStorageFileReadRequest {
         request_id: 0,
         name: "save.dat".to_owned(),
@@ -2160,6 +2175,22 @@ fn remote_storage_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    let prelude_state = PreludeRemoteStorageState::default();
+    assert_eq!(prelude_state.cloud_enabled_for_app(), None);
+    assert_eq!(prelude_state.cloud_enabled_for_account(), None);
+    assert_eq!(prelude_state.cloud_available(), None);
+    assert_eq!(
+        prelude_state.file_names().collect::<Vec<_>>(),
+        Vec::<&str>::new()
+    );
+    assert_eq!(prelude_state.file_size("save.dat"), None);
+    assert_eq!(prelude_state.file_data_by_request(0), None);
+    assert_eq!(prelude_state.file_read_bytes("save.dat"), None);
+    assert_eq!(prelude_state.file_read_bytes_by_request(0), None);
+    assert_eq!(prelude_state.file_write_bytes(0), None);
+    assert_eq!(prelude_state.file_write_bytes_by_name("save.dat"), None);
+    assert!(!prelude_state.has_shared_file("save.dat"));
+    assert_eq!(prelude_state.shared_file_handle_raw("save.dat"), None);
     accepts_prelude_exports(
         PreludeRemoteStoragePlugin::new(),
         PreludeRemoteStorageCommand::is_cloud_enabled_for_app(),
