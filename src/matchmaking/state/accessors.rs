@@ -39,6 +39,11 @@ impl SteamworksMatchmakingState {
         &self.last_lobby_list
     }
 
+    /// Returns the number of lobbies in the most recent lobby-list result.
+    pub fn last_lobby_list_count(&self) -> usize {
+        self.last_lobby_list.len()
+    }
+
     /// Returns bounded completed lobby-list snapshots by request ID.
     pub fn lobby_list_results(&self) -> &[SteamworksLobbyListResult] {
         &self.lobby_list_results
@@ -132,6 +137,16 @@ impl SteamworksMatchmakingState {
         &self.joined_lobbies
     }
 
+    /// Returns the number of lobbies this command layer currently considers joined.
+    pub fn joined_lobby_count(&self) -> usize {
+        self.joined_lobbies.len()
+    }
+
+    /// Returns the most recent lobby ID this command layer observed as joined.
+    pub fn last_joined_lobby_id(&self) -> Option<steamworks::LobbyId> {
+        self.last_joined_lobby.as_ref().map(|joined| joined.lobby)
+    }
+
     /// Returns whether this command layer currently considers the lobby joined.
     pub fn is_lobby_joined(&self, lobby: steamworks::LobbyId) -> bool {
         self.joined_lobbies.contains(&lobby)
@@ -155,6 +170,11 @@ impl SteamworksMatchmakingState {
         self.lobby_data_counts
             .iter()
             .find(|count| count.lobby == lobby)
+    }
+
+    /// Returns the latest known metadata entry count for a lobby.
+    pub fn lobby_data_count_value(&self, lobby: steamworks::LobbyId) -> Option<u32> {
+        self.lobby_data_count(lobby).map(|count| count.count)
     }
 
     /// Returns the most recent lobby metadata value read.
@@ -201,6 +221,11 @@ impl SteamworksMatchmakingState {
                         .map(|(_, value)| value.as_str())
                 })
             })
+    }
+
+    /// Returns whether the latest known metadata for a lobby has a value for a key.
+    pub fn has_lobby_data(&self, lobby: steamworks::LobbyId, key: impl AsRef<str>) -> Option<bool> {
+        self.lobby_data(lobby, key).map(|value| value.is_some())
     }
 
     /// Returns the most recent lobby metadata entry read by index.
@@ -363,6 +388,17 @@ impl SteamworksMatchmakingState {
             .map(|value| value.value.as_deref())
     }
 
+    /// Returns whether the latest known member metadata has a value for a lobby/user/key triple.
+    pub fn has_lobby_member_data(
+        &self,
+        lobby: steamworks::LobbyId,
+        user: steamworks::SteamId,
+        key: impl AsRef<str>,
+    ) -> Option<bool> {
+        self.lobby_member_data(lobby, user, key)
+            .map(|value| value.is_some())
+    }
+
     /// Returns the most recent lobby member limit read.
     pub fn last_lobby_member_limit(&self) -> Option<&SteamworksLobbyMemberLimit> {
         self.last_lobby_member_limit.as_ref()
@@ -486,6 +522,12 @@ impl SteamworksMatchmakingState {
             .find(|joinability| joinability.lobby == lobby)
     }
 
+    /// Returns the latest known joinable flag for a lobby.
+    pub fn lobby_joinable(&self, lobby: steamworks::LobbyId) -> Option<bool> {
+        self.lobby_joinability(lobby)
+            .map(|joinability| joinability.joinable)
+    }
+
     /// Returns the most recent lobby chat message sent.
     pub fn last_lobby_chat_message_sent(&self) -> Option<&SteamworksLobbyChatMessageSent> {
         self.last_lobby_chat_message_sent.as_ref()
@@ -527,6 +569,25 @@ impl SteamworksMatchmakingState {
             .find(|entry| entry.lobby == lobby && entry.chat_id == chat_id)
     }
 
+    /// Returns the latest owned chat entry bytes for a lobby/chat entry pair.
+    pub fn lobby_chat_entry_data(&self, lobby: steamworks::LobbyId, chat_id: i32) -> Option<&[u8]> {
+        self.lobby_chat_entry(lobby, chat_id)
+            .map(|entry| entry.data.as_slice())
+    }
+
+    /// Returns the latest known byte length for a lobby/chat entry pair.
+    pub fn lobby_chat_entry_len(&self, lobby: steamworks::LobbyId, chat_id: i32) -> Option<usize> {
+        self.lobby_chat_entry(lobby, chat_id)
+            .map(|entry| entry.data.len())
+    }
+
+    /// Returns bytes from the most recent lobby chat entry read.
+    pub fn last_lobby_chat_entry_data(&self) -> Option<&[u8]> {
+        self.last_lobby_chat_entry
+            .as_ref()
+            .map(|entry| entry.data.as_slice())
+    }
+
     /// Returns the most recent lobby game-server data submitted.
     pub fn last_lobby_game_server_set(&self) -> Option<&SteamworksLobbyGameServerAssignment> {
         self.last_lobby_game_server_set.as_ref()
@@ -565,6 +626,30 @@ impl SteamworksMatchmakingState {
         self.lobby_game_server_lookups
             .iter()
             .find(|lookup| lookup.lobby == lobby)
+    }
+
+    /// Returns whether the latest game-server lookup for a lobby found a server.
+    pub fn has_lobby_game_server(&self, lobby: steamworks::LobbyId) -> Option<bool> {
+        self.lobby_game_server(lobby)
+            .map(|lookup| lookup.server.is_some())
+    }
+
+    /// Returns the latest game-server address for a lobby, preserving an empty lookup as `Some(None)`.
+    pub fn lobby_game_server_address(
+        &self,
+        lobby: steamworks::LobbyId,
+    ) -> Option<Option<std::net::SocketAddrV4>> {
+        self.lobby_game_server(lobby)
+            .map(|lookup| lookup.server.as_ref().map(|server| server.address))
+    }
+
+    /// Returns the latest game-server Steam ID for a lobby, preserving absent IDs as `Some(None)`.
+    pub fn lobby_game_server_steam_id(
+        &self,
+        lobby: steamworks::LobbyId,
+    ) -> Option<Option<steamworks::SteamId>> {
+        self.lobby_game_server(lobby)
+            .map(|lookup| lookup.server.as_ref().and_then(|server| server.steam_id))
     }
 
     /// Returns the most recent lobby created callback snapshot.

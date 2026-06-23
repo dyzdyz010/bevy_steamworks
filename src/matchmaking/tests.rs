@@ -459,6 +459,7 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         })
     );
     assert_eq!(state.last_lobby_list(), &[first_lobby, second_lobby]);
+    assert_eq!(state.last_lobby_list_count(), 2);
     assert_eq!(
         state.last_lobby_create_request(),
         Some(&SteamworksLobbyCreateRequest {
@@ -491,8 +492,10 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
             lobby: second_lobby,
         })
     );
+    assert_eq!(state.last_joined_lobby_id(), Some(second_lobby));
     assert_eq!(state.last_left_lobby(), Some(first_lobby));
     assert_eq!(state.joined_lobbies(), &[second_lobby]);
+    assert_eq!(state.joined_lobby_count(), 1);
     assert!(state.is_lobby_joined(second_lobby));
     assert!(!state.is_lobby_joined(first_lobby));
     assert_eq!(
@@ -619,7 +622,7 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.last_lobby_game_server(),
         Some(&SteamworksLobbyGameServerLookup {
             lobby: second_lobby,
-            server: Some(server),
+            server: Some(server.clone()),
         })
     );
     assert_eq!(state.lobby_list_requests().len(), 1);
@@ -643,6 +646,7 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.lobby_data_count(second_lobby),
         state.last_lobby_data_count()
     );
+    assert_eq!(state.lobby_data_count_value(second_lobby), Some(2));
     assert_eq!(
         state.lobby_data_value(second_lobby, "mode"),
         state.last_lobby_data()
@@ -651,6 +655,9 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
     assert_eq!(state.lobby_data(second_lobby, "map"), Some(Some("arena")));
     assert_eq!(state.lobby_data(second_lobby, "missing"), Some(None));
     assert_eq!(state.lobby_data(first_lobby, "mode"), None);
+    assert_eq!(state.has_lobby_data(second_lobby, "mode"), Some(true));
+    assert_eq!(state.has_lobby_data(second_lobby, "missing"), Some(false));
+    assert_eq!(state.has_lobby_data(first_lobby, "mode"), None);
     assert_eq!(
         state.lobby_data_entry(second_lobby, 1),
         state.last_lobby_data_entry()
@@ -686,6 +693,14 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
     );
     assert_eq!(state.lobby_member_data(second_lobby, user, "missing"), None);
     assert_eq!(
+        state.has_lobby_member_data(second_lobby, user, "rank"),
+        Some(true)
+    );
+    assert_eq!(
+        state.has_lobby_member_data(second_lobby, user, "missing"),
+        None
+    );
+    assert_eq!(
         state.lobby_member_limit(second_lobby),
         state.last_lobby_member_limit()
     );
@@ -715,6 +730,7 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.lobby_joinability(second_lobby),
         state.last_lobby_joinability()
     );
+    assert_eq!(state.lobby_joinable(second_lobby), Some(false));
     assert_eq!(
         state.lobby_chat_message_sent(second_lobby),
         state.last_lobby_chat_message_sent()
@@ -724,12 +740,30 @@ fn state_records_matchmaking_operations_without_unbounded_history() {
         state.last_lobby_chat_entry()
     );
     assert_eq!(
+        state.lobby_chat_entry_data(second_lobby, 7),
+        Some([1, 2, 3].as_slice())
+    );
+    assert_eq!(state.lobby_chat_entry_len(second_lobby, 7), Some(3));
+    assert_eq!(
+        state.last_lobby_chat_entry_data(),
+        Some([1, 2, 3].as_slice())
+    );
+    assert_eq!(
         state.lobby_game_server_assignment(second_lobby),
         state.last_lobby_game_server_set()
     );
     assert_eq!(
         state.lobby_game_server(second_lobby),
         state.last_lobby_game_server()
+    );
+    assert_eq!(state.has_lobby_game_server(second_lobby), Some(true));
+    assert_eq!(
+        state.lobby_game_server_address(second_lobby),
+        Some(Some(server.address))
+    );
+    assert_eq!(
+        state.lobby_game_server_steam_id(second_lobby),
+        Some(Some(owner))
     );
 }
 

@@ -1091,13 +1091,18 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
     let _ = SteamworksMatchmakingCommand::get_lobby_game_server(lobby);
     let root_state = SteamworksMatchmakingState::default();
     assert!(root_state.lobby_list_requests().is_empty());
+    assert_eq!(root_state.last_lobby_list_count(), 0);
     assert_eq!(root_state.lobby_list_request(1), None);
     assert!(root_state.lobby_list_results().is_empty());
     assert_eq!(root_state.lobby_list_result(1), None);
+    assert_eq!(root_state.joined_lobby_count(), 0);
+    assert_eq!(root_state.last_joined_lobby_id(), None);
     assert!(!root_state.is_lobby_joined(lobby));
     assert!(root_state.lobby_data_values().is_empty());
+    assert_eq!(root_state.lobby_data_count_value(lobby), None);
     assert_eq!(root_state.lobby_data_value(lobby, "mode"), None);
     assert_eq!(root_state.lobby_data(lobby, "mode"), None);
+    assert_eq!(root_state.has_lobby_data(lobby, "mode"), None);
     assert_eq!(root_state.all_lobby_data_value(lobby, "mode"), None);
     assert!(root_state.lobby_member_data_values().is_empty());
     assert_eq!(
@@ -1105,12 +1110,20 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(root_state.lobby_member_data(lobby, user, "rank"), None);
+    assert_eq!(root_state.has_lobby_member_data(lobby, user, "rank"), None);
     assert_eq!(root_state.lobby_member_limit_value(lobby), None);
     assert_eq!(root_state.lobby_owner_id(lobby), None);
     assert_eq!(root_state.lobby_member_count_value(lobby), None);
     assert_eq!(root_state.lobby_member_ids(lobby), None);
     assert_eq!(root_state.has_lobby_member(lobby, user), None);
+    assert_eq!(root_state.lobby_joinable(lobby), None);
+    assert_eq!(root_state.lobby_chat_entry_data(lobby, 1), None);
+    assert_eq!(root_state.lobby_chat_entry_len(lobby, 1), None);
+    assert_eq!(root_state.last_lobby_chat_entry_data(), None);
     assert_eq!(root_state.lobby_game_server(lobby), None);
+    assert_eq!(root_state.has_lobby_game_server(lobby), None);
+    assert_eq!(root_state.lobby_game_server_address(lobby), None);
+    assert_eq!(root_state.lobby_game_server_steam_id(lobby), None);
     let _root_lobby_list_result = SteamworksLobbyListResult {
         request_id: 1,
         filter: SteamworksLobbyListFilter::new(),
@@ -1153,13 +1166,18 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
     let _ = PreludeMatchmakingCommand::get_lobby_game_server(lobby);
     let prelude_state = PreludeMatchmakingState::default();
     assert!(prelude_state.lobby_list_requests().is_empty());
+    assert_eq!(prelude_state.last_lobby_list_count(), 0);
     assert_eq!(prelude_state.lobby_list_request(1), None);
     assert!(prelude_state.lobby_list_results().is_empty());
     assert_eq!(prelude_state.lobby_list_result(1), None);
+    assert_eq!(prelude_state.joined_lobby_count(), 0);
+    assert_eq!(prelude_state.last_joined_lobby_id(), None);
     assert!(!prelude_state.is_lobby_joined(lobby));
     assert!(prelude_state.lobby_data_values().is_empty());
+    assert_eq!(prelude_state.lobby_data_count_value(lobby), None);
     assert_eq!(prelude_state.lobby_data_value(lobby, "mode"), None);
     assert_eq!(prelude_state.lobby_data(lobby, "mode"), None);
+    assert_eq!(prelude_state.has_lobby_data(lobby, "mode"), None);
     assert_eq!(prelude_state.all_lobby_data_value(lobby, "mode"), None);
     assert!(prelude_state.lobby_member_data_values().is_empty());
     assert_eq!(
@@ -1167,12 +1185,23 @@ fn matchmaking_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(prelude_state.lobby_member_data(lobby, user, "rank"), None);
+    assert_eq!(
+        prelude_state.has_lobby_member_data(lobby, user, "rank"),
+        None
+    );
     assert_eq!(prelude_state.lobby_member_limit_value(lobby), None);
     assert_eq!(prelude_state.lobby_owner_id(lobby), None);
     assert_eq!(prelude_state.lobby_member_count_value(lobby), None);
     assert_eq!(prelude_state.lobby_member_ids(lobby), None);
     assert_eq!(prelude_state.has_lobby_member(lobby, user), None);
+    assert_eq!(prelude_state.lobby_joinable(lobby), None);
+    assert_eq!(prelude_state.lobby_chat_entry_data(lobby, 1), None);
+    assert_eq!(prelude_state.lobby_chat_entry_len(lobby, 1), None);
+    assert_eq!(prelude_state.last_lobby_chat_entry_data(), None);
     assert_eq!(prelude_state.lobby_game_server(lobby), None);
+    assert_eq!(prelude_state.has_lobby_game_server(lobby), None);
+    assert_eq!(prelude_state.lobby_game_server_address(lobby), None);
+    assert_eq!(prelude_state.lobby_game_server_steam_id(lobby), None);
     let _prelude_lobby_list_result = PreludeLobbyListResult {
         request_id: 1,
         filter: PreludeLobbyListFilter::new(),
