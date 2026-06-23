@@ -4,7 +4,7 @@ use bevy_steamworks::{
         SteamAPIInitError as PreludeInitError, SteamworksAppsCommand as PreludeAppsCommand,
         SteamworksAppsError as PreludeAppsError, SteamworksAppsOperation as PreludeAppsOperation,
         SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
-        SteamworksAvatarSize as PreludeAvatarSize,
+        SteamworksAppsState as PreludeAppsState, SteamworksAvatarSize as PreludeAvatarSize,
         SteamworksCallbackRegistry as PreludeCallbackRegistry, SteamworksClient as PreludeClient,
         SteamworksClientPlugins as PreludeClientPlugins,
         SteamworksCommandError as PreludeCommandError,
@@ -172,8 +172,8 @@ use bevy_steamworks::{
         SteamworksUtilsState as PreludeUtilsState,
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
-    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAvatarSize, SteamworksCallbackRegistry,
-    SteamworksClient, SteamworksClientPlugins, SteamworksCommandError,
+    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAppsState, SteamworksAvatarSize,
+    SteamworksCallbackRegistry, SteamworksClient, SteamworksClientPlugins, SteamworksCommandError,
     SteamworksConnectionRequestPolicy, SteamworksEvent, SteamworksFailurePolicy,
     SteamworksFloatingGamepadTextInputDismissed, SteamworksFloatingGamepadTextInputMode,
     SteamworksFloatingGamepadTextInputRequest, SteamworksFloatingGamepadTextInputShown,
@@ -436,6 +436,21 @@ fn apps_api_is_exported_from_root_and_prelude() {
         SteamworksAppsResult::Ok(SteamworksAppsOperation::AppBuildIdRead { build_id: 1 }),
         SteamworksAppsError::ClientUnavailable,
     );
+    let root_state = SteamworksAppsState::default();
+    let app_id = steamworks::AppId(480);
+    assert_eq!(root_state.current_app_id(), None);
+    assert_eq!(root_state.current_app_owned(), None);
+    assert_eq!(root_state.known_app_install_check_count(), 0);
+    assert_eq!(root_state.known_dlc_install_check_count(), 0);
+    assert_eq!(root_state.known_subscribed_app_check_count(), 0);
+    assert_eq!(root_state.app_installed(app_id), None);
+    assert_eq!(root_state.available_game_language_count(), None);
+    assert_eq!(root_state.supports_game_language("english"), None);
+    assert_eq!(root_state.current_game_language_is("english"), None);
+    assert_eq!(root_state.is_on_beta_branch(), None);
+    assert_eq!(root_state.has_launch_command_line(), None);
+    assert!(!root_state.launch_query_param_was_read("connect"));
+    assert_eq!(root_state.launch_query_param_has_value("connect"), None);
 
     let command = PreludeAppsCommand::is_subscribed();
     let operation = PreludeAppsOperation::SubscriptionRead { subscribed: true };
@@ -457,6 +472,20 @@ fn apps_api_is_exported_from_root_and_prelude() {
         }),
         PreludeAppsError::ClientUnavailable,
     );
+    let prelude_state = PreludeAppsState::default();
+    assert_eq!(prelude_state.current_app_id(), None);
+    assert_eq!(prelude_state.current_app_owned(), None);
+    assert_eq!(prelude_state.known_app_install_check_count(), 0);
+    assert_eq!(prelude_state.known_dlc_install_check_count(), 0);
+    assert_eq!(prelude_state.known_subscribed_app_check_count(), 0);
+    assert_eq!(prelude_state.app_installed(app_id), None);
+    assert_eq!(prelude_state.available_game_language_count(), None);
+    assert_eq!(prelude_state.supports_game_language("english"), None);
+    assert_eq!(prelude_state.current_game_language_is("english"), None);
+    assert_eq!(prelude_state.is_on_beta_branch(), None);
+    assert_eq!(prelude_state.has_launch_command_line(), None);
+    assert!(!prelude_state.launch_query_param_was_read("connect"));
+    assert_eq!(prelude_state.launch_query_param_has_value("connect"), None);
 }
 
 #[test]

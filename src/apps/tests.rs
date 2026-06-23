@@ -215,7 +215,9 @@ fn state_records_app_operations() {
     });
 
     assert_eq!(state.current_app_info(), Some(&info));
+    assert_eq!(state.current_app_id(), Some(app_id));
     assert_eq!(state.subscribed(), Some(false));
+    assert_eq!(state.current_app_owned(), Some(false));
     assert_eq!(state.subscribed_from_free_weekend(), Some(true));
     assert_eq!(state.vac_banned(), Some(true));
     assert_eq!(state.cybercafe(), Some(true));
@@ -226,9 +228,18 @@ fn state_records_app_operations() {
         state.available_game_languages(),
         Some(["german".to_owned()].as_slice())
     );
+    assert_eq!(state.available_game_language_count(), Some(1));
+    assert_eq!(state.supports_game_language("german"), Some(true));
+    assert_eq!(state.supports_game_language("english"), Some(false));
     assert_eq!(state.current_game_language(), Some("german"));
+    assert_eq!(state.current_game_language_is("german"), Some(true));
+    assert_eq!(state.current_game_language_is("english"), Some(false));
     assert_eq!(state.current_beta_name(), None);
     assert_eq!(state.current_beta_name_result(), Some(None));
+    assert_eq!(state.is_on_beta_branch(), Some(false));
+    assert_eq!(state.known_app_install_check_count(), 1);
+    assert_eq!(state.known_dlc_install_check_count(), 1);
+    assert_eq!(state.known_subscribed_app_check_count(), 1);
     assert_eq!(state.app_installed(app_id), Some(true));
     assert_eq!(state.dlc_installed(dlc_id), Some(true));
     assert_eq!(state.subscribed_app(app_id), Some(true));
@@ -237,7 +248,12 @@ fn state_records_app_operations() {
         Some("C:/Steam/steamapps/common/Spacewar")
     );
     assert_eq!(state.launch_command_line(), Some("+connect 127.0.0.1"));
+    assert_eq!(state.has_launch_command_line(), Some(true));
     assert_eq!(state.launch_query_param("connect"), Some("localhost"));
+    assert!(state.launch_query_param_was_read("connect"));
+    assert!(!state.launch_query_param_was_read("missing"));
+    assert_eq!(state.launch_query_param_has_value("connect"), Some(true));
+    assert_eq!(state.launch_query_param_has_value("missing"), None);
     assert_eq!(
         state.launch_query_params(),
         &[("connect".to_owned(), "localhost".to_owned())]
