@@ -164,11 +164,27 @@ fn state_records_operations_without_unbounded_callback_history() {
         ))
     );
     assert_eq!(
+        state.relay_network_config_availability(),
+        Some(steamworks::networking_types::NetworkingAvailability::Attempting)
+    );
+    assert_eq!(state.relay_network_config_availability_error(), None);
+    assert_eq!(state.relay_network_config_available(), Some(false));
+    assert_eq!(state.relay_network_config_pending(), Some(true));
+    assert_eq!(state.relay_network_config_unavailable(), Some(false));
+    assert_eq!(
         state.last_any_relay_availability(),
         Some(&Ok(
             steamworks::networking_types::NetworkingAvailability::Current
         ))
     );
+    assert_eq!(
+        state.any_relay_availability(),
+        Some(steamworks::networking_types::NetworkingAvailability::Current)
+    );
+    assert_eq!(state.any_relay_availability_error(), None);
+    assert_eq!(state.any_relay_available(), Some(true));
+    assert_eq!(state.any_relay_pending(), Some(false));
+    assert_eq!(state.any_relay_unavailable(), Some(false));
     assert_eq!(state.last_relay_debugging_message(), Some("measuring"));
 
     state.record_operation(
@@ -206,7 +222,11 @@ fn state_records_operations_without_unbounded_callback_history() {
     assert_eq!(state.relay_network_pending(), Some(false));
     assert_eq!(state.relay_network_unavailable(), Some(false));
     assert_eq!(state.relay_network_config_available(), Some(true));
+    assert_eq!(state.relay_network_config_pending(), Some(false));
+    assert_eq!(state.relay_network_config_unavailable(), Some(false));
     assert_eq!(state.any_relay_available(), Some(true));
+    assert_eq!(state.any_relay_pending(), Some(false));
+    assert_eq!(state.any_relay_unavailable(), Some(false));
     assert_eq!(state.last_relay_debugging_message(), Some("ready"));
     assert_eq!(state.relay_network_status_callback_count(), 1);
 
@@ -222,6 +242,32 @@ fn state_records_operations_without_unbounded_callback_history() {
     assert_eq!(state.relay_network_available(), Some(false));
     assert_eq!(state.relay_network_pending(), Some(true));
     assert_eq!(state.relay_network_unavailable(), Some(true));
+
+    state.record_operation(
+        &SteamworksNetworkingUtilsOperation::RelayNetworkConfigStatusRead {
+            availability: Err(steamworks::networking_types::NetworkingAvailabilityError::Unknown),
+        },
+    );
+    assert_eq!(state.relay_network_config_availability(), None);
+    assert_eq!(
+        state.relay_network_config_availability_error(),
+        Some(steamworks::networking_types::NetworkingAvailabilityError::Unknown)
+    );
+    assert_eq!(state.relay_network_config_available(), Some(false));
+    assert_eq!(state.relay_network_config_pending(), Some(false));
+    assert_eq!(state.relay_network_config_unavailable(), Some(true));
+
+    state.record_operation(&SteamworksNetworkingUtilsOperation::AnyRelayStatusRead {
+        availability: Err(steamworks::networking_types::NetworkingAvailabilityError::Retrying),
+    });
+    assert_eq!(state.any_relay_availability(), None);
+    assert_eq!(
+        state.any_relay_availability_error(),
+        Some(steamworks::networking_types::NetworkingAvailabilityError::Retrying)
+    );
+    assert_eq!(state.any_relay_available(), Some(false));
+    assert_eq!(state.any_relay_pending(), Some(true));
+    assert_eq!(state.any_relay_unavailable(), Some(true));
 }
 
 #[test]

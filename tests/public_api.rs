@@ -1977,7 +1977,15 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.relay_network_pending(), None);
     assert_eq!(root_state.relay_network_unavailable(), None);
     assert_eq!(root_state.relay_network_config_available(), None);
+    assert_eq!(root_state.relay_network_config_availability(), None);
+    assert_eq!(root_state.relay_network_config_availability_error(), None);
+    assert_eq!(root_state.relay_network_config_pending(), None);
+    assert_eq!(root_state.relay_network_config_unavailable(), None);
     assert_eq!(root_state.any_relay_available(), None);
+    assert_eq!(root_state.any_relay_availability(), None);
+    assert_eq!(root_state.any_relay_availability_error(), None);
+    assert_eq!(root_state.any_relay_pending(), None);
+    assert_eq!(root_state.any_relay_unavailable(), None);
     accepts_prelude_state_status(
         bevy_steamworks::prelude::SteamworksNetworkingUtilsState::default(),
         None,
@@ -1989,7 +1997,18 @@ fn networking_utils_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.relay_network_pending(), None);
     assert_eq!(prelude_state.relay_network_unavailable(), None);
     assert_eq!(prelude_state.relay_network_config_available(), None);
+    assert_eq!(prelude_state.relay_network_config_availability(), None);
+    assert_eq!(
+        prelude_state.relay_network_config_availability_error(),
+        None
+    );
+    assert_eq!(prelude_state.relay_network_config_pending(), None);
+    assert_eq!(prelude_state.relay_network_config_unavailable(), None);
     assert_eq!(prelude_state.any_relay_available(), None);
+    assert_eq!(prelude_state.any_relay_availability(), None);
+    assert_eq!(prelude_state.any_relay_availability_error(), None);
+    assert_eq!(prelude_state.any_relay_pending(), None);
+    assert_eq!(prelude_state.any_relay_unavailable(), None);
 
     let command = SteamworksNetworkingUtilsCommand::get_relay_debug_message();
     let operation = SteamworksNetworkingUtilsOperation::RelayDebugMessageRead {

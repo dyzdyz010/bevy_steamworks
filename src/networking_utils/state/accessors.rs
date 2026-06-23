@@ -66,6 +66,28 @@ impl SteamworksNetworkingUtilsState {
         availability_current(self.last_relay_network_config_availability.as_ref())
     }
 
+    /// Returns the most recent successful relay network-config availability value.
+    pub fn relay_network_config_availability(&self) -> Option<NetworkingAvailability> {
+        availability_value(self.last_relay_network_config_availability.as_ref())
+    }
+
+    /// Returns the most recent relay network-config availability error.
+    pub fn relay_network_config_availability_error(&self) -> Option<NetworkingAvailabilityError> {
+        availability_error(self.last_relay_network_config_availability.as_ref())
+    }
+
+    /// Returns whether the most recent relay network-config availability is still pending.
+    pub fn relay_network_config_pending(&self) -> Option<bool> {
+        availability_pending(self.last_relay_network_config_availability.as_ref())
+    }
+
+    /// Returns whether the most recent relay network-config availability reported an error.
+    pub fn relay_network_config_unavailable(&self) -> Option<bool> {
+        self.last_relay_network_config_availability
+            .as_ref()
+            .map(Result::is_err)
+    }
+
     /// Returns the most recent any-relay availability.
     pub fn last_any_relay_availability(
         &self,
@@ -76,6 +98,28 @@ impl SteamworksNetworkingUtilsState {
     /// Returns whether the most recent any-relay availability is current.
     pub fn any_relay_available(&self) -> Option<bool> {
         availability_current(self.last_any_relay_availability.as_ref())
+    }
+
+    /// Returns the most recent successful any-relay availability value.
+    pub fn any_relay_availability(&self) -> Option<NetworkingAvailability> {
+        availability_value(self.last_any_relay_availability.as_ref())
+    }
+
+    /// Returns the most recent any-relay availability error.
+    pub fn any_relay_availability_error(&self) -> Option<NetworkingAvailabilityError> {
+        availability_error(self.last_any_relay_availability.as_ref())
+    }
+
+    /// Returns whether the most recent any-relay availability is still pending.
+    pub fn any_relay_pending(&self) -> Option<bool> {
+        availability_pending(self.last_any_relay_availability.as_ref())
+    }
+
+    /// Returns whether the most recent any-relay availability reported an error.
+    pub fn any_relay_unavailable(&self) -> Option<bool> {
+        self.last_any_relay_availability
+            .as_ref()
+            .map(Result::is_err)
     }
 
     /// Returns the most recent relay diagnostic debug message.
