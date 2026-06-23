@@ -312,13 +312,59 @@ fn state_records_local_stats_and_named_achievements() {
     });
 
     assert_eq!(state.stat_i32("kills"), Some(2));
+    assert_eq!(
+        state.stat_i32_values().collect::<Vec<_>>(),
+        vec![("kills", 2)]
+    );
+    assert_eq!(state.stat_i32_count(), 1);
+    assert!(state.has_stat_i32("kills"));
+    assert!(!state.has_stat_i32("deaths"));
     assert_eq!(state.stat_f32("accuracy"), Some(0.75));
+    assert_eq!(
+        state.stat_f32_values().collect::<Vec<_>>(),
+        vec![("accuracy", 0.75)]
+    );
+    assert_eq!(state.stat_f32_count(), 1);
+    assert!(state.has_stat_f32("accuracy"));
+    assert!(!state.has_stat_f32("missing"));
     assert_eq!(state.achievement_count(), Some(12));
+    assert_eq!(state.known_achievement_count(), 2);
+    assert_eq!(
+        state.achievement_names().collect::<Vec<_>>(),
+        vec!["ACH_WIN", "ACH_SECRET"]
+    );
+    assert!(state.has_achievement("ACH_WIN"));
+    assert!(!state.has_achievement("ACH_MISSING"));
+    assert_eq!(state.unlocked_achievements().count(), 1);
+    assert_eq!(state.locked_achievements().count(), 1);
     assert_eq!(state.achievement_unlocked("ACH_WIN"), Some(true));
     assert_eq!(state.achievement_unlock_time("ACH_WIN"), Some(42));
     assert_eq!(
+        state.achievement_display_name("ACH_WIN"),
+        Some(Some("Winner"))
+    );
+    assert_eq!(
+        state.achievement_description("ACH_WIN"),
+        Some(Some("Win once"))
+    );
+    assert_eq!(state.achievement_hidden("ACH_WIN"), Some(Some(true)));
+    assert_eq!(
         state.achievement_display_attribute("ACH_WIN", "name"),
         Some("Winner")
+    );
+    assert_eq!(state.global_achievement_percentage_count(), 2);
+    assert_eq!(
+        state.global_achievement_percentages(),
+        &[
+            SteamworksAchievementGlobalPercentage {
+                api_name: "ACH_WIN".to_owned(),
+                percent: 12.5,
+            },
+            SteamworksAchievementGlobalPercentage {
+                api_name: "ACH_OTHER".to_owned(),
+                percent: 99.0,
+            },
+        ]
     );
     assert_eq!(state.achievement_global_percent("ACH_WIN"), Some(12.5));
     assert_eq!(state.achievement_global_percent("ACH_OTHER"), Some(99.0));
@@ -671,10 +717,24 @@ fn leaderboard_state_records_latest_info_and_entries() {
         state.leaderboard_id("weekly_score"),
         Some(created_leaderboard)
     );
+    assert!(state.has_leaderboard_id("daily_score"));
+    assert!(!state.has_leaderboard_id("monthly_score"));
     assert_eq!(state.leaderboards(), &[info.clone()]);
     assert_eq!(state.leaderboard_info(leaderboard), Some(&info));
+    assert!(state.has_leaderboard_info(leaderboard));
+    assert!(!state.has_leaderboard_info(created_leaderboard));
     assert_eq!(state.leaderboard_info_by_name("daily_score"), Some(&info));
     assert_eq!(state.leaderboard_info_by_name("weekly_score"), None);
+    assert_eq!(state.leaderboard_name(leaderboard), Some("daily_score"));
+    assert_eq!(
+        state.leaderboard_display_type(leaderboard),
+        Some(Some(SteamworksLeaderboardDisplayType::Numeric))
+    );
+    assert_eq!(
+        state.leaderboard_sort_method(leaderboard),
+        Some(Some(SteamworksLeaderboardSortMethod::Descending))
+    );
+    assert_eq!(state.leaderboard_entry_count(leaderboard), Some(42));
 
     state.record_operation(&SteamworksStatsOperation::LeaderboardScoreUploadSubmitted {
         leaderboard,
@@ -714,6 +774,17 @@ fn leaderboard_state_records_latest_info_and_entries() {
         })
     );
     assert_eq!(
+        state.leaderboard_score_upload(leaderboard),
+        Some(Some(&upload))
+    );
+    assert_eq!(state.leaderboard_uploaded_score(leaderboard), Some(9000));
+    assert_eq!(state.leaderboard_score_was_changed(leaderboard), Some(true));
+    assert_eq!(state.leaderboard_uploaded_rank_new(leaderboard), Some(1));
+    assert_eq!(
+        state.leaderboard_uploaded_rank_previous(leaderboard),
+        Some(3)
+    );
+    assert_eq!(
         state.leaderboard_entries_download_request(leaderboard),
         Some(&SteamworksLeaderboardEntriesDownloadRequest {
             leaderboard,
@@ -733,18 +804,33 @@ fn leaderboard_state_records_latest_info_and_entries() {
         Some(&[entry.clone()][..])
     );
     assert_eq!(
+        state.leaderboard_downloaded_entry_count(leaderboard),
+        Some(1)
+    );
+    assert_eq!(state.last_leaderboard_downloaded_entry_count(), 1);
+    assert_eq!(
         state.leaderboard_entry_by_user(leaderboard, entry.user),
         Some(&entry)
+    );
+    assert_eq!(
+        state.leaderboard_has_entry_for_user(leaderboard, entry.user),
+        Some(true)
     );
     assert_eq!(
         state.leaderboard_entry_by_user(leaderboard, steamworks::SteamId::from_raw(456)),
         None
     );
     assert_eq!(
+        state.leaderboard_has_entry_for_user(leaderboard, steamworks::SteamId::from_raw(456)),
+        Some(false)
+    );
+    assert_eq!(
         state.leaderboard_entry_by_rank(leaderboard, 1),
         Some(&entry)
     );
+    assert_eq!(state.leaderboard_has_rank(leaderboard, 1), Some(true));
     assert_eq!(state.leaderboard_entry_by_rank(leaderboard, 2), None);
+    assert_eq!(state.leaderboard_has_rank(leaderboard, 2), Some(false));
     assert_eq!(
         state.leaderboard_score_by_user(leaderboard, entry.user),
         Some(9000)
@@ -759,13 +845,17 @@ fn leaderboard_state_records_latest_info_and_entries() {
     );
     state.record_operation(&SteamworksStatsOperation::LeaderboardForgotten { leaderboard });
     assert_eq!(state.leaderboard_id("daily_score"), None);
+    assert!(!state.has_leaderboard_id("daily_score"));
     assert_eq!(
         state.leaderboard_id("weekly_score"),
         Some(created_leaderboard)
     );
     assert!(state.leaderboards().is_empty());
     assert_eq!(state.leaderboard_info(leaderboard), None);
+    assert!(!state.has_leaderboard_info(leaderboard));
     assert_eq!(state.leaderboard_info_by_name("daily_score"), None);
+    assert_eq!(state.leaderboard_name(leaderboard), None);
+    assert_eq!(state.leaderboard_entry_count(leaderboard), None);
 
     assert_eq!(
         state.last_leaderboard_find_request(),
@@ -831,17 +921,25 @@ fn leaderboard_state_records_latest_info_and_entries() {
     assert_eq!(state.last_forgotten_leaderboard(), Some(leaderboard));
     assert_eq!(state.leaderboard_score_upload_request(leaderboard), None);
     assert_eq!(state.leaderboard_score_upload_result(leaderboard), None);
+    assert_eq!(state.leaderboard_score_upload(leaderboard), None);
+    assert_eq!(state.leaderboard_uploaded_score(leaderboard), None);
     assert_eq!(
         state.leaderboard_entries_download_request(leaderboard),
         None
     );
     assert_eq!(state.leaderboard_entries_download_result(leaderboard), None);
     assert_eq!(state.leaderboard_entries(leaderboard), None);
+    assert_eq!(state.leaderboard_downloaded_entry_count(leaderboard), None);
     assert_eq!(
         state.leaderboard_entry_by_user(leaderboard, entry.user),
         None
     );
+    assert_eq!(
+        state.leaderboard_has_entry_for_user(leaderboard, entry.user),
+        None
+    );
     assert_eq!(state.leaderboard_entry_by_rank(leaderboard, 1), None);
+    assert_eq!(state.leaderboard_has_rank(leaderboard, 1), None);
     assert_eq!(
         state.leaderboard_score_by_user(leaderboard, entry.user),
         None
@@ -1185,11 +1283,19 @@ fn global_stats_state_records_latest_values() {
         })
     );
     assert_eq!(
+        state.global_stat_history_i64_series("daily_kills"),
+        Some([3, 2, 1].as_slice())
+    );
+    assert_eq!(
         state.last_global_stat_history_f64(),
         Some(&SteamworksGlobalStatHistory {
             name: "daily_accuracy".to_owned(),
             values: vec![0.5, 0.6],
         })
+    );
+    assert_eq!(
+        state.global_stat_history_f64_series("daily_accuracy"),
+        Some([0.5, 0.6].as_slice())
     );
     assert_eq!(
         state.global_stat_history_f64("daily_accuracy"),
@@ -1210,6 +1316,8 @@ fn global_stats_state_records_latest_values() {
     assert_eq!(state.global_stat_f64("average_accuracy"), None);
     assert_eq!(state.global_stat_history_i64("daily_kills"), None);
     assert_eq!(state.global_stat_history_f64("daily_accuracy"), None);
+    assert_eq!(state.global_stat_history_i64_series("daily_kills"), None);
+    assert_eq!(state.global_stat_history_f64_series("daily_accuracy"), None);
     assert!(state.global_stat_i64_values().is_empty());
     assert!(state.global_stat_f64_values().is_empty());
     assert!(state.global_stat_history_i64_values().is_empty());

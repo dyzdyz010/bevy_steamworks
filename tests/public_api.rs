@@ -2893,11 +2893,36 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert!(!root_plugin.requests_current_user_stats_on_startup());
     assert!(!root_plugin.auto_store_enabled());
     let root_state = bevy_steamworks::SteamworksStatsState::default();
+    assert_eq!(root_state.stat_i32_values().count(), 0);
+    assert_eq!(root_state.stat_i32_count(), 0);
+    assert_eq!(root_state.stat_i32("kills"), None);
+    assert!(!root_state.has_stat_i32("kills"));
+    assert_eq!(root_state.stat_f32_values().count(), 0);
+    assert_eq!(root_state.stat_f32_count(), 0);
+    assert_eq!(root_state.stat_f32("accuracy"), None);
+    assert!(!root_state.has_stat_f32("accuracy"));
+    assert!(root_state.achievements().is_empty());
+    assert_eq!(root_state.known_achievement_count(), 0);
+    assert_eq!(root_state.achievement_names().count(), 0);
+    assert!(!root_state.has_achievement("ACH_WIN"));
+    assert_eq!(root_state.unlocked_achievements().count(), 0);
+    assert_eq!(root_state.locked_achievements().count(), 0);
+    assert_eq!(root_state.achievement_display_name("ACH_WIN"), None);
+    assert_eq!(root_state.achievement_description("ACH_WIN"), None);
+    assert_eq!(root_state.achievement_hidden("ACH_WIN"), None);
+    assert!(root_state.global_achievement_percentages().is_empty());
+    assert_eq!(root_state.global_achievement_percentage_count(), 0);
     let root_leaderboard: bevy_steamworks::SteamworksLeaderboardId =
         bevy_steamworks::SteamworksLeaderboardId::from_raw(1);
     assert_eq!(root_state.leaderboard_id("daily"), None);
+    assert!(!root_state.has_leaderboard_id("daily"));
     assert_eq!(root_state.leaderboard_info(root_leaderboard), None);
+    assert!(!root_state.has_leaderboard_info(root_leaderboard));
     assert_eq!(root_state.leaderboard_info_by_name("daily"), None);
+    assert_eq!(root_state.leaderboard_name(root_leaderboard), None);
+    assert_eq!(root_state.leaderboard_display_type(root_leaderboard), None);
+    assert_eq!(root_state.leaderboard_sort_method(root_leaderboard), None);
+    assert_eq!(root_state.leaderboard_entry_count(root_leaderboard), None);
     assert!(root_state.leaderboards().is_empty());
     assert!(root_state.global_stat_i64_values().is_empty());
     assert_eq!(root_state.global_stat_i64("kills"), None);
@@ -2905,8 +2930,16 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(root_state.global_stat_f64("accuracy"), None);
     assert!(root_state.global_stat_history_i64_values().is_empty());
     assert_eq!(root_state.global_stat_history_i64("daily_kills"), None);
+    assert_eq!(
+        root_state.global_stat_history_i64_series("daily_kills"),
+        None
+    );
     assert!(root_state.global_stat_history_f64_values().is_empty());
     assert_eq!(root_state.global_stat_history_f64("daily_accuracy"), None);
+    assert_eq!(
+        root_state.global_stat_history_f64_series("daily_accuracy"),
+        None
+    );
     assert!(root_state.leaderboard_score_upload_requests().is_empty());
     assert_eq!(
         root_state.leaderboard_score_upload_request(root_leaderboard),
@@ -2915,6 +2948,23 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert!(root_state.leaderboard_score_upload_results().is_empty());
     assert_eq!(
         root_state.leaderboard_score_upload_result(root_leaderboard),
+        None
+    );
+    assert_eq!(root_state.leaderboard_score_upload(root_leaderboard), None);
+    assert_eq!(
+        root_state.leaderboard_uploaded_score(root_leaderboard),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_score_was_changed(root_leaderboard),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_uploaded_rank_new(root_leaderboard),
+        None
+    );
+    assert_eq!(
+        root_state.leaderboard_uploaded_rank_previous(root_leaderboard),
         None
     );
     assert!(root_state
@@ -2930,15 +2980,25 @@ fn stats_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(root_state.leaderboard_entries(root_leaderboard), None);
+    assert_eq!(
+        root_state.leaderboard_downloaded_entry_count(root_leaderboard),
+        None
+    );
+    assert_eq!(root_state.last_leaderboard_downloaded_entry_count(), 0);
     let root_user = steamworks::SteamId::from_raw(1);
     assert_eq!(
         root_state.leaderboard_entry_by_user(root_leaderboard, root_user),
         None
     );
     assert_eq!(
+        root_state.leaderboard_has_entry_for_user(root_leaderboard, root_user),
+        None
+    );
+    assert_eq!(
         root_state.leaderboard_entry_by_rank(root_leaderboard, 1),
         None
     );
+    assert_eq!(root_state.leaderboard_has_rank(root_leaderboard, 1), None);
     assert_eq!(
         root_state.leaderboard_score_by_user(root_leaderboard, root_user),
         None
@@ -2979,11 +3039,45 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert!(!prelude_plugin.requests_current_user_stats_on_startup());
     assert!(!prelude_plugin.auto_store_enabled());
     let prelude_state = bevy_steamworks::prelude::SteamworksStatsState::default();
+    assert_eq!(prelude_state.stat_i32_values().count(), 0);
+    assert_eq!(prelude_state.stat_i32_count(), 0);
+    assert_eq!(prelude_state.stat_i32("kills"), None);
+    assert!(!prelude_state.has_stat_i32("kills"));
+    assert_eq!(prelude_state.stat_f32_values().count(), 0);
+    assert_eq!(prelude_state.stat_f32_count(), 0);
+    assert_eq!(prelude_state.stat_f32("accuracy"), None);
+    assert!(!prelude_state.has_stat_f32("accuracy"));
+    assert!(prelude_state.achievements().is_empty());
+    assert_eq!(prelude_state.known_achievement_count(), 0);
+    assert_eq!(prelude_state.achievement_names().count(), 0);
+    assert!(!prelude_state.has_achievement("ACH_WIN"));
+    assert_eq!(prelude_state.unlocked_achievements().count(), 0);
+    assert_eq!(prelude_state.locked_achievements().count(), 0);
+    assert_eq!(prelude_state.achievement_display_name("ACH_WIN"), None);
+    assert_eq!(prelude_state.achievement_description("ACH_WIN"), None);
+    assert_eq!(prelude_state.achievement_hidden("ACH_WIN"), None);
+    assert!(prelude_state.global_achievement_percentages().is_empty());
+    assert_eq!(prelude_state.global_achievement_percentage_count(), 0);
     let prelude_leaderboard: bevy_steamworks::prelude::SteamworksLeaderboardId =
         bevy_steamworks::prelude::SteamworksLeaderboardId::from_raw(1);
     assert_eq!(prelude_state.leaderboard_id("daily"), None);
+    assert!(!prelude_state.has_leaderboard_id("daily"));
     assert_eq!(prelude_state.leaderboard_info(prelude_leaderboard), None);
+    assert!(!prelude_state.has_leaderboard_info(prelude_leaderboard));
     assert_eq!(prelude_state.leaderboard_info_by_name("daily"), None);
+    assert_eq!(prelude_state.leaderboard_name(prelude_leaderboard), None);
+    assert_eq!(
+        prelude_state.leaderboard_display_type(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_sort_method(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_entry_count(prelude_leaderboard),
+        None
+    );
     assert!(prelude_state.leaderboards().is_empty());
     assert!(prelude_state.global_stat_i64_values().is_empty());
     assert_eq!(prelude_state.global_stat_i64("kills"), None);
@@ -2991,9 +3085,17 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert_eq!(prelude_state.global_stat_f64("accuracy"), None);
     assert!(prelude_state.global_stat_history_i64_values().is_empty());
     assert_eq!(prelude_state.global_stat_history_i64("daily_kills"), None);
+    assert_eq!(
+        prelude_state.global_stat_history_i64_series("daily_kills"),
+        None
+    );
     assert!(prelude_state.global_stat_history_f64_values().is_empty());
     assert_eq!(
         prelude_state.global_stat_history_f64("daily_accuracy"),
+        None
+    );
+    assert_eq!(
+        prelude_state.global_stat_history_f64_series("daily_accuracy"),
         None
     );
     assert!(prelude_state.leaderboard_score_upload_requests().is_empty());
@@ -3004,6 +3106,26 @@ fn stats_api_is_exported_from_root_and_prelude() {
     assert!(prelude_state.leaderboard_score_upload_results().is_empty());
     assert_eq!(
         prelude_state.leaderboard_score_upload_result(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_score_upload(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_uploaded_score(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_score_was_changed(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_uploaded_rank_new(prelude_leaderboard),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_uploaded_rank_previous(prelude_leaderboard),
         None
     );
     assert!(prelude_state
@@ -3021,13 +3143,26 @@ fn stats_api_is_exported_from_root_and_prelude() {
         None
     );
     assert_eq!(prelude_state.leaderboard_entries(prelude_leaderboard), None);
+    assert_eq!(
+        prelude_state.leaderboard_downloaded_entry_count(prelude_leaderboard),
+        None
+    );
+    assert_eq!(prelude_state.last_leaderboard_downloaded_entry_count(), 0);
     let prelude_user = steamworks::SteamId::from_raw(1);
     assert_eq!(
         prelude_state.leaderboard_entry_by_user(prelude_leaderboard, prelude_user),
         None
     );
     assert_eq!(
+        prelude_state.leaderboard_has_entry_for_user(prelude_leaderboard, prelude_user),
+        None
+    );
+    assert_eq!(
         prelude_state.leaderboard_entry_by_rank(prelude_leaderboard, 1),
+        None
+    );
+    assert_eq!(
+        prelude_state.leaderboard_has_rank(prelude_leaderboard, 1),
         None
     );
     assert_eq!(
