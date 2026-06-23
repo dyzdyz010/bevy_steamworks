@@ -23,6 +23,11 @@ impl SteamworksFriendsState {
         &self.friends
     }
 
+    /// Returns the number of friends in the latest friend list snapshot.
+    pub fn friend_count(&self) -> usize {
+        self.friends.len()
+    }
+
     /// Returns the latest known snapshot for a Steam user.
     ///
     /// This cache is merged from list, coplay, and single-friend reads.
@@ -72,9 +77,78 @@ impl SteamworksFriendsState {
         &self.known_friends
     }
 
+    /// Returns the number of latest known friend snapshots cached by this plugin.
+    pub fn known_friend_count(&self) -> usize {
+        self.known_friends.len()
+    }
+
+    /// Returns known friends whose latest persona state is not offline.
+    pub fn online_friends(&self) -> impl Iterator<Item = &SteamworksFriendInfo> + '_ {
+        self.known_friends
+            .iter()
+            .filter(|friend| friend.state != steamworks::FriendState::Offline)
+    }
+
+    /// Returns known friends with cached in-game information.
+    pub fn friends_in_game(&self) -> impl Iterator<Item = &SteamworksFriendInfo> + '_ {
+        self.known_friends
+            .iter()
+            .filter(|friend| friend.game.is_some())
+    }
+
+    /// Returns known friends whose cached game snapshot matches an app/game ID.
+    pub fn friends_playing_game(
+        &self,
+        game: steamworks::GameId,
+    ) -> impl Iterator<Item = &SteamworksFriendInfo> + '_ {
+        self.known_friends.iter().filter(move |friend| {
+            friend
+                .game
+                .as_ref()
+                .is_some_and(|friend_game| friend_game.game == game)
+        })
+    }
+
+    /// Returns known friends whose cached game snapshot references a lobby.
+    pub fn friends_in_lobby(
+        &self,
+        lobby: steamworks::LobbyId,
+    ) -> impl Iterator<Item = &SteamworksFriendInfo> + '_ {
+        self.known_friends.iter().filter(move |friend| {
+            friend
+                .game
+                .as_ref()
+                .is_some_and(|friend_game| friend_game.lobby == lobby)
+        })
+    }
+
+    /// Returns whether a known friend has cached in-game information.
+    pub fn friend_is_in_game(&self, steam_id: steamworks::SteamId) -> Option<bool> {
+        self.friend(steam_id).map(|friend| friend.game.is_some())
+    }
+
+    /// Returns whether a known friend has cached game information for a lobby.
+    pub fn friend_is_in_lobby(
+        &self,
+        steam_id: steamworks::SteamId,
+        lobby: steamworks::LobbyId,
+    ) -> Option<bool> {
+        self.friend(steam_id).map(|friend| {
+            friend
+                .game
+                .as_ref()
+                .is_some_and(|friend_game| friend_game.lobby == lobby)
+        })
+    }
+
     /// Returns the last recently-played-with snapshot read through the plugin.
     pub fn coplay_friends(&self) -> &[SteamworksCoplayFriendInfo] {
         &self.coplay_friends
+    }
+
+    /// Returns the number of friends in the last recently-played-with snapshot.
+    pub fn coplay_friend_count(&self) -> usize {
+        self.coplay_friends.len()
     }
 
     /// Returns the cached coplay snapshot for a Steam user.

@@ -573,12 +573,23 @@ fn friends_api_is_exported_from_root_and_prelude() {
         error,
     );
     let friend = steamworks::SteamId::from_raw(11);
+    let lobby = steamworks::LobbyId::from_raw(12);
+    let game = steamworks::GameId::from_raw(480);
     let root_state = SteamworksFriendsState::default();
+    assert_eq!(root_state.friend_count(), 0);
+    assert_eq!(root_state.known_friend_count(), 0);
+    assert_eq!(root_state.coplay_friend_count(), 0);
     assert!(!root_state.has_known_friend(friend));
     assert_eq!(root_state.friend_name(friend), None);
     assert_eq!(root_state.friend_nickname(friend), None);
     assert_eq!(root_state.friend_state(friend), None);
     assert_eq!(root_state.friend_game(friend), None);
+    assert_eq!(root_state.online_friends().count(), 0);
+    assert_eq!(root_state.friends_in_game().count(), 0);
+    assert_eq!(root_state.friends_playing_game(game).count(), 0);
+    assert_eq!(root_state.friends_in_lobby(lobby).count(), 0);
+    assert_eq!(root_state.friend_is_in_game(friend), None);
+    assert_eq!(root_state.friend_is_in_lobby(friend, lobby), None);
     assert_eq!(root_state.coplay_app_id(friend), None);
     assert_eq!(root_state.coplay_time(friend), None);
     assert_eq!(
@@ -612,11 +623,20 @@ fn friends_api_is_exported_from_root_and_prelude() {
         error,
     );
     let prelude_state = PreludeFriendsState::default();
+    assert_eq!(prelude_state.friend_count(), 0);
+    assert_eq!(prelude_state.known_friend_count(), 0);
+    assert_eq!(prelude_state.coplay_friend_count(), 0);
     assert!(!prelude_state.has_known_friend(friend));
     assert_eq!(prelude_state.friend_name(friend), None);
     assert_eq!(prelude_state.friend_nickname(friend), None);
     assert_eq!(prelude_state.friend_state(friend), None);
     assert_eq!(prelude_state.friend_game(friend), None);
+    assert_eq!(prelude_state.online_friends().count(), 0);
+    assert_eq!(prelude_state.friends_in_game().count(), 0);
+    assert_eq!(prelude_state.friends_playing_game(game).count(), 0);
+    assert_eq!(prelude_state.friends_in_lobby(lobby).count(), 0);
+    assert_eq!(prelude_state.friend_is_in_game(friend), None);
+    assert_eq!(prelude_state.friend_is_in_lobby(friend, lobby), None);
     assert_eq!(prelude_state.coplay_app_id(friend), None);
     assert_eq!(prelude_state.coplay_time(friend), None);
     assert_eq!(

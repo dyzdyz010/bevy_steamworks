@@ -340,6 +340,7 @@ fn state_records_friend_operations() {
 
     assert_eq!(state.last_persona_name(), Some("Current User"));
     assert_eq!(state.friends(), &[initial_friend]);
+    assert_eq!(state.friend_count(), 1);
     assert_eq!(state.friend(friend), Some(&updated_friend));
     assert!(state.has_known_friend(friend));
     assert!(!state.has_known_friend(steamworks::SteamId::from_raw(999)));
@@ -355,7 +356,40 @@ fn state_records_friend_operations() {
     );
     assert_eq!(state.friend_game(steamworks::SteamId::from_raw(999)), None);
     assert_eq!(state.known_friends().len(), 2);
+    assert_eq!(state.known_friend_count(), 2);
+    assert_eq!(
+        state.online_friends().cloned().collect::<Vec<_>>(),
+        vec![updated_friend.clone(), coplay_friend.friend.clone()]
+    );
+    assert_eq!(
+        state.friends_in_game().cloned().collect::<Vec<_>>(),
+        vec![updated_friend.clone()]
+    );
+    assert_eq!(
+        state
+            .friends_playing_game(steamworks::GameId::from_raw(480))
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec![updated_friend.clone()]
+    );
+    assert_eq!(
+        state.friends_in_lobby(lobby).cloned().collect::<Vec<_>>(),
+        vec![updated_friend.clone()]
+    );
+    assert_eq!(state.friend_is_in_game(friend), Some(true));
+    assert_eq!(state.friend_is_in_game(user), Some(false));
+    assert_eq!(
+        state.friend_is_in_game(steamworks::SteamId::from_raw(999)),
+        None
+    );
+    assert_eq!(state.friend_is_in_lobby(friend, lobby), Some(true));
+    assert_eq!(state.friend_is_in_lobby(user, lobby), Some(false));
+    assert_eq!(
+        state.friend_is_in_lobby(steamworks::SteamId::from_raw(999), lobby),
+        None
+    );
     assert_eq!(state.coplay_friends(), std::slice::from_ref(&coplay_friend));
+    assert_eq!(state.coplay_friend_count(), 1);
     assert_eq!(state.coplay_friend(user), Some(&coplay_friend));
     assert_eq!(state.coplay_app_id(user), Some(app_id));
     assert_eq!(state.coplay_time(user), Some(123));
