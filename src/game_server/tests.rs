@@ -325,20 +325,36 @@ fn server_callbacks_are_bridged_without_server() {
         state.auth_ticket_validation(user),
         state.last_auth_ticket_validation()
     );
+    assert_eq!(state.auth_ticket_validation_succeeded(user), Some(false));
     assert_eq!(state.auth_ticket_validations().len(), 1);
     assert_eq!(state.last_client_approval(), Some(&approval));
     assert_eq!(state.client_approval(user), Some(&approval));
+    assert!(state.has_client_approval(user));
+    assert_eq!(state.client_approval_owner(user), Some(owner));
     assert_eq!(state.client_approvals(), &[approval]);
     assert_eq!(state.last_client_denial(), Some(&denial));
     assert_eq!(state.client_denial(user), Some(&denial));
+    assert!(state.has_client_denial(user));
+    assert_eq!(
+        state.client_denial_reason(user),
+        Some(steamworks::DenyReason::NoLicense)
+    );
     assert_eq!(state.client_denials(), &[denial]);
     assert_eq!(state.last_client_kick(), Some(&kick));
     assert_eq!(state.client_kick(user), Some(&kick));
+    assert!(state.has_client_kick(user));
+    assert_eq!(
+        state.client_kick_reason(user),
+        Some(steamworks::DenyReason::SteamConnectionLost)
+    );
     assert_eq!(state.client_kicks(), &[kick]);
     assert_eq!(state.last_client_group_status(), Some(&group_status));
     assert_eq!(state.client_group_status(user, group), Some(&group_status));
+    assert_eq!(state.client_group_member(user, group), Some(true));
+    assert_eq!(state.client_group_officer(user, group), Some(false));
     assert_eq!(state.client_group_statuses(), &[group_status]);
     assert!(state.authenticated_users().is_empty());
+    assert!(!state.is_user_authenticated(user));
     assert_eq!(state.last_error(), None);
 }
 
@@ -679,7 +695,9 @@ fn state_records_server_operations() {
 
     assert_eq!(state.steam_id(), Some(steam_id));
     assert_eq!(state.authenticated_users(), &[user]);
+    assert!(state.is_user_authenticated(user));
     assert!(state.active_auth_tickets().is_empty());
+    assert_eq!(state.active_auth_ticket_count(), 0);
     assert!(state.last_auth_session_ticket().is_none());
     assert!(state.auth_session_tickets().is_empty());
     assert!(state.last_auth_session_ticket_for_identity().is_none());
@@ -707,6 +725,8 @@ fn state_records_server_operations() {
         state.key_values(),
         &[("map".to_string(), "arena2".to_string())]
     );
+    assert_eq!(state.key_value("map"), Some("arena2"));
+    assert_eq!(state.key_value("mode"), None);
     assert_eq!(state.password_protected(), Some(false));
     assert_eq!(state.bot_player_count(), Some(2));
     assert_eq!(
@@ -725,9 +745,11 @@ fn state_records_server_operations() {
     state.record_operation(&SteamworksServerOperation::AllKeyValuesCleared);
 
     assert!(state.authenticated_users().is_empty());
+    assert!(!state.is_user_authenticated(user));
     assert_eq!(state.last_ended_authentication_session(), Some(user));
     assert_eq!(state.authentication_session_end_count(), 1);
     assert!(state.key_values().is_empty());
+    assert_eq!(state.key_value("map"), None);
 }
 
 #[test]

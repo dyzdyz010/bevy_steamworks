@@ -38,6 +38,11 @@ impl SteamworksServerState {
         &self.active_auth_tickets
     }
 
+    /// Returns how many locally issued auth tickets are still active.
+    pub fn active_auth_ticket_count(&self) -> usize {
+        self.active_auth_tickets.len()
+    }
+
     /// Returns users currently considered authenticated or approved by this layer.
     ///
     /// Entries are removed after [`crate::SteamworksServerCommand::EndAuthenticationSession`]
@@ -45,6 +50,11 @@ impl SteamworksServerState {
     /// denial, or kick for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns whether a user is currently considered authenticated or approved by this layer.
+    pub fn is_user_authenticated(&self, user: steamworks::SteamId) -> bool {
+        self.authenticated_users.contains(&user)
     }
 
     /// Returns the most recent auth session ticket issued through this command layer.
@@ -184,6 +194,12 @@ impl SteamworksServerState {
             .find(|validation| validation.steam_id == user)
     }
 
+    /// Returns whether the latest cached auth-ticket validation for a user succeeded.
+    pub fn auth_ticket_validation_succeeded(&self, user: steamworks::SteamId) -> Option<bool> {
+        self.auth_ticket_validation(user)
+            .map(|validation| validation.response.is_ok())
+    }
+
     /// Returns the most recent game-server client approval callback snapshot.
     pub fn last_client_approval(&self) -> Option<&SteamworksServerClientApproval> {
         self.last_client_approval.as_ref()
@@ -202,6 +218,16 @@ impl SteamworksServerState {
         self.client_approvals
             .iter()
             .find(|approval| approval.user == user)
+    }
+
+    /// Returns whether a client approval callback has been cached for a user.
+    pub fn has_client_approval(&self, user: steamworks::SteamId) -> bool {
+        self.client_approval(user).is_some()
+    }
+
+    /// Returns the latest cached game owner from a client approval callback.
+    pub fn client_approval_owner(&self, user: steamworks::SteamId) -> Option<steamworks::SteamId> {
+        self.client_approval(user).map(|approval| approval.owner)
     }
 
     /// Returns the most recent game-server client denial callback snapshot.
@@ -224,6 +250,19 @@ impl SteamworksServerState {
             .find(|denial| denial.user == user)
     }
 
+    /// Returns whether a client denial callback has been cached for a user.
+    pub fn has_client_denial(&self, user: steamworks::SteamId) -> bool {
+        self.client_denial(user).is_some()
+    }
+
+    /// Returns the latest cached client denial reason for a user.
+    pub fn client_denial_reason(
+        &self,
+        user: steamworks::SteamId,
+    ) -> Option<steamworks::DenyReason> {
+        self.client_denial(user).map(|denial| denial.deny_reason)
+    }
+
     /// Returns the most recent game-server client kick callback snapshot.
     pub fn last_client_kick(&self) -> Option<&SteamworksServerClientKick> {
         self.last_client_kick.as_ref()
@@ -237,6 +276,16 @@ impl SteamworksServerState {
     /// Returns the latest game-server client kick for a Steam user.
     pub fn client_kick(&self, user: steamworks::SteamId) -> Option<&SteamworksServerClientKick> {
         self.client_kicks.iter().find(|kick| kick.user == user)
+    }
+
+    /// Returns whether a client kick callback has been cached for a user.
+    pub fn has_client_kick(&self, user: steamworks::SteamId) -> bool {
+        self.client_kick(user).is_some()
+    }
+
+    /// Returns the latest cached client kick reason for a user.
+    pub fn client_kick_reason(&self, user: steamworks::SteamId) -> Option<steamworks::DenyReason> {
+        self.client_kick(user).map(|kick| kick.deny_reason)
     }
 
     /// Returns the most recent game-server group status callback snapshot.
@@ -258,6 +307,26 @@ impl SteamworksServerState {
         self.client_group_statuses
             .iter()
             .find(|status| status.user == user && status.group == group)
+    }
+
+    /// Returns whether the latest cached group status says a user is a group member.
+    pub fn client_group_member(
+        &self,
+        user: steamworks::SteamId,
+        group: steamworks::SteamId,
+    ) -> Option<bool> {
+        self.client_group_status(user, group)
+            .map(|status| status.member)
+    }
+
+    /// Returns whether the latest cached group status says a user is a group officer.
+    pub fn client_group_officer(
+        &self,
+        user: steamworks::SteamId,
+        group: steamworks::SteamId,
+    ) -> Option<bool> {
+        self.client_group_status(user, group)
+            .map(|status| status.officer)
     }
 
     /// Returns the most recent product string submitted through this command layer.
@@ -333,6 +402,13 @@ impl SteamworksServerState {
     /// Returns key/value rules submitted through this command layer.
     pub fn key_values(&self) -> &[(String, String)] {
         &self.key_values
+    }
+
+    /// Returns a server browser rule value submitted through this command layer.
+    pub fn key_value(&self, key: &str) -> Option<&str> {
+        self.key_values
+            .iter()
+            .find_map(|(known_key, value)| (known_key == key).then_some(value.as_str()))
     }
 
     /// Returns the most recent password-protected flag submitted through this command layer.

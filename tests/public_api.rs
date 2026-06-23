@@ -708,20 +708,32 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     let user = steamworks::SteamId::from_raw(7);
     let group = steamworks::SteamId::from_raw(8);
     let root_state = SteamworksServerState::default();
+    assert_eq!(root_state.active_auth_ticket_count(), 0);
+    assert!(!root_state.is_user_authenticated(user));
     assert!(root_state.auth_session_tickets().is_empty());
     assert!(root_state.auth_session_tickets_for_identity().is_empty());
     assert!(root_state.auth_ticket_responses().is_empty());
     assert!(root_state.auth_ticket_validations().is_empty());
     assert_eq!(root_state.auth_ticket_validation(user), None);
+    assert_eq!(root_state.auth_ticket_validation_succeeded(user), None);
     assert!(root_state.steam_server_connection_events().is_empty());
     assert!(root_state.client_approvals().is_empty());
     assert_eq!(root_state.client_approval(user), None);
+    assert!(!root_state.has_client_approval(user));
+    assert_eq!(root_state.client_approval_owner(user), None);
     assert!(root_state.client_denials().is_empty());
     assert_eq!(root_state.client_denial(user), None);
+    assert!(!root_state.has_client_denial(user));
+    assert_eq!(root_state.client_denial_reason(user), None);
     assert!(root_state.client_kicks().is_empty());
     assert_eq!(root_state.client_kick(user), None);
+    assert!(!root_state.has_client_kick(user));
+    assert_eq!(root_state.client_kick_reason(user), None);
     assert!(root_state.client_group_statuses().is_empty());
     assert_eq!(root_state.client_group_status(user, group), None);
+    assert_eq!(root_state.client_group_member(user, group), None);
+    assert_eq!(root_state.client_group_officer(user, group), None);
+    assert_eq!(root_state.key_value("map"), None);
 
     accepts_root_exports(plugin, command, operation, result, error, unavailable);
 
@@ -768,20 +780,32 @@ fn game_server_api_is_exported_from_root_and_prelude() {
     let _identity_ticket: Option<PreludeServerIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = PreludeServerError::InvalidNetworkingIdentity;
     let prelude_state = PreludeServerState::default();
+    assert_eq!(prelude_state.active_auth_ticket_count(), 0);
+    assert!(!prelude_state.is_user_authenticated(user));
     assert!(prelude_state.auth_session_tickets().is_empty());
     assert!(prelude_state.auth_session_tickets_for_identity().is_empty());
     assert!(prelude_state.auth_ticket_responses().is_empty());
     assert!(prelude_state.auth_ticket_validations().is_empty());
     assert_eq!(prelude_state.auth_ticket_validation(user), None);
+    assert_eq!(prelude_state.auth_ticket_validation_succeeded(user), None);
     assert!(prelude_state.steam_server_connection_events().is_empty());
     assert!(prelude_state.client_approvals().is_empty());
     assert_eq!(prelude_state.client_approval(user), None);
+    assert!(!prelude_state.has_client_approval(user));
+    assert_eq!(prelude_state.client_approval_owner(user), None);
     assert!(prelude_state.client_denials().is_empty());
     assert_eq!(prelude_state.client_denial(user), None);
+    assert!(!prelude_state.has_client_denial(user));
+    assert_eq!(prelude_state.client_denial_reason(user), None);
     assert!(prelude_state.client_kicks().is_empty());
     assert_eq!(prelude_state.client_kick(user), None);
+    assert!(!prelude_state.has_client_kick(user));
+    assert_eq!(prelude_state.client_kick_reason(user), None);
     assert!(prelude_state.client_group_statuses().is_empty());
     assert_eq!(prelude_state.client_group_status(user, group), None);
+    assert_eq!(prelude_state.client_group_member(user, group), None);
+    assert_eq!(prelude_state.client_group_officer(user, group), None);
+    assert_eq!(prelude_state.key_value("map"), None);
 
     accepts_prelude_exports(plugin, command, operation, result, error, unavailable);
 }
