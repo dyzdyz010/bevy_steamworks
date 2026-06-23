@@ -607,6 +607,10 @@ cargo run --example networking_messages
 $env:BEVY_STEAMWORKS_NETWORKING_PEER = "76561198000000000"
 $env:BEVY_STEAMWORKS_NETWORKING_MESSAGE = "hello"
 cargo run --example networking_messages
+$env:BEVY_STEAMWORKS_NETWORKING_AUTO_ACCEPT = "0"
+$env:BEVY_STEAMWORKS_NETWORKING_ACCEPT_PEER = "76561198000000000"
+$env:BEVY_STEAMWORKS_NETWORKING_REJECT_PEER = "76561198000000001"
+cargo run --example networking_messages
 ```
 
 ## Networking Utils and Relay Status

@@ -25,6 +25,14 @@ fn configure_networking_messages(
     commands
         .write(SteamworksNetworkingMessagesCommand::set_auto_accept_session_requests(auto_accept));
 
+    if let Some(peer) = env_steam_id("BEVY_STEAMWORKS_NETWORKING_ACCEPT_PEER") {
+        commands.write(SteamworksNetworkingMessagesCommand::accept_session_requests_from(peer));
+    }
+
+    if let Some(peer) = env_steam_id("BEVY_STEAMWORKS_NETWORKING_REJECT_PEER") {
+        commands.write(SteamworksNetworkingMessagesCommand::reject_session_requests_from(peer));
+    }
+
     if let Ok(peer) = std::env::var("BEVY_STEAMWORKS_NETWORKING_PEER") {
         if let Ok(peer) = peer.parse::<u64>() {
             let payload = std::env::var("BEVY_STEAMWORKS_NETWORKING_MESSAGE")
@@ -69,6 +77,14 @@ fn exit_after_a_short_run(mut frames: ResMut<FramesRemaining>, mut exit: Message
 
 fn env_u32(name: &str) -> Option<u32> {
     std::env::var(name).ok()?.parse().ok()
+}
+
+fn env_steam_id(name: &str) -> Option<SteamId> {
+    std::env::var(name)
+        .ok()?
+        .parse::<u64>()
+        .ok()
+        .map(SteamId::from_raw)
 }
 
 fn env_usize(name: &str) -> Option<usize> {
