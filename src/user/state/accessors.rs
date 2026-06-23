@@ -18,14 +18,47 @@ impl SteamworksUserState {
         self.current_user.as_ref()
     }
 
+    /// Returns the latest known Steam ID for the current user.
+    ///
+    /// This prefers the full current-user snapshot when available and falls
+    /// back to the latest standalone Steam ID read.
+    pub fn steam_id(&self) -> Option<steamworks::SteamId> {
+        self.current_user
+            .as_ref()
+            .map(|info| info.steam_id)
+            .or(self.last_steam_id)
+    }
+
     /// Returns the most recent Steam ID read through this plugin.
     pub fn last_steam_id(&self) -> Option<steamworks::SteamId> {
         self.last_steam_id
     }
 
+    /// Returns the latest known Steam user level.
+    ///
+    /// This prefers the full current-user snapshot when available and falls
+    /// back to the latest standalone level read.
+    pub fn level(&self) -> Option<u32> {
+        self.current_user
+            .as_ref()
+            .map(|info| info.level)
+            .or(self.last_level)
+    }
+
     /// Returns the most recent Steam user level read through this plugin.
     pub fn last_level(&self) -> Option<u32> {
         self.last_level
+    }
+
+    /// Returns the latest known Steam server connection state.
+    ///
+    /// This prefers the full current-user snapshot when available and falls
+    /// back to standalone logged-on reads and Steam server connection callbacks.
+    pub fn logged_on(&self) -> Option<bool> {
+        self.current_user
+            .as_ref()
+            .map(|info| info.logged_on)
+            .or(self.steam_server_connected)
     }
 
     /// Returns the latest known Steam server connection state.
@@ -45,6 +78,11 @@ impl SteamworksUserState {
         &self.active_auth_tickets
     }
 
+    /// Returns how many locally issued auth tickets are still active.
+    pub fn active_auth_ticket_count(&self) -> usize {
+        self.active_auth_tickets.len()
+    }
+
     /// Returns users with sessions started through this command layer.
     ///
     /// Entries are removed after [`crate::SteamworksUserCommand::EndAuthenticationSession`]
@@ -52,6 +90,11 @@ impl SteamworksUserState {
     /// for the same user.
     pub fn authenticated_users(&self) -> &[steamworks::SteamId] {
         &self.authenticated_users
+    }
+
+    /// Returns whether a remote user currently has a tracked authenticated session.
+    pub fn is_user_authenticated(&self, user: steamworks::SteamId) -> bool {
+        self.authenticated_users.contains(&user)
     }
 
     /// Returns the most recent auth session ticket issued through this command layer.
@@ -162,6 +205,29 @@ impl SteamworksUserState {
             .find(|license| license.user == user && license.app_id == app_id)
     }
 
+    /// Returns the latest license value for a user/app pair.
+    pub fn user_license(
+        &self,
+        user: steamworks::SteamId,
+        app_id: steamworks::AppId,
+    ) -> Option<&steamworks::UserHasLicense> {
+        self.user_license_for_app(user, app_id)
+            .map(|license| &license.license)
+    }
+
+    /// Returns whether the latest license check reported a valid app license.
+    ///
+    /// Returns `None` when this plugin has not cached a license check for the
+    /// user/app pair.
+    pub fn user_has_license_for_app(
+        &self,
+        user: steamworks::SteamId,
+        app_id: steamworks::AppId,
+    ) -> Option<bool> {
+        self.user_license(user, app_id)
+            .map(|license| matches!(license, steamworks::UserHasLicense::HasLicense))
+    }
+
     /// Returns how many auth session tickets this plugin issued.
     pub fn auth_session_ticket_issue_count(&self) -> u64 {
         self.auth_session_ticket_issue_count
@@ -227,6 +293,12 @@ impl SteamworksUserState {
             .find(|response| response.app_id == app_id && response.order_id == order_id)
     }
 
+    /// Returns whether the latest microtransaction callback authorized an app/order pair.
+    pub fn micro_txn_authorized(&self, app_id: steamworks::AppId, order_id: u64) -> Option<bool> {
+        self.micro_txn_authorization_response(app_id, order_id)
+            .map(|response| response.authorized)
+    }
+
     /// Returns the most recent auth session ticket response callback snapshot.
     pub fn last_auth_ticket_response(&self) -> Option<&SteamworksAuthSessionTicketResponse> {
         self.last_auth_ticket_response.as_ref()
@@ -285,5 +357,11 @@ impl SteamworksUserState {
         self.auth_ticket_validations
             .iter()
             .find(|validation| validation.steam_id == user)
+    }
+
+    /// Returns whether the latest cached auth-ticket validation for a user succeeded.
+    pub fn auth_ticket_validation_succeeded(&self, user: steamworks::SteamId) -> Option<bool> {
+        self.auth_ticket_validation(user)
+            .map(|validation| validation.response.is_ok())
     }
 }

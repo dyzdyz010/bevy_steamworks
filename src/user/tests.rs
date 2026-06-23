@@ -390,6 +390,8 @@ fn connection_and_microtxn_callbacks_are_bridged_without_client() {
         state.micro_txn_authorization_response(app_id, 99),
         Some(&micro_txn)
     );
+    assert_eq!(state.micro_txn_authorized(app_id, 99), Some(true));
+    assert_eq!(state.micro_txn_authorized(app_id, 100), None);
     assert_eq!(state.micro_txn_authorization_responses(), &[micro_txn]);
     assert_eq!(state.last_error(), None);
 }
@@ -478,7 +480,11 @@ fn state_records_user_operations_without_unbounded_history() {
     );
     assert_eq!(state.last_steam_id(), Some(second_user));
     assert_eq!(state.last_level(), Some(9));
+    assert_eq!(state.steam_id(), Some(second_user));
+    assert_eq!(state.level(), Some(9));
+    assert_eq!(state.logged_on(), Some(false));
     assert!(state.active_auth_tickets().is_empty());
+    assert_eq!(state.active_auth_ticket_count(), 0);
     assert!(state.last_auth_session_ticket().is_none());
     assert!(state.last_auth_session_ticket_for_identity().is_none());
     assert_eq!(state.auth_session_ticket_issue_count(), 0);
@@ -487,6 +493,7 @@ fn state_records_user_operations_without_unbounded_history() {
     assert!(state.last_cancelled_auth_ticket().is_none());
     assert_eq!(state.auth_ticket_cancel_count(), 0);
     assert!(state.authenticated_users().is_empty());
+    assert!(!state.is_user_authenticated(first_user));
     assert_eq!(
         state.last_started_authentication_session(),
         Some(first_user)
@@ -506,6 +513,15 @@ fn state_records_user_operations_without_unbounded_history() {
         state.user_license_for_app(first_user, app_id),
         state.last_user_license_for_app()
     );
+    assert_eq!(
+        state.user_license(first_user, app_id),
+        Some(&steamworks::UserHasLicense::HasLicense)
+    );
+    assert_eq!(
+        state.user_has_license_for_app(first_user, app_id),
+        Some(true)
+    );
+    assert_eq!(state.user_has_license_for_app(second_user, app_id), None);
     assert_eq!(state.user_licenses_for_apps().len(), 1);
     assert_eq!(state.user_license_check_count(), 1);
 }
@@ -567,10 +583,12 @@ fn validation_callbacks_do_not_create_sessions_but_failures_remove_known_session
         state.auth_ticket_validation(user),
         state.last_auth_ticket_validation()
     );
+    assert_eq!(state.auth_ticket_validation_succeeded(user), Some(true));
     assert_eq!(state.auth_ticket_validations().len(), 1);
 
     state.record_operation(&SteamworksUserOperation::AuthenticationSessionStarted { user });
     assert_eq!(state.authenticated_users(), &[user]);
+    assert!(state.is_user_authenticated(user));
 
     state.record_operation(
         &SteamworksUserOperation::AuthenticationTicketValidationReceived {
@@ -595,5 +613,6 @@ fn validation_callbacks_do_not_create_sessions_but_failures_remove_known_session
         state.auth_ticket_validation(user),
         state.last_auth_ticket_validation()
     );
+    assert_eq!(state.auth_ticket_validation_succeeded(user), Some(false));
     assert_eq!(state.auth_ticket_validations().len(), 1);
 }

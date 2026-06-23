@@ -2621,18 +2621,27 @@ fn user_api_is_exported_from_root_and_prelude() {
     let user = steamworks::SteamId::from_raw(1);
     let app_id = steamworks::AppId(480);
     let root_state = SteamworksUserState::default();
+    assert_eq!(root_state.steam_id(), None);
+    assert_eq!(root_state.level(), None);
+    assert_eq!(root_state.logged_on(), None);
     assert!(root_state.auth_session_tickets().is_empty());
     assert!(root_state.auth_session_tickets_for_identity().is_empty());
     assert!(root_state.web_api_ticket_requests().is_empty());
+    assert_eq!(root_state.active_auth_ticket_count(), 0);
+    assert!(!root_state.is_user_authenticated(user));
     assert!(root_state.user_licenses_for_apps().is_empty());
     assert_eq!(root_state.user_license_for_app(user, app_id), None);
+    assert_eq!(root_state.user_license(user, app_id), None);
+    assert_eq!(root_state.user_has_license_for_app(user, app_id), None);
     assert!(root_state.auth_ticket_responses().is_empty());
     assert!(root_state.web_api_ticket_responses().is_empty());
     assert!(root_state.auth_ticket_validations().is_empty());
     assert_eq!(root_state.auth_ticket_validation(user), None);
+    assert_eq!(root_state.auth_ticket_validation_succeeded(user), None);
     assert!(root_state.steam_server_connection_events().is_empty());
     assert!(root_state.micro_txn_authorization_responses().is_empty());
     assert_eq!(root_state.micro_txn_authorization_response(app_id, 1), None);
+    assert_eq!(root_state.micro_txn_authorized(app_id, 1), None);
 
     accepts_root_exports(
         SteamworksUserPlugin::new(),
@@ -2662,21 +2671,30 @@ fn user_api_is_exported_from_root_and_prelude() {
     let _identity_ticket: Option<PreludeIssuedAuthSessionTicketForIdentity> = None;
     let _identity_error = PreludeUserError::InvalidNetworkingIdentity;
     let prelude_state = PreludeUserState::default();
+    assert_eq!(prelude_state.steam_id(), None);
+    assert_eq!(prelude_state.level(), None);
+    assert_eq!(prelude_state.logged_on(), None);
     assert!(prelude_state.auth_session_tickets().is_empty());
     assert!(prelude_state.auth_session_tickets_for_identity().is_empty());
     assert!(prelude_state.web_api_ticket_requests().is_empty());
+    assert_eq!(prelude_state.active_auth_ticket_count(), 0);
+    assert!(!prelude_state.is_user_authenticated(user));
     assert!(prelude_state.user_licenses_for_apps().is_empty());
     assert_eq!(prelude_state.user_license_for_app(user, app_id), None);
+    assert_eq!(prelude_state.user_license(user, app_id), None);
+    assert_eq!(prelude_state.user_has_license_for_app(user, app_id), None);
     assert!(prelude_state.auth_ticket_responses().is_empty());
     assert!(prelude_state.web_api_ticket_responses().is_empty());
     assert!(prelude_state.auth_ticket_validations().is_empty());
     assert_eq!(prelude_state.auth_ticket_validation(user), None);
+    assert_eq!(prelude_state.auth_ticket_validation_succeeded(user), None);
     assert!(prelude_state.steam_server_connection_events().is_empty());
     assert!(prelude_state.micro_txn_authorization_responses().is_empty());
     assert_eq!(
         prelude_state.micro_txn_authorization_response(app_id, 1),
         None
     );
+    assert_eq!(prelude_state.micro_txn_authorized(app_id, 1), None);
 
     accepts_prelude_exports(PreludeUserPlugin::new(), command, operation, result, error);
 }
