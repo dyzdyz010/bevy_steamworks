@@ -100,11 +100,14 @@ use bevy_steamworks::{
         SteamworksRemoteStorageResult as PreludeRemoteStorageResult,
         SteamworksRemoteStorageSharedFile as PreludeRemoteStorageSharedFile,
         SteamworksRemoteStorageState as PreludeRemoteStorageState,
+        SteamworksScreenshotReady as PreludeScreenshotReady,
+        SteamworksScreenshotReadyError as PreludeScreenshotReadyError,
         SteamworksScreenshotsCommand as PreludeScreenshotsCommand,
         SteamworksScreenshotsError as PreludeScreenshotsError,
         SteamworksScreenshotsOperation as PreludeScreenshotsOperation,
         SteamworksScreenshotsPlugin as PreludeScreenshotsPlugin,
         SteamworksScreenshotsResult as PreludeScreenshotsResult,
+        SteamworksScreenshotsState as PreludeScreenshotsState,
         SteamworksServerCommand as PreludeServerCommand,
         SteamworksServerConfig as PreludeServerConfig, SteamworksServerError as PreludeServerError,
         SteamworksServerInitMode as PreludeServerInitMode,
@@ -127,6 +130,7 @@ use bevy_steamworks::{
         SteamworksStatsCommand as PreludeStatsCommand, SteamworksStatsError as PreludeStatsError,
         SteamworksStatsOperation as PreludeStatsOperation,
         SteamworksStatsPlugin as PreludeStatsPlugin, SteamworksStatsResult as PreludeStatsResult,
+        SteamworksSubmittedScreenshot as PreludeSubmittedScreenshot,
         SteamworksSystem as PreludeSystem, SteamworksTimelineCommand as PreludeTimelineCommand,
         SteamworksTimelineError as PreludeTimelineError,
         SteamworksTimelineGameMode as PreludeTimelineGameMode,
@@ -204,9 +208,10 @@ use bevy_steamworks::{
     SteamworksRemoteStorageFileShareRequest, SteamworksRemoteStorageFileWrite,
     SteamworksRemoteStorageFileWriteRequest, SteamworksRemoteStorageFileWritten,
     SteamworksRemoteStorageOperation, SteamworksRemoteStoragePlugin, SteamworksRemoteStorageResult,
-    SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState, SteamworksScreenshotsCommand,
-    SteamworksScreenshotsError, SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin,
-    SteamworksScreenshotsResult, SteamworksServerCommand, SteamworksServerConfig,
+    SteamworksRemoteStorageSharedFile, SteamworksRemoteStorageState, SteamworksScreenshotReady,
+    SteamworksScreenshotReadyError, SteamworksScreenshotsCommand, SteamworksScreenshotsError,
+    SteamworksScreenshotsOperation, SteamworksScreenshotsPlugin, SteamworksScreenshotsResult,
+    SteamworksScreenshotsState, SteamworksServerCommand, SteamworksServerConfig,
     SteamworksServerError, SteamworksServerInitMode,
     SteamworksServerIssuedAuthSessionTicketForIdentity, SteamworksServerListFilters,
     SteamworksServerListKind, SteamworksServerListRequestId, SteamworksServerOperation,
@@ -215,12 +220,13 @@ use bevy_steamworks::{
     SteamworksServerQueryKind, SteamworksServerQueryTarget, SteamworksServerResult,
     SteamworksServerRule, SteamworksServerRules, SteamworksServerState,
     SteamworksServerUnavailable, SteamworksStatsCommand, SteamworksStatsError,
-    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult, SteamworksSystem,
-    SteamworksTimelineCommand, SteamworksTimelineError, SteamworksTimelineGameMode,
-    SteamworksTimelineOperation, SteamworksTimelinePlugin, SteamworksTimelineResult,
-    SteamworksTimelineState, SteamworksUgcCommand, SteamworksUgcContentDescriptor,
-    SteamworksUgcDownloadItemResult, SteamworksUgcError, SteamworksUgcGameServerWorkshopInit,
-    SteamworksUgcItemDetails, SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
+    SteamworksStatsOperation, SteamworksStatsPlugin, SteamworksStatsResult,
+    SteamworksSubmittedScreenshot, SteamworksSystem, SteamworksTimelineCommand,
+    SteamworksTimelineError, SteamworksTimelineGameMode, SteamworksTimelineOperation,
+    SteamworksTimelinePlugin, SteamworksTimelineResult, SteamworksTimelineState,
+    SteamworksUgcCommand, SteamworksUgcContentDescriptor, SteamworksUgcDownloadItemResult,
+    SteamworksUgcError, SteamworksUgcGameServerWorkshopInit, SteamworksUgcItemDetails,
+    SteamworksUgcItemDownloadInfo, SteamworksUgcItemDownloadInfoResult,
     SteamworksUgcItemInstallInfo, SteamworksUgcItemInstallInfoResult, SteamworksUgcItemStateInfo,
     SteamworksUgcOperation, SteamworksUgcPlugin, SteamworksUgcQuery, SteamworksUgcQueryIds,
     SteamworksUgcQueryIdsResult, SteamworksUgcQueryOptions, SteamworksUgcQueryRequest,
@@ -2209,6 +2215,27 @@ fn screenshots_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let handle = 11;
+    let _ready = SteamworksScreenshotReady {
+        local_handle: Ok(handle),
+    };
+    let _ready_error = SteamworksScreenshotReadyError::IoFailure;
+    let _submission = SteamworksSubmittedScreenshot {
+        handle,
+        filename: std::path::PathBuf::from("shot.png"),
+        thumbnail_filename: Some(std::path::PathBuf::from("thumb.png")),
+        width: 1920,
+        height: 1080,
+    };
+    let state = SteamworksScreenshotsState::default();
+    assert!(state.submitted_screenshots().is_empty());
+    assert_eq!(state.submitted_screenshot(handle), None);
+    assert_eq!(state.submitted_screenshot_by_filename("shot.png"), None);
+    assert_eq!(state.submitted_screenshot_dimensions(handle), None);
+    assert_eq!(state.submitted_screenshot_thumbnail(handle), None);
+    assert_eq!(state.screenshot_ready_success_count(), 0);
+    assert_eq!(state.screenshot_ready_error_count(), 0);
+    assert_eq!(state.last_screenshot_ready_error(), None);
 
     accepts_root_exports(
         SteamworksScreenshotsPlugin::new(),
@@ -2237,6 +2264,26 @@ fn screenshots_api_is_exported_from_root_and_prelude() {
         command: command.clone(),
         error: error.clone(),
     };
+    let _prelude_ready = PreludeScreenshotReady {
+        local_handle: Ok(handle),
+    };
+    let _prelude_ready_error = PreludeScreenshotReadyError::IoFailure;
+    let _prelude_submission = PreludeSubmittedScreenshot {
+        handle,
+        filename: std::path::PathBuf::from("shot.png"),
+        thumbnail_filename: Some(std::path::PathBuf::from("thumb.png")),
+        width: 1920,
+        height: 1080,
+    };
+    let state = PreludeScreenshotsState::default();
+    assert!(state.submitted_screenshots().is_empty());
+    assert_eq!(state.submitted_screenshot(handle), None);
+    assert_eq!(state.submitted_screenshot_by_filename("shot.png"), None);
+    assert_eq!(state.submitted_screenshot_dimensions(handle), None);
+    assert_eq!(state.submitted_screenshot_thumbnail(handle), None);
+    assert_eq!(state.screenshot_ready_success_count(), 0);
+    assert_eq!(state.screenshot_ready_error_count(), 0);
+    assert_eq!(state.last_screenshot_ready_error(), None);
 
     accepts_prelude_exports(
         PreludeScreenshotsPlugin::new(),

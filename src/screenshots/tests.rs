@@ -208,9 +208,30 @@ fn state_records_screenshot_operations() {
         state.submitted_screenshot(updated_submission.handle),
         Some(&updated_submission)
     );
+    assert_eq!(
+        state.submitted_screenshot_by_filename("updated.png"),
+        Some(&updated_submission)
+    );
+    assert_eq!(state.submitted_screenshot_by_filename("missing.png"), None);
+    assert_eq!(
+        state.submitted_screenshot_dimensions(updated_submission.handle),
+        Some((1280, 720))
+    );
+    assert_eq!(state.submitted_screenshot_dimensions(99), None);
+    assert_eq!(
+        state.submitted_screenshot_thumbnail(updated_submission.handle),
+        Some(None)
+    );
+    assert_eq!(
+        state.submitted_screenshot_thumbnail(second_submission.handle),
+        Some(None)
+    );
+    assert_eq!(state.submitted_screenshot_thumbnail(99), None);
     assert_eq!(state.last_submitted_screenshot(), Some(&updated_submission));
     assert_eq!(state.screenshot_requested_count(), 3);
     assert_eq!(state.screenshot_ready_count(), 1);
+    assert_eq!(state.screenshot_ready_success_count(), 1);
+    assert_eq!(state.screenshot_ready_error_count(), 0);
     assert_eq!(
         state.screenshot_ready_events(),
         &[SteamworksScreenshotReady {
@@ -230,6 +251,7 @@ fn state_records_screenshot_operations() {
             local_handle: Ok(updated_submission.handle),
         })
     );
+    assert_eq!(state.last_screenshot_ready_error(), None);
 }
 
 #[test]
@@ -368,6 +390,8 @@ fn screenshot_callbacks_are_bridged_without_client() {
     let state = app.world().resource::<SteamworksScreenshotsState>();
     assert_eq!(state.screenshot_requested_count(), 2);
     assert_eq!(state.screenshot_ready_count(), 2);
+    assert_eq!(state.screenshot_ready_success_count(), 1);
+    assert_eq!(state.screenshot_ready_error_count(), 1);
     assert_eq!(state.screenshot_ready_events().len(), 2);
     assert_eq!(
         state.screenshot_ready(handle),
@@ -380,6 +404,10 @@ fn screenshot_callbacks_are_bridged_without_client() {
         Some(&SteamworksScreenshotReady {
             local_handle: Err(SteamworksScreenshotReadyError::IoFailure),
         })
+    );
+    assert_eq!(
+        state.last_screenshot_ready_error(),
+        Some(SteamworksScreenshotReadyError::IoFailure)
     );
     assert_eq!(state.last_error(), None);
 }
