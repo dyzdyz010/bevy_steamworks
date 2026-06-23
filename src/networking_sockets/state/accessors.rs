@@ -54,6 +54,11 @@ impl SteamworksNetworkingSocketsState {
         &self.listen_socket_events
     }
 
+    /// Returns the number of cached listen-socket event batches.
+    pub fn listen_socket_event_batch_count(&self) -> usize {
+        self.listen_socket_events.len()
+    }
+
     /// Returns the cached event batch for one listen socket.
     pub fn listen_socket_event_batch(
         &self,
@@ -62,6 +67,15 @@ impl SteamworksNetworkingSocketsState {
         self.listen_socket_events
             .iter()
             .find(|events| events.listen_socket == listen_socket)
+    }
+
+    /// Returns the number of events cached for one listen socket.
+    pub fn listen_socket_event_count(
+        &self,
+        listen_socket: SteamworksListenSocketId,
+    ) -> Option<usize> {
+        self.listen_socket_event_batch(listen_socket)
+            .map(|events| events.events.len())
     }
 
     /// Returns the most recent connection event batch processed through this plugin.
@@ -74,6 +88,11 @@ impl SteamworksNetworkingSocketsState {
         &self.connection_events
     }
 
+    /// Returns the number of cached connection event batches.
+    pub fn connection_event_batch_count(&self) -> usize {
+        self.connection_events.len()
+    }
+
     /// Returns the cached event batch for one connection.
     pub fn connection_event_batch(
         &self,
@@ -84,6 +103,24 @@ impl SteamworksNetworkingSocketsState {
             .find(|events| events.connection == connection)
     }
 
+    /// Returns the number of events cached for one connection.
+    pub fn connection_event_count(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<usize> {
+        self.connection_event_batch(connection)
+            .map(|events| events.events.len())
+    }
+
+    /// Returns whether the latest cached event batch removed one connection.
+    pub fn connection_event_removed(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<bool> {
+        self.connection_event_batch(connection)
+            .map(|events| events.connection_removed)
+    }
+
     /// Returns the most recent connection info snapshot read through the plugin.
     pub fn last_connection_info(&self) -> Option<&SteamworksNetworkingSocketsConnectionInfo> {
         self.last_connection_info.as_ref()
@@ -92,6 +129,11 @@ impl SteamworksNetworkingSocketsState {
     /// Returns bounded connection info snapshots keyed by connection.
     pub fn connection_infos(&self) -> &[SteamworksNetworkingSocketsConnectionInfo] {
         &self.connection_infos
+    }
+
+    /// Returns the number of cached connection info snapshots.
+    pub fn connection_info_count(&self) -> usize {
+        self.connection_infos.len()
     }
 
     /// Returns the cached connection info for one connection.
@@ -124,6 +166,14 @@ impl SteamworksNetworkingSocketsState {
     ) -> Option<Option<&steamworks::networking_types::NetworkingIdentity>> {
         self.connection_info(connection)
             .map(|info| info.remote.as_ref())
+    }
+
+    /// Returns the cached end reason for one connection, preserving a known connection without one as `Some(None)`.
+    pub fn connection_end_reason(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<Option<steamworks::networking_types::NetConnectionEnd>> {
+        self.connection_info(connection).map(|info| info.end_reason)
     }
 
     /// Returns the latest known connection user data.
@@ -164,6 +214,11 @@ impl SteamworksNetworkingSocketsState {
         &self.realtime_statuses
     }
 
+    /// Returns the number of cached realtime status snapshots.
+    pub fn realtime_status_count(&self) -> usize {
+        self.realtime_statuses.len()
+    }
+
     /// Returns the cached realtime status for one connection.
     pub fn realtime_status(
         &self,
@@ -195,9 +250,61 @@ impl SteamworksNetworkingSocketsState {
         })
     }
 
+    /// Returns the latest cached send capacity for one connection.
+    pub fn connection_send_rate_bytes_per_sec(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<i32> {
+        self.realtime_status(connection)
+            .map(|status| status.send_rate_bytes_per_sec)
+    }
+
+    /// Returns the latest cached pending unreliable bytes for one connection.
+    pub fn connection_pending_unreliable(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<i32> {
+        self.realtime_status(connection)
+            .map(|status| status.pending_unreliable)
+    }
+
+    /// Returns the latest cached pending reliable bytes for one connection.
+    pub fn connection_pending_reliable(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<i32> {
+        self.realtime_status(connection)
+            .map(|status| status.pending_reliable)
+    }
+
+    /// Returns the number of cached realtime lane snapshots for one connection.
+    pub fn connection_lane_count(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<usize> {
+        self.realtime_status(connection)
+            .map(|status| status.lanes.len())
+    }
+
     /// Returns the most recent sent-message snapshot.
     pub fn last_sent_message(&self) -> Option<&SteamworksNetworkingSocketsSentMessage> {
         self.last_sent_message.as_ref()
+    }
+
+    /// Returns the connection for the most recent single-message send.
+    pub fn last_sent_message_connection(&self) -> Option<SteamworksNetworkingSocketsConnectionId> {
+        self.last_sent_message().map(|message| message.connection)
+    }
+
+    /// Returns the message number for the most recent single-message send.
+    pub fn last_sent_message_number(&self) -> Option<u64> {
+        self.last_sent_message()
+            .map(|message| message.message_number)
+    }
+
+    /// Returns the byte count for the most recent single-message send.
+    pub fn last_sent_message_bytes(&self) -> Option<usize> {
+        self.last_sent_message().map(|message| message.bytes)
     }
 
     /// Returns the most recent batch send outcomes.
@@ -205,9 +312,19 @@ impl SteamworksNetworkingSocketsState {
         &self.last_sent_messages
     }
 
+    /// Returns the number of outcomes in the most recent batch send.
+    pub fn last_sent_message_count(&self) -> usize {
+        self.last_sent_messages.len()
+    }
+
     /// Returns bounded batch-send outcomes in observation order.
     pub fn recent_sent_messages(&self) -> &[SteamworksNetworkingSocketsMessageSendResult] {
         &self.recent_sent_messages
+    }
+
+    /// Returns the number of bounded batch-send outcomes retained across batches.
+    pub fn recent_sent_message_count(&self) -> usize {
+        self.recent_sent_messages.len()
     }
 
     /// Returns bounded batch-send outcomes for one connection.
@@ -218,6 +335,14 @@ impl SteamworksNetworkingSocketsState {
         self.recent_sent_messages
             .iter()
             .filter(move |message| message.connection == connection)
+    }
+
+    /// Returns the number of bounded batch-send outcomes for one connection.
+    pub fn sent_message_count_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> usize {
+        self.sent_messages_for_connection(connection).count()
     }
 
     /// Returns the most recent batch-send outcome for one connection.
@@ -231,14 +356,51 @@ impl SteamworksNetworkingSocketsState {
             .find(|message| message.connection == connection)
     }
 
+    /// Returns the Steam message number from the most recent successful batch-send outcome for one connection.
+    pub fn last_sent_message_number_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<u64> {
+        self.last_sent_message_for_connection(connection)
+            .and_then(|message| message.result.ok())
+    }
+
+    /// Returns whether the most recent batch-send outcome for one connection succeeded.
+    pub fn last_sent_message_succeeded_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<bool> {
+        self.last_sent_message_for_connection(connection)
+            .map(|message| message.result.is_ok())
+    }
+
+    /// Returns the byte count from the most recent batch-send outcome for one connection.
+    pub fn last_sent_message_bytes_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<usize> {
+        self.last_sent_message_for_connection(connection)
+            .map(|message| message.bytes)
+    }
+
     /// Returns the most recent batch of received messages.
     pub fn last_received_messages(&self) -> &[SteamworksNetworkingSocketsMessage] {
         &self.last_received_messages
     }
 
+    /// Returns the number of messages in the most recent connection receive batch.
+    pub fn last_received_message_count(&self) -> usize {
+        self.last_received_messages.len()
+    }
+
     /// Returns bounded received message snapshots in observation order.
     pub fn recent_received_messages(&self) -> &[SteamworksNetworkingSocketsMessage] {
         &self.recent_received_messages
+    }
+
+    /// Returns the number of bounded received message snapshots retained across batches.
+    pub fn recent_received_message_count(&self) -> usize {
+        self.recent_received_messages.len()
     }
 
     /// Returns bounded received message snapshots for one connection.
@@ -249,6 +411,14 @@ impl SteamworksNetworkingSocketsState {
         self.recent_received_messages
             .iter()
             .filter(move |message| message.connection == connection)
+    }
+
+    /// Returns the number of bounded received message snapshots for one connection.
+    pub fn received_message_count_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> usize {
+        self.received_messages_for_connection(connection).count()
     }
 
     /// Returns the most recent received message for one connection.
@@ -262,14 +432,51 @@ impl SteamworksNetworkingSocketsState {
             .find(|message| message.connection == connection)
     }
 
+    /// Returns the byte count for the most recent received message for one connection.
+    pub fn last_received_message_bytes_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<usize> {
+        self.last_received_message_for_connection(connection)
+            .map(|message| message.data.len())
+    }
+
+    /// Returns the channel for the most recent received message for one connection.
+    pub fn last_received_message_channel_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<i32> {
+        self.last_received_message_for_connection(connection)
+            .map(|message| message.channel)
+    }
+
+    /// Returns the payload bytes for the most recent received message for one connection.
+    pub fn last_received_message_data_for_connection(
+        &self,
+        connection: SteamworksNetworkingSocketsConnectionId,
+    ) -> Option<&[u8]> {
+        self.last_received_message_for_connection(connection)
+            .map(|message| message.data.as_slice())
+    }
+
     /// Returns the most recent batch of messages received from a poll group.
     pub fn last_poll_group_messages(&self) -> &[SteamworksNetworkingSocketsPollGroupMessage] {
         &self.last_poll_group_messages
     }
 
+    /// Returns the number of messages in the most recent poll-group receive batch.
+    pub fn last_poll_group_message_count(&self) -> usize {
+        self.last_poll_group_messages.len()
+    }
+
     /// Returns bounded poll-group message snapshots in observation order.
     pub fn recent_poll_group_messages(&self) -> &[SteamworksNetworkingSocketsPollGroupMessage] {
         &self.recent_poll_group_messages
+    }
+
+    /// Returns the number of bounded poll-group message snapshots retained across batches.
+    pub fn recent_poll_group_message_count(&self) -> usize {
+        self.recent_poll_group_messages.len()
     }
 
     /// Returns bounded poll-group message snapshots for one poll group.
@@ -282,6 +489,14 @@ impl SteamworksNetworkingSocketsState {
             .filter(move |message| message.poll_group == poll_group)
     }
 
+    /// Returns the number of bounded poll-group message snapshots for one poll group.
+    pub fn poll_group_message_count(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> usize {
+        self.poll_group_messages(poll_group).count()
+    }
+
     /// Returns the most recent message received from one poll group.
     pub fn last_poll_group_message(
         &self,
@@ -291,6 +506,33 @@ impl SteamworksNetworkingSocketsState {
             .iter()
             .rev()
             .find(|message| message.poll_group == poll_group)
+    }
+
+    /// Returns the byte count for the most recent message received from one poll group.
+    pub fn last_poll_group_message_bytes(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> Option<usize> {
+        self.last_poll_group_message(poll_group)
+            .map(|message| message.data.len())
+    }
+
+    /// Returns the channel for the most recent message received from one poll group.
+    pub fn last_poll_group_message_channel(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> Option<i32> {
+        self.last_poll_group_message(poll_group)
+            .map(|message| message.channel)
+    }
+
+    /// Returns the payload bytes for the most recent message received from one poll group.
+    pub fn last_poll_group_message_data(
+        &self,
+        poll_group: SteamworksNetworkingSocketsPollGroupId,
+    ) -> Option<&[u8]> {
+        self.last_poll_group_message(poll_group)
+            .map(|message| message.data.as_slice())
     }
 
     /// Returns the most recent connection flushed through this plugin.

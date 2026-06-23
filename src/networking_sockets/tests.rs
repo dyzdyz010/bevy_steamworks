@@ -1084,7 +1084,12 @@ fn state_lookup_caches_are_queryable_by_handle() {
         pending_reliable: 7,
         sent_unacked_reliable: 8,
         queued_send_bytes: 9,
-        lanes: Vec::new(),
+        lanes: vec![SteamworksNetworkingSocketsRealtimeLaneStatus {
+            pending_unreliable: 10,
+            pending_reliable: 11,
+            sent_unacked_reliable: 12,
+            queued_send_bytes: 13,
+        }],
     };
     let sent = SteamworksNetworkingSocketsMessageSendResult {
         connection,
@@ -1131,6 +1136,11 @@ fn state_lookup_caches_are_queryable_by_handle() {
             status: realtime.clone(),
         },
     );
+    state.record_operation(&SteamworksNetworkingSocketsOperation::MessageSent {
+        connection,
+        message_number: 99,
+        bytes: 16,
+    });
     state.record_operation(&SteamworksNetworkingSocketsOperation::MessagesSent {
         messages: vec![sent.clone()],
     });
@@ -1150,20 +1160,40 @@ fn state_lookup_caches_are_queryable_by_handle() {
     );
 
     assert_eq!(state.listen_socket_events(), &[listen_batch.clone()]);
+    assert_eq!(state.listen_socket_event_batch_count(), 1);
     assert_eq!(
         state.listen_socket_event_batch(listen_socket),
         Some(&listen_batch)
     );
+    assert_eq!(state.listen_socket_event_count(listen_socket), Some(1));
     assert_eq!(state.connection_events(), &[connection_batch.clone()]);
+    assert_eq!(state.connection_event_batch_count(), 1);
     assert_eq!(
         state.connection_event_batch(connection),
         Some(&connection_batch)
     );
+    assert_eq!(state.connection_event_count(connection), Some(1));
+    assert_eq!(state.connection_event_removed(connection), Some(false));
     assert_eq!(state.connection_infos(), &[info.clone()]);
+    assert_eq!(state.connection_info_count(), 1);
     assert_eq!(state.connection_info(connection), Some(&info));
+    assert_eq!(state.connection_end_reason(connection), Some(None));
     assert_eq!(state.realtime_statuses(), &[realtime.clone()]);
+    assert_eq!(state.realtime_status_count(), 1);
     assert_eq!(state.realtime_status(connection), Some(&realtime));
+    assert_eq!(
+        state.connection_send_rate_bytes_per_sec(connection),
+        Some(5)
+    );
+    assert_eq!(state.connection_pending_unreliable(connection), Some(6));
+    assert_eq!(state.connection_pending_reliable(connection), Some(7));
+    assert_eq!(state.connection_lane_count(connection), Some(1));
+    assert_eq!(state.last_sent_message_connection(), Some(connection));
+    assert_eq!(state.last_sent_message_number(), Some(99));
+    assert_eq!(state.last_sent_message_bytes(), Some(16));
+    assert_eq!(state.last_sent_message_count(), 1);
     assert_eq!(state.recent_sent_messages(), &[sent.clone()]);
+    assert_eq!(state.recent_sent_message_count(), 1);
     assert_eq!(
         state
             .sent_messages_for_connection(connection)
@@ -1171,11 +1201,26 @@ fn state_lookup_caches_are_queryable_by_handle() {
             .collect::<Vec<_>>(),
         vec![sent.clone()]
     );
+    assert_eq!(state.sent_message_count_for_connection(connection), 1);
     assert_eq!(
         state.last_sent_message_for_connection(connection),
         Some(&sent)
     );
+    assert_eq!(
+        state.last_sent_message_number_for_connection(connection),
+        Some(5)
+    );
+    assert_eq!(
+        state.last_sent_message_succeeded_for_connection(connection),
+        Some(true)
+    );
+    assert_eq!(
+        state.last_sent_message_bytes_for_connection(connection),
+        Some(3)
+    );
+    assert_eq!(state.last_received_message_count(), 1);
     assert_eq!(state.recent_received_messages(), &[received.clone()]);
+    assert_eq!(state.recent_received_message_count(), 1);
     assert_eq!(
         state
             .received_messages_for_connection(connection)
@@ -1183,14 +1228,29 @@ fn state_lookup_caches_are_queryable_by_handle() {
             .collect::<Vec<_>>(),
         vec![received.clone()]
     );
+    assert_eq!(state.received_message_count_for_connection(connection), 1);
     assert_eq!(
         state.last_received_message_for_connection(connection),
         Some(&received)
     );
     assert_eq!(
+        state.last_received_message_bytes_for_connection(connection),
+        Some(3)
+    );
+    assert_eq!(
+        state.last_received_message_channel_for_connection(connection),
+        Some(1)
+    );
+    assert_eq!(
+        state.last_received_message_data_for_connection(connection),
+        Some([1, 2, 3].as_slice())
+    );
+    assert_eq!(state.last_poll_group_message_count(), 1);
+    assert_eq!(
         state.recent_poll_group_messages(),
         &[poll_group_message.clone()]
     );
+    assert_eq!(state.recent_poll_group_message_count(), 1);
     assert_eq!(
         state
             .poll_group_messages(poll_group)
@@ -1198,9 +1258,16 @@ fn state_lookup_caches_are_queryable_by_handle() {
             .collect::<Vec<_>>(),
         vec![poll_group_message.clone()]
     );
+    assert_eq!(state.poll_group_message_count(poll_group), 1);
     assert_eq!(
         state.last_poll_group_message(poll_group),
         Some(&poll_group_message)
+    );
+    assert_eq!(state.last_poll_group_message_bytes(poll_group), Some(2));
+    assert_eq!(state.last_poll_group_message_channel(poll_group), Some(2));
+    assert_eq!(
+        state.last_poll_group_message_data(poll_group),
+        Some([4, 5].as_slice())
     );
 
     state.record_operation(&SteamworksNetworkingSocketsOperation::ConnectionClosed {
@@ -1215,12 +1282,15 @@ fn state_lookup_caches_are_queryable_by_handle() {
 
     assert_eq!(state.connection_info(connection), None);
     assert_eq!(state.realtime_status(connection), None);
+    assert_eq!(state.connection_info_count(), 0);
+    assert_eq!(state.realtime_status_count(), 0);
     assert_eq!(
         state.connection_event_batch(connection),
         Some(&connection_batch)
     );
     assert_eq!(state.listen_socket_event_batch(listen_socket), None);
     assert_eq!(state.last_poll_group_message(poll_group), None);
+    assert_eq!(state.poll_group_message_count(poll_group), 0);
 }
 
 #[test]
