@@ -2,11 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     push_bounded_received_messages, push_bounded_session_failure, push_bounded_session_request,
-    SteamworksNetworkingMessagesState,
+    upsert_bounded_session_decision, SteamworksNetworkingMessagesState,
 };
 use crate::networking_messages::{
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
-    SteamworksNetworkingMessagesResult,
+    SteamworksNetworkingMessagesResult, SteamworksNetworkingMessagesSessionDecision,
+    SteamworksNetworkingPeer,
 };
 
 impl SteamworksNetworkingMessagesState {
@@ -38,8 +39,19 @@ impl SteamworksNetworkingMessagesState {
             SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled } => {
                 self.set_auto_accept_session_requests(*enabled);
             }
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet { decision } => {
+                self.set_session_request_decision(decision.clone());
+            }
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionCleared { peer } => {
+                self.clear_session_request_decision(peer);
+            }
             SteamworksNetworkingMessagesOperation::SessionRequestReceived { request } => {
                 self.session_request_count = self.session_request_count.saturating_add(1);
+                if request.accepted {
+                    self.session_accept_count = self.session_accept_count.saturating_add(1);
+                } else {
+                    self.session_reject_count = self.session_reject_count.saturating_add(1);
+                }
                 push_bounded_session_request(&mut self.session_requests, request.clone());
                 self.last_session_request = Some(request.clone());
             }
@@ -65,6 +77,12 @@ impl SteamworksNetworkingMessagesState {
         self.auto_accept_session_requests.clone()
     }
 
+    pub(in crate::networking_messages) fn session_request_decision_policy(
+        &self,
+    ) -> Arc<Mutex<Vec<SteamworksNetworkingMessagesSessionDecision>>> {
+        self.session_request_decisions.clone()
+    }
+
     pub(in crate::networking_messages) fn callback_results_queue(
         &self,
     ) -> Arc<Mutex<Vec<SteamworksNetworkingMessagesResult>>> {
@@ -76,6 +94,29 @@ impl SteamworksNetworkingMessagesState {
             .auto_accept_session_requests
             .lock()
             .expect("Steamworks Networking Messages policy mutex was poisoned") = enabled;
+    }
+
+    pub(in crate::networking_messages) fn set_session_request_decision(
+        &self,
+        decision: SteamworksNetworkingMessagesSessionDecision,
+    ) {
+        upsert_bounded_session_decision(
+            &mut self
+                .session_request_decisions
+                .lock()
+                .expect("Steamworks Networking Messages decision mutex was poisoned"),
+            decision,
+        );
+    }
+
+    pub(in crate::networking_messages) fn clear_session_request_decision(
+        &self,
+        peer: &SteamworksNetworkingPeer,
+    ) {
+        self.session_request_decisions
+            .lock()
+            .expect("Steamworks Networking Messages decision mutex was poisoned")
+            .retain(|decision| &decision.peer != peer);
     }
 
     pub(in crate::networking_messages) fn drain_callback_results(

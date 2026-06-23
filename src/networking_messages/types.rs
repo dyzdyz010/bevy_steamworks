@@ -101,6 +101,15 @@ pub struct SteamworksNetworkingMessagesSessionRequestInfo {
     pub accepted: bool,
 }
 
+/// Peer-specific callback-time Networking Messages session decision.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SteamworksNetworkingMessagesSessionDecision {
+    /// Remote peer targeted by the decision.
+    pub peer: SteamworksNetworkingPeer,
+    /// Whether matching future session requests should be accepted.
+    pub accepted: bool,
+}
+
 /// Snapshot of one Networking Messages session connection state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SteamworksNetworkingMessagesConnectionInfo {

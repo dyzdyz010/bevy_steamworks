@@ -31,6 +31,12 @@ pub(super) fn validate_command(
         SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo { peer } => {
             validate_peer(peer)
         }
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision { decision } => {
+            validate_peer(&decision.peer)
+        }
+        SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision { peer } => {
+            validate_peer(peer)
+        }
         SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { .. } => Ok(()),
     }
 }
@@ -67,6 +73,22 @@ mod tests {
                     steamworks::networking_types::SendFlags::RELIABLE,
                     0,
                     vec![1],
+                )
+            ),
+            Err(SteamworksNetworkingMessagesError::InvalidIdentity)
+        );
+        assert_eq!(
+            validate_command(
+                &SteamworksNetworkingMessagesCommand::accept_session_requests_from(
+                    steamworks::SteamId::from_raw(0),
+                )
+            ),
+            Err(SteamworksNetworkingMessagesError::InvalidIdentity)
+        );
+        assert_eq!(
+            validate_command(
+                &SteamworksNetworkingMessagesCommand::clear_session_request_decision(
+                    steamworks::SteamId::from_raw(0),
                 )
             ),
             Err(SteamworksNetworkingMessagesError::InvalidIdentity)

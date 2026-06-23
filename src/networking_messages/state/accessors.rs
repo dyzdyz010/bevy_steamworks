@@ -1,7 +1,8 @@
 use super::SteamworksNetworkingMessagesState;
 use crate::networking_messages::{
     SteamworksNetworkingMessage, SteamworksNetworkingMessagesConnectionInfo,
-    SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesSessionRequestInfo,
+    SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesSessionDecision,
+    SteamworksNetworkingMessagesSessionRequestInfo, SteamworksNetworkingPeer,
 };
 
 impl SteamworksNetworkingMessagesState {
@@ -269,6 +270,45 @@ impl SteamworksNetworkingMessagesState {
         self.session_request(remote).map(|request| request.accepted)
     }
 
+    /// Returns peer-specific session request decision overrides.
+    pub fn session_request_decisions(&self) -> Vec<SteamworksNetworkingMessagesSessionDecision> {
+        self.session_request_decisions
+            .lock()
+            .expect("Steamworks Networking Messages decision mutex was poisoned")
+            .clone()
+    }
+
+    /// Returns the number of peer-specific session request decision overrides.
+    pub fn session_request_decision_count(&self) -> usize {
+        self.session_request_decisions
+            .lock()
+            .expect("Steamworks Networking Messages decision mutex was poisoned")
+            .len()
+    }
+
+    /// Returns the peer-specific session request decision override for one peer.
+    pub fn session_request_decision(
+        &self,
+        peer: &SteamworksNetworkingPeer,
+    ) -> Option<SteamworksNetworkingMessagesSessionDecision> {
+        self.session_request_decisions
+            .lock()
+            .expect("Steamworks Networking Messages decision mutex was poisoned")
+            .iter()
+            .rev()
+            .find(|decision| &decision.peer == peer)
+            .cloned()
+    }
+
+    /// Returns whether one peer-specific session request override accepts requests.
+    pub fn session_request_decision_accepts(
+        &self,
+        peer: &SteamworksNetworkingPeer,
+    ) -> Option<bool> {
+        self.session_request_decision(peer)
+            .map(|decision| decision.accepted)
+    }
+
     /// Returns bounded session failure callback snapshots.
     pub fn session_failures(&self) -> &[SteamworksNetworkingMessagesConnectionInfo] {
         &self.session_failures
@@ -341,6 +381,16 @@ impl SteamworksNetworkingMessagesState {
     /// Returns the number of incoming session requests observed by the plugin.
     pub fn session_request_count(&self) -> u64 {
         self.session_request_count
+    }
+
+    /// Returns the number of incoming session requests accepted by the plugin.
+    pub fn session_accept_count(&self) -> u64 {
+        self.session_accept_count
+    }
+
+    /// Returns the number of incoming session requests rejected by the plugin.
+    pub fn session_reject_count(&self) -> u64 {
+        self.session_reject_count
     }
 
     /// Returns the number of session failures observed by the plugin.

@@ -51,6 +51,7 @@ use bevy_steamworks::{
         SteamworksNetworkingMessagesOperation as PreludeNetworkingMessagesOperation,
         SteamworksNetworkingMessagesPlugin as PreludeNetworkingMessagesPlugin,
         SteamworksNetworkingMessagesResult as PreludeNetworkingMessagesResult,
+        SteamworksNetworkingMessagesSessionDecision as PreludeNetworkingMessagesSessionDecision,
         SteamworksNetworkingMessagesState as PreludeNetworkingMessagesState,
         SteamworksNetworkingOperation as PreludeNetworkingOperation,
         SteamworksNetworkingPeer as PreludeNetworkingPeer,
@@ -194,8 +195,9 @@ use bevy_steamworks::{
     SteamworksNetworkingError, SteamworksNetworkingMessagesCommand,
     SteamworksNetworkingMessagesError, SteamworksNetworkingMessagesOperation,
     SteamworksNetworkingMessagesPlugin, SteamworksNetworkingMessagesResult,
-    SteamworksNetworkingMessagesState, SteamworksNetworkingOperation, SteamworksNetworkingPeer,
-    SteamworksNetworkingPlugin, SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
+    SteamworksNetworkingMessagesSessionDecision, SteamworksNetworkingMessagesState,
+    SteamworksNetworkingOperation, SteamworksNetworkingPeer, SteamworksNetworkingPlugin,
+    SteamworksNetworkingResult, SteamworksNetworkingSocketsCommand,
     SteamworksNetworkingSocketsConfigEntry, SteamworksNetworkingSocketsConnectionId,
     SteamworksNetworkingSocketsConnectionMessages, SteamworksNetworkingSocketsConnectionName,
     SteamworksNetworkingSocketsConnectionUserData, SteamworksNetworkingSocketsError,
@@ -1516,6 +1518,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     fn accepts_root_exports(
         _plugin: SteamworksNetworkingMessagesPlugin,
         _peer: SteamworksNetworkingPeer,
+        _decision: SteamworksNetworkingMessagesSessionDecision,
         _command: SteamworksNetworkingMessagesCommand,
         _operation: SteamworksNetworkingMessagesOperation,
         _result: SteamworksNetworkingMessagesResult,
@@ -1527,6 +1530,7 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     fn accepts_prelude_exports(
         _plugin: PreludeNetworkingMessagesPlugin,
         _peer: PreludeNetworkingPeer,
+        _decision: PreludeNetworkingMessagesSessionDecision,
         _command: PreludeNetworkingMessagesCommand,
         _operation: PreludeNetworkingMessagesOperation,
         _result: PreludeNetworkingMessagesResult,
@@ -1541,14 +1545,17 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         peer.to_identity(),
         steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
     );
-    let command = SteamworksNetworkingMessagesCommand::send_message(
+    let decision = SteamworksNetworkingMessagesSessionDecision {
+        peer: peer.clone(),
+        accepted: false,
+    };
+    let command = SteamworksNetworkingMessagesCommand::set_session_request_decision(
         steam_id,
-        steamworks::networking_types::SendFlags::RELIABLE,
-        0,
-        b"ping",
+        decision.accepted,
     );
-    let operation =
-        SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
+    let operation = SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet {
+        decision: decision.clone(),
+    };
     let error = SteamworksNetworkingMessagesError::ClientUnavailable;
     let result = SteamworksNetworkingMessagesResult::Err {
         command: command.clone(),
@@ -1597,14 +1604,22 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     assert_eq!(state.session_request(&identity), None);
     assert!(!state.has_session_request(&identity));
     assert_eq!(state.session_request_accepted(&identity), None);
+    assert!(state.session_request_decisions().is_empty());
+    assert_eq!(state.session_request_decision_count(), 0);
+    assert_eq!(state.session_request_decision(&peer), None);
+    assert_eq!(state.session_request_decision_accepts(&peer), None);
     assert!(state.session_failures().is_empty());
     assert_eq!(state.cached_session_failure_count(), 0);
     assert_eq!(state.session_failure(&identity), None);
     assert!(!state.has_session_failure(&identity));
     assert_eq!(state.session_failure_state(&identity), None);
     assert_eq!(state.session_failure_end_reason(&identity), None);
+    assert_eq!(state.session_accept_count(), 0);
+    assert_eq!(state.session_reject_count(), 0);
 
-    accepts_root_exports(plugin, peer, command, operation, result, error, state);
+    accepts_root_exports(
+        plugin, peer, decision, command, operation, result, error, state,
+    );
 
     let steam_id = steamworks::SteamId::from_raw(7);
     let peer = PreludeNetworkingPeer::from(steam_id);
@@ -1612,14 +1627,14 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
         peer.to_identity(),
         steamworks::networking_types::NetworkingIdentity::new_steam_id(steam_id)
     );
-    let command = PreludeNetworkingMessagesCommand::send_message(
-        steam_id,
-        steamworks::networking_types::SendFlags::RELIABLE,
-        0,
-        b"ping",
-    );
-    let operation =
-        PreludeNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled: true };
+    let decision = PreludeNetworkingMessagesSessionDecision {
+        peer: peer.clone(),
+        accepted: true,
+    };
+    let command = PreludeNetworkingMessagesCommand::accept_session_requests_from(steam_id);
+    let operation = PreludeNetworkingMessagesOperation::SessionRequestDecisionSet {
+        decision: decision.clone(),
+    };
     let error = PreludeNetworkingMessagesError::ClientUnavailable;
     let result = PreludeNetworkingMessagesResult::Err {
         command: command.clone(),
@@ -1668,14 +1683,22 @@ fn networking_messages_api_is_exported_from_root_and_prelude() {
     assert_eq!(state.session_request(&identity), None);
     assert!(!state.has_session_request(&identity));
     assert_eq!(state.session_request_accepted(&identity), None);
+    assert!(state.session_request_decisions().is_empty());
+    assert_eq!(state.session_request_decision_count(), 0);
+    assert_eq!(state.session_request_decision(&peer), None);
+    assert_eq!(state.session_request_decision_accepts(&peer), None);
     assert!(state.session_failures().is_empty());
     assert_eq!(state.cached_session_failure_count(), 0);
     assert_eq!(state.session_failure(&identity), None);
     assert!(!state.has_session_failure(&identity));
     assert_eq!(state.session_failure_state(&identity), None);
     assert_eq!(state.session_failure_end_reason(&identity), None);
+    assert_eq!(state.session_accept_count(), 0);
+    assert_eq!(state.session_reject_count(), 0);
 
-    accepts_prelude_exports(plugin, peer, command, operation, result, error, state);
+    accepts_prelude_exports(
+        plugin, peer, decision, command, operation, result, error, state,
+    );
 }
 
 #[test]

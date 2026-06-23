@@ -31,11 +31,21 @@ pub(super) fn ensure_networking_messages_callbacks(
 
     let request_queue = state.callback_results_queue();
     let auto_accept = state.auto_accept_session_requests_policy();
+    let decision_policy = state.session_request_decision_policy();
     networking_messages.session_request_callback(move |request| {
         let remote = request.remote().clone();
-        let should_accept = *auto_accept
+        let peer_decision = decision_policy
             .lock()
-            .expect("Steamworks Networking Messages policy mutex was poisoned");
+            .expect("Steamworks Networking Messages decision mutex was poisoned")
+            .iter()
+            .rev()
+            .find(|decision| decision.peer.to_identity() == remote)
+            .map(|decision| decision.accepted);
+        let should_accept = peer_decision.unwrap_or_else(|| {
+            *auto_accept
+                .lock()
+                .expect("Steamworks Networking Messages policy mutex was poisoned")
+        });
         let accepted = should_accept && request.accept();
         let result = SteamworksNetworkingMessagesResult::Ok(
             SteamworksNetworkingMessagesOperation::SessionRequestReceived {
@@ -90,10 +100,17 @@ pub(super) fn apply_networking_messages_policy_commands(
     mut commands: MessageReader<SteamworksNetworkingMessagesCommand>,
 ) {
     for command in commands.read() {
-        if let SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled } =
-            command
-        {
-            state.set_auto_accept_session_requests(*enabled);
+        match command {
+            SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled } => {
+                state.set_auto_accept_session_requests(*enabled);
+            }
+            SteamworksNetworkingMessagesCommand::SetSessionRequestDecision { decision } => {
+                state.set_session_request_decision(decision.clone());
+            }
+            SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision { peer } => {
+                state.clear_session_request_decision(peer);
+            }
+            _ => {}
         }
     }
 }

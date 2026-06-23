@@ -1,6 +1,7 @@
 use super::super::{
     SteamworksNetworkingMessage, SteamworksNetworkingMessagesConnectionInfo,
-    SteamworksNetworkingMessagesSessionRequestInfo, SteamworksNetworkingPeer,
+    SteamworksNetworkingMessagesSessionDecision, SteamworksNetworkingMessagesSessionRequestInfo,
+    SteamworksNetworkingPeer,
 };
 
 /// A successfully submitted Steam Networking Messages operation or callback.
@@ -35,6 +36,16 @@ pub enum SteamworksNetworkingMessagesOperation {
     AutoAcceptSessionRequestsSet {
         /// Whether future session requests are accepted.
         enabled: bool,
+    },
+    /// A peer-specific callback-time session request decision was set.
+    SessionRequestDecisionSet {
+        /// Decision snapshot.
+        decision: SteamworksNetworkingMessagesSessionDecision,
+    },
+    /// A peer-specific callback-time session request decision was cleared.
+    SessionRequestDecisionCleared {
+        /// Peer whose decision override was removed.
+        peer: SteamworksNetworkingPeer,
     },
     /// A session request callback was observed.
     SessionRequestReceived {

@@ -1,4 +1,4 @@
-use super::super::super::SteamworksNetworkingPeer;
+use super::super::super::{SteamworksNetworkingMessagesSessionDecision, SteamworksNetworkingPeer};
 use super::SteamworksNetworkingMessagesCommand;
 
 impl SteamworksNetworkingMessagesCommand {
@@ -43,6 +43,34 @@ impl SteamworksNetworkingMessagesCommand {
     /// Creates a [`crate::SteamworksNetworkingMessagesCommand::GetSessionConnectionInfo`] command.
     pub fn get_session_connection_info(peer: impl Into<SteamworksNetworkingPeer>) -> Self {
         Self::GetSessionConnectionInfo { peer: peer.into() }
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingMessagesCommand::SetSessionRequestDecision`] command.
+    pub fn set_session_request_decision(
+        peer: impl Into<SteamworksNetworkingPeer>,
+        accepted: bool,
+    ) -> Self {
+        Self::SetSessionRequestDecision {
+            decision: SteamworksNetworkingMessagesSessionDecision {
+                peer: peer.into(),
+                accepted,
+            },
+        }
+    }
+
+    /// Creates a command that accepts future session requests from one peer.
+    pub fn accept_session_requests_from(peer: impl Into<SteamworksNetworkingPeer>) -> Self {
+        Self::set_session_request_decision(peer, true)
+    }
+
+    /// Creates a command that rejects future session requests from one peer.
+    pub fn reject_session_requests_from(peer: impl Into<SteamworksNetworkingPeer>) -> Self {
+        Self::set_session_request_decision(peer, false)
+    }
+
+    /// Creates a [`crate::SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision`] command.
+    pub fn clear_session_request_decision(peer: impl Into<SteamworksNetworkingPeer>) -> Self {
+        Self::ClearSessionRequestDecision { peer: peer.into() }
     }
 
     /// Creates a [`crate::SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests`] command.

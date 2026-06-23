@@ -40,11 +40,7 @@ pub(super) fn process_networking_messages_commands(
             continue;
         }
 
-        if let SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled } =
-            command
-        {
-            let operation =
-                SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled };
+        if let Some(operation) = local_networking_messages_command_operation(&command) {
             state.record_operation(&operation);
             tracing::debug!(
                 target: "bevy_steamworks",
@@ -105,6 +101,29 @@ fn record_networking_messages_result(
     }
 }
 
+fn local_networking_messages_command_operation(
+    command: &SteamworksNetworkingMessagesCommand,
+) -> Option<SteamworksNetworkingMessagesOperation> {
+    match command {
+        SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled } => Some(
+            SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet {
+                enabled: *enabled,
+            },
+        ),
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision { decision } => Some(
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet {
+                decision: decision.clone(),
+            },
+        ),
+        SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision { peer } => Some(
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionCleared {
+                peer: peer.clone(),
+            },
+        ),
+        _ => None,
+    }
+}
+
 fn handle_networking_messages_command(
     networking_messages: &steamworks::networking_messages::NetworkingMessages,
     command: SteamworksNetworkingMessagesCommand,
@@ -153,6 +172,12 @@ fn handle_networking_messages_command(
         }
         SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled } => {
             SteamworksNetworkingMessagesOperation::AutoAcceptSessionRequestsSet { enabled }
+        }
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision { decision } => {
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet { decision }
+        }
+        SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision { peer } => {
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionCleared { peer }
         }
     })
 }

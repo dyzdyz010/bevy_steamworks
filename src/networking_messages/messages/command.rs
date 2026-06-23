@@ -1,6 +1,6 @@
 use bevy_ecs::message::Message;
 
-use super::super::SteamworksNetworkingPeer;
+use super::super::{SteamworksNetworkingMessagesSessionDecision, SteamworksNetworkingPeer};
 
 mod constructors;
 
@@ -28,6 +28,16 @@ pub enum SteamworksNetworkingMessagesCommand {
     /// Read connection information for one peer.
     GetSessionConnectionInfo {
         /// Peer to inspect.
+        peer: SteamworksNetworkingPeer,
+    },
+    /// Set the callback-time decision for future session requests from one peer.
+    SetSessionRequestDecision {
+        /// Peer-specific decision to apply when a request arrives.
+        decision: SteamworksNetworkingMessagesSessionDecision,
+    },
+    /// Clear the callback-time decision for future session requests from one peer.
+    ClearSessionRequestDecision {
+        /// Peer whose decision override should be removed.
         peer: SteamworksNetworkingPeer,
     },
     /// Set whether future incoming session requests are accepted in the callback.

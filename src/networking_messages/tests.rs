@@ -112,6 +112,56 @@ fn local_auto_accept_command_updates_without_client() {
         .auto_accept_session_requests());
 }
 
+#[test]
+fn local_session_request_decision_commands_update_without_client() {
+    let mut app = App::new();
+    let steam_id = steamworks::SteamId::from_raw(76561198000000000);
+    let peer = SteamworksNetworkingPeer::steam_id(steam_id);
+
+    app.add_plugins(SteamworksNetworkingMessagesPlugin::new());
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingMessagesCommand>>()
+        .write(SteamworksNetworkingMessagesCommand::reject_session_requests_from(steam_id));
+
+    app.update();
+
+    let mut results = app
+        .world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingMessagesResult>>();
+    let drained = results.drain().collect::<Vec<_>>();
+
+    assert_eq!(
+        drained,
+        vec![SteamworksNetworkingMessagesResult::Ok(
+            SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet {
+                decision: SteamworksNetworkingMessagesSessionDecision {
+                    peer: peer.clone(),
+                    accepted: false,
+                },
+            }
+        )]
+    );
+    assert_eq!(
+        app.world()
+            .resource::<SteamworksNetworkingMessagesState>()
+            .session_request_decision_accepts(&peer),
+        Some(false)
+    );
+
+    app.world_mut()
+        .resource_mut::<Messages<SteamworksNetworkingMessagesCommand>>()
+        .write(SteamworksNetworkingMessagesCommand::clear_session_request_decision(peer.clone()));
+
+    app.update();
+
+    assert_eq!(
+        app.world()
+            .resource::<SteamworksNetworkingMessagesState>()
+            .session_request_decision_accepts(&peer),
+        None
+    );
+}
+
 #[derive(Default, Resource)]
 struct ObservedAutoAccept(bool);
 
@@ -232,6 +282,39 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksNetworkingMessagesCommand::set_session_request_decision(addr, true),
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision {
+            decision: SteamworksNetworkingMessagesSessionDecision {
+                peer: SteamworksNetworkingPeer::Ip(addr),
+                accepted: true,
+            },
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingMessagesCommand::accept_session_requests_from(steam_id),
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision {
+            decision: SteamworksNetworkingMessagesSessionDecision {
+                peer: SteamworksNetworkingPeer::SteamId(steam_id),
+                accepted: true,
+            },
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingMessagesCommand::reject_session_requests_from(steam_id),
+        SteamworksNetworkingMessagesCommand::SetSessionRequestDecision {
+            decision: SteamworksNetworkingMessagesSessionDecision {
+                peer: SteamworksNetworkingPeer::SteamId(steam_id),
+                accepted: false,
+            },
+        }
+    );
+    assert_eq!(
+        SteamworksNetworkingMessagesCommand::clear_session_request_decision(steam_id),
+        SteamworksNetworkingMessagesCommand::ClearSessionRequestDecision {
+            peer: SteamworksNetworkingPeer::SteamId(steam_id),
+        }
+    );
+    assert_eq!(
         SteamworksNetworkingMessagesCommand::set_auto_accept_session_requests(false),
         SteamworksNetworkingMessagesCommand::SetAutoAcceptSessionRequests { enabled: false }
     );
@@ -269,6 +352,11 @@ fn state_records_operations_without_unbounded_message_history() {
         send_flags: steamworks::networking_types::SendFlags::UNRELIABLE,
         message_number: 3,
         connection_user_data: 0,
+    };
+    let decision_peer = SteamworksNetworkingPeer::identity(other_peer.clone());
+    let decision = SteamworksNetworkingMessagesSessionDecision {
+        peer: decision_peer.clone(),
+        accepted: false,
     };
 
     state.record_operation(&SteamworksNetworkingMessagesOperation::MessagesReceived {
@@ -315,6 +403,19 @@ fn state_records_operations_without_unbounded_message_history() {
             request: SteamworksNetworkingMessagesSessionRequestInfo {
                 remote: peer.clone(),
                 accepted: true,
+            },
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingMessagesOperation::SessionRequestDecisionSet {
+            decision: decision.clone(),
+        },
+    );
+    state.record_operation(
+        &SteamworksNetworkingMessagesOperation::SessionRequestReceived {
+            request: SteamworksNetworkingMessagesSessionRequestInfo {
+                remote: other_peer.clone(),
+                accepted: false,
             },
         },
     );
@@ -400,9 +501,11 @@ fn state_records_operations_without_unbounded_message_history() {
     assert_eq!(state.last_connection_quality(), Some((0.9, 0.8)));
     assert_eq!(state.received_count(), 3);
     assert_eq!(state.sent_count(), 1);
-    assert_eq!(state.session_request_count(), 1);
-    assert_eq!(state.session_requests().len(), 1);
-    assert_eq!(state.cached_session_request_count(), 1);
+    assert_eq!(state.session_request_count(), 2);
+    assert_eq!(state.session_accept_count(), 1);
+    assert_eq!(state.session_reject_count(), 1);
+    assert_eq!(state.session_requests().len(), 2);
+    assert_eq!(state.cached_session_request_count(), 2);
     assert_eq!(
         state.session_request(&peer),
         Some(&SteamworksNetworkingMessagesSessionRequestInfo {
@@ -412,6 +515,17 @@ fn state_records_operations_without_unbounded_message_history() {
     );
     assert!(state.has_session_request(&peer));
     assert_eq!(state.session_request_accepted(&peer), Some(true));
+    assert_eq!(state.session_request_accepted(&other_peer), Some(false));
+    assert_eq!(state.session_request_decisions(), vec![decision.clone()]);
+    assert_eq!(state.session_request_decision_count(), 1);
+    assert_eq!(
+        state.session_request_decision(&decision_peer),
+        Some(decision.clone())
+    );
+    assert_eq!(
+        state.session_request_decision_accepts(&decision_peer),
+        Some(false)
+    );
     assert_eq!(state.session_failure_count(), 1);
     assert_eq!(state.session_failures().len(), 1);
     assert_eq!(state.cached_session_failure_count(), 1);

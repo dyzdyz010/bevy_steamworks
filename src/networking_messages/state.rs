@@ -23,9 +23,12 @@ pub struct SteamworksNetworkingMessagesState {
     session_failures: Vec<SteamworksNetworkingMessagesConnectionInfo>,
     last_session_request: Option<SteamworksNetworkingMessagesSessionRequestInfo>,
     last_session_failure: Option<SteamworksNetworkingMessagesConnectionInfo>,
+    session_request_decisions: Arc<Mutex<Vec<SteamworksNetworkingMessagesSessionDecision>>>,
     sent_count: u64,
     received_count: u64,
     session_request_count: u64,
+    session_accept_count: u64,
+    session_reject_count: u64,
     session_failure_count: u64,
     callbacks_registered: bool,
     auto_accept_session_requests: Arc<Mutex<bool>>,
@@ -50,9 +53,12 @@ impl SteamworksNetworkingMessagesState {
             session_failures: Vec::new(),
             last_session_request: None,
             last_session_failure: None,
+            session_request_decisions: Arc::new(Mutex::new(Vec::new())),
             sent_count: 0,
             received_count: 0,
             session_request_count: 0,
+            session_accept_count: 0,
+            session_reject_count: 0,
             session_failure_count: 0,
             callbacks_registered: false,
             auto_accept_session_requests: Arc::new(Mutex::new(auto_accept_session_requests)),
@@ -83,4 +89,20 @@ pub(super) fn push_bounded_session_failure(
 ) {
     failures.push(failure);
     trim_oldest(failures, STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT);
+}
+
+pub(super) fn upsert_bounded_session_decision(
+    decisions: &mut Vec<SteamworksNetworkingMessagesSessionDecision>,
+    decision: SteamworksNetworkingMessagesSessionDecision,
+) {
+    if let Some(existing) = decisions
+        .iter_mut()
+        .find(|existing| existing.peer == decision.peer)
+    {
+        *existing = decision;
+        return;
+    }
+
+    decisions.push(decision);
+    trim_oldest(decisions, STEAMWORKS_NETWORKING_MESSAGES_STATE_CACHE_LIMIT);
 }
