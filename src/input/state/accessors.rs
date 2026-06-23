@@ -7,6 +7,7 @@ use super::{
     SteamworksInputError, SteamworksInputHandle, SteamworksInputMotionSnapshot,
     SteamworksInputNamedActionSetHandle, SteamworksInputNamedAnalogActionHandle,
     SteamworksInputNamedDigitalActionHandle, SteamworksInputSourceMode, SteamworksInputState,
+    SteamworksInputType,
 };
 use crate::SteamworksInputControllerInfo;
 
@@ -32,6 +33,11 @@ impl SteamworksInputState {
         &self.controllers
     }
 
+    /// Returns the number of known controller snapshots cached by this plugin.
+    pub fn controller_count(&self) -> usize {
+        self.controllers.len()
+    }
+
     /// Returns the cached controller snapshot for a handle.
     pub fn controller(
         &self,
@@ -42,9 +48,28 @@ impl SteamworksInputState {
             .find(|controller| controller.handle == handle)
     }
 
+    /// Returns whether a controller snapshot is cached for a handle.
+    pub fn has_controller(&self, handle: SteamworksInputHandle) -> bool {
+        self.controller(handle).is_some()
+    }
+
+    /// Returns the cached controller type for a handle.
+    pub fn controller_input_type(
+        &self,
+        handle: SteamworksInputHandle,
+    ) -> Option<SteamworksInputType> {
+        self.controller(handle)
+            .map(|controller| controller.input_type)
+    }
+
     /// Returns action set handles read through the plugin.
     pub fn action_sets(&self) -> &[SteamworksInputNamedActionSetHandle] {
         &self.action_sets
+    }
+
+    /// Returns the number of named action set handles cached by this plugin.
+    pub fn action_set_count(&self) -> usize {
+        self.action_sets.len()
     }
 
     /// Returns the cached action set handle for a manifest action set name.
@@ -54,9 +79,19 @@ impl SteamworksInputState {
             .find_map(|handle| (handle.name == name).then_some(handle.handle))
     }
 
+    /// Returns whether a named action set handle is cached.
+    pub fn has_action_set_handle(&self, name: &str) -> bool {
+        self.action_set_handle(name).is_some()
+    }
+
     /// Returns digital action handles read through the plugin.
     pub fn digital_actions(&self) -> &[SteamworksInputNamedDigitalActionHandle] {
         &self.digital_actions
+    }
+
+    /// Returns the number of named digital action handles cached by this plugin.
+    pub fn digital_action_count(&self) -> usize {
+        self.digital_actions.len()
     }
 
     /// Returns the cached digital action handle for a manifest action name.
@@ -66,9 +101,19 @@ impl SteamworksInputState {
             .find_map(|handle| (handle.name == name).then_some(handle.handle))
     }
 
+    /// Returns whether a named digital action handle is cached.
+    pub fn has_digital_action_handle(&self, name: &str) -> bool {
+        self.digital_action_handle(name).is_some()
+    }
+
     /// Returns analog action handles read through the plugin.
     pub fn analog_actions(&self) -> &[SteamworksInputNamedAnalogActionHandle] {
         &self.analog_actions
+    }
+
+    /// Returns the number of named analog action handles cached by this plugin.
+    pub fn analog_action_count(&self) -> usize {
+        self.analog_actions.len()
     }
 
     /// Returns the cached analog action handle for a manifest action name.
@@ -76,6 +121,11 @@ impl SteamworksInputState {
         self.analog_actions
             .iter()
             .find_map(|handle| (handle.name == name).then_some(handle.handle))
+    }
+
+    /// Returns whether a named analog action handle is cached.
+    pub fn has_analog_action_handle(&self, name: &str) -> bool {
+        self.analog_action_handle(name).is_some()
     }
 
     /// Returns the most recent action manifest path accepted by Steam Input.
@@ -93,6 +143,11 @@ impl SteamworksInputState {
         &self.action_set_activations
     }
 
+    /// Returns the number of cached action set activations.
+    pub fn action_set_activation_count(&self) -> usize {
+        self.action_set_activations.len()
+    }
+
     /// Returns the cached action set activation for a controller.
     pub fn action_set_activation(
         &self,
@@ -104,6 +159,20 @@ impl SteamworksInputState {
             .copied()
     }
 
+    /// Returns whether an action set activation is cached for a controller.
+    pub fn has_action_set_activation(&self, controller: SteamworksInputHandle) -> bool {
+        self.action_set_activation(controller).is_some()
+    }
+
+    /// Returns the cached active action set handle for a controller.
+    pub fn active_action_set(
+        &self,
+        controller: SteamworksInputHandle,
+    ) -> Option<SteamworksInputActionSetHandle> {
+        self.action_set_activation(controller)
+            .map(|activation| activation.action_set)
+    }
+
     /// Returns the most recent digital action data snapshot.
     pub fn last_digital_action(&self) -> Option<&SteamworksInputDigitalActionSnapshot> {
         self.last_digital_action.as_ref()
@@ -112,6 +181,11 @@ impl SteamworksInputState {
     /// Returns cached digital action data snapshots keyed by controller and action.
     pub fn digital_action_data_snapshots(&self) -> &[SteamworksInputDigitalActionSnapshot] {
         &self.digital_action_snapshots
+    }
+
+    /// Returns the number of cached digital action data snapshots.
+    pub fn digital_action_snapshot_count(&self) -> usize {
+        self.digital_action_snapshots.len()
     }
 
     /// Returns the cached digital action data snapshot for a controller/action pair.
@@ -153,6 +227,11 @@ impl SteamworksInputState {
     /// Returns cached analog action data snapshots keyed by controller and action.
     pub fn analog_action_data_snapshots(&self) -> &[SteamworksInputAnalogActionSnapshot] {
         &self.analog_action_snapshots
+    }
+
+    /// Returns the number of cached analog action data snapshots.
+    pub fn analog_action_snapshot_count(&self) -> usize {
+        self.analog_action_snapshots.len()
     }
 
     /// Returns the cached analog action data snapshot for a controller/action pair.
@@ -210,6 +289,11 @@ impl SteamworksInputState {
         &self.digital_action_origin_snapshots
     }
 
+    /// Returns the number of cached digital action origin snapshots.
+    pub fn digital_action_origin_snapshot_count(&self) -> usize {
+        self.digital_action_origin_snapshots.len()
+    }
+
     /// Returns the cached digital action origins for a controller/action-set/action triple.
     pub fn digital_action_origins(
         &self,
@@ -226,6 +310,17 @@ impl SteamworksInputState {
             })
     }
 
+    /// Returns the number of cached origins for a controller/action-set/digital-action triple.
+    pub fn digital_action_origin_count(
+        &self,
+        controller: SteamworksInputHandle,
+        action_set: SteamworksInputActionSetHandle,
+        action: SteamworksInputDigitalActionHandle,
+    ) -> Option<usize> {
+        self.digital_action_origins(controller, action_set, action)
+            .map(|snapshot| snapshot.origins.len())
+    }
+
     /// Returns the most recent analog action origin snapshot.
     pub fn last_analog_action_origins(
         &self,
@@ -236,6 +331,11 @@ impl SteamworksInputState {
     /// Returns cached analog action origin snapshots keyed by controller, action set, and action.
     pub fn analog_action_origin_snapshots(&self) -> &[SteamworksInputAnalogActionOriginsSnapshot] {
         &self.analog_action_origin_snapshots
+    }
+
+    /// Returns the number of cached analog action origin snapshots.
+    pub fn analog_action_origin_snapshot_count(&self) -> usize {
+        self.analog_action_origin_snapshots.len()
     }
 
     /// Returns the cached analog action origins for a controller/action-set/action triple.
@@ -252,9 +352,25 @@ impl SteamworksInputState {
         })
     }
 
+    /// Returns the number of cached origins for a controller/action-set/analog-action triple.
+    pub fn analog_action_origin_count(
+        &self,
+        controller: SteamworksInputHandle,
+        action_set: SteamworksInputActionSetHandle,
+        action: SteamworksInputAnalogActionHandle,
+    ) -> Option<usize> {
+        self.analog_action_origins(controller, action_set, action)
+            .map(|snapshot| snapshot.origins.len())
+    }
+
     /// Returns cached action origin presentation data read from origin queries.
     pub fn action_origin_infos(&self) -> &[SteamworksInputActionOriginInfo] {
         &self.action_origin_infos
+    }
+
+    /// Returns the number of cached action origin presentation snapshots.
+    pub fn action_origin_info_count(&self) -> usize {
+        self.action_origin_infos.len()
     }
 
     /// Returns cached presentation data for one action origin.
@@ -265,6 +381,23 @@ impl SteamworksInputState {
         self.action_origin_infos
             .iter()
             .find(|info| info.origin == origin)
+    }
+
+    /// Returns whether action origin presentation data is cached for an origin.
+    pub fn has_action_origin_info(&self, origin: SteamworksInputActionOrigin) -> bool {
+        self.action_origin_info(origin).is_some()
+    }
+
+    /// Returns the cached glyph path for an action origin.
+    pub fn action_origin_glyph_path(&self, origin: SteamworksInputActionOrigin) -> Option<&str> {
+        self.action_origin_info(origin)
+            .map(|info| info.glyph_path.as_str())
+    }
+
+    /// Returns the cached localized name for an action origin.
+    pub fn action_origin_name(&self, origin: SteamworksInputActionOrigin) -> Option<&str> {
+        self.action_origin_info(origin)
+            .map(|info| info.name.as_str())
     }
 
     /// Returns the most recent action origin presentation snapshot.
@@ -282,6 +415,11 @@ impl SteamworksInputState {
         &self.motion_snapshots
     }
 
+    /// Returns the number of cached motion snapshots.
+    pub fn motion_snapshot_count(&self) -> usize {
+        self.motion_snapshots.len()
+    }
+
     /// Returns the cached motion snapshot for a controller.
     pub fn motion(
         &self,
@@ -290,6 +428,11 @@ impl SteamworksInputState {
         self.motion_snapshots
             .iter()
             .find(|snapshot| snapshot.controller == controller)
+    }
+
+    /// Returns whether motion data is cached for a controller.
+    pub fn has_motion(&self, controller: SteamworksInputHandle) -> bool {
+        self.motion(controller).is_some()
     }
 
     /// Returns the cached rotation quaternion for a controller.
@@ -319,5 +462,10 @@ impl SteamworksInputState {
     /// Returns the most recent controller for which the binding panel was shown.
     pub fn last_binding_panel_controller(&self) -> Option<SteamworksInputHandle> {
         self.last_binding_panel_controller
+    }
+
+    /// Returns whether this plugin observed a successful binding panel request.
+    pub fn binding_panel_was_shown(&self) -> bool {
+        self.last_binding_panel_controller.is_some()
     }
 }

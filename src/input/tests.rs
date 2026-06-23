@@ -418,9 +418,25 @@ fn state_records_input_operations() {
             ..controller_info
         })
     );
+    assert_eq!(state.controller_count(), 1);
+    assert!(state.has_controller(controller));
+    assert!(!state.has_controller(SteamworksInputHandle::from_raw(99)));
+    assert_eq!(
+        state.controller_input_type(controller),
+        Some(SteamworksInputType::GenericGamepad)
+    );
+    assert_eq!(state.action_set_count(), 1);
     assert_eq!(state.action_set_handle("gameplay"), Some(action_set));
+    assert!(state.has_action_set_handle("gameplay"));
+    assert!(!state.has_action_set_handle("menu"));
+    assert_eq!(state.digital_action_count(), 1);
     assert_eq!(state.digital_action_handle("jump"), Some(digital_action));
+    assert!(state.has_digital_action_handle("jump"));
+    assert!(!state.has_digital_action_handle("crouch"));
+    assert_eq!(state.analog_action_count(), 1);
     assert_eq!(state.analog_action_handle("move"), Some(analog_action));
+    assert!(state.has_analog_action_handle("move"));
+    assert!(!state.has_analog_action_handle("look"));
     assert_eq!(
         state.last_action_set_activation(),
         Some(SteamworksInputActionSetActivation {
@@ -436,6 +452,9 @@ fn state_records_input_operations() {
         })
     );
     assert_eq!(state.action_set_activations().len(), 1);
+    assert_eq!(state.action_set_activation_count(), 1);
+    assert!(state.has_action_set_activation(controller));
+    assert_eq!(state.active_action_set(controller), Some(action_set));
     assert_eq!(state.last_digital_action(), Some(&digital_snapshot));
     assert_eq!(
         state.digital_action_data(controller, digital_action),
@@ -453,6 +472,7 @@ fn state_records_input_operations() {
         state.digital_action_data_snapshots(),
         &[digital_snapshot.clone()]
     );
+    assert_eq!(state.digital_action_snapshot_count(), 1);
     assert_eq!(state.last_analog_action(), Some(&analog_snapshot));
     assert_eq!(
         state.analog_action_data(controller, analog_action),
@@ -474,6 +494,7 @@ fn state_records_input_operations() {
         state.analog_action_data_snapshots(),
         &[analog_snapshot.clone()]
     );
+    assert_eq!(state.analog_action_snapshot_count(), 1);
     assert_eq!(
         state.last_digital_action_origins(),
         Some(&SteamworksInputDigitalActionOriginsSnapshot {
@@ -493,6 +514,11 @@ fn state_records_input_operations() {
         })
     );
     assert_eq!(state.digital_action_origin_snapshots().len(), 1);
+    assert_eq!(state.digital_action_origin_snapshot_count(), 1);
+    assert_eq!(
+        state.digital_action_origin_count(controller, action_set, digital_action),
+        Some(1)
+    );
     assert_eq!(
         state.last_analog_action_origins(),
         Some(&SteamworksInputAnalogActionOriginsSnapshot {
@@ -512,13 +538,28 @@ fn state_records_input_operations() {
         })
     );
     assert_eq!(state.analog_action_origin_snapshots().len(), 1);
+    assert_eq!(state.analog_action_origin_snapshot_count(), 1);
+    assert_eq!(
+        state.analog_action_origin_count(controller, action_set, analog_action),
+        Some(2)
+    );
     assert_eq!(
         state.action_origin_infos(),
         &[updated_origin.clone(), second_origin.clone()]
     );
+    assert_eq!(state.action_origin_info_count(), 2);
     assert_eq!(
         state.action_origin_info(updated_origin.origin),
         Some(&updated_origin)
+    );
+    assert!(state.has_action_origin_info(updated_origin.origin));
+    assert_eq!(
+        state.action_origin_glyph_path(updated_origin.origin),
+        Some("glyph-updated.svg")
+    );
+    assert_eq!(
+        state.action_origin_name(updated_origin.origin),
+        Some("A Button Updated")
     );
     assert_eq!(
         state.action_origin_info(second_origin.origin),
@@ -540,7 +581,10 @@ fn state_records_input_operations() {
         Some([4.0, 5.0, 6.0])
     );
     assert_eq!(state.motion_snapshots(), &[motion]);
+    assert_eq!(state.motion_snapshot_count(), 1);
+    assert!(state.has_motion(controller));
     assert_eq!(state.last_binding_panel_controller(), Some(controller));
+    assert!(state.binding_panel_was_shown());
 }
 
 #[test]
