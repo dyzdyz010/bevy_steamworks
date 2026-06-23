@@ -2484,8 +2484,18 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         error,
     );
     let root_state = SteamworksTimelineState::default();
+    assert_eq!(root_state.state_description_text(), None);
+    assert_eq!(root_state.state_description_duration(), None);
     assert!(root_state.events().is_empty());
     assert_eq!(root_state.last_event(), None);
+    assert_eq!(root_state.last_event_with_icon("boss"), None);
+    assert_eq!(root_state.last_event_icon(), None);
+    assert_eq!(root_state.last_event_title(), None);
+    assert_eq!(root_state.last_event_description(), None);
+    assert_eq!(root_state.last_event_priority(), None);
+    assert_eq!(root_state.last_event_start_offset_seconds(), None);
+    assert_eq!(root_state.last_event_duration(), None);
+    assert_eq!(root_state.last_event_clip_priority(), None);
     assert_eq!(root_state.event_count(), 0);
 
     let command = PreludeTimelineCommand::set_game_mode(PreludeTimelineGameMode::Playing);
@@ -2506,8 +2516,18 @@ fn timeline_api_is_exported_from_root_and_prelude() {
         error,
     );
     let prelude_state = PreludeTimelineState::default();
+    assert_eq!(prelude_state.state_description_text(), None);
+    assert_eq!(prelude_state.state_description_duration(), None);
     assert!(prelude_state.events().is_empty());
     assert_eq!(prelude_state.last_event(), None);
+    assert_eq!(prelude_state.last_event_with_icon("boss"), None);
+    assert_eq!(prelude_state.last_event_icon(), None);
+    assert_eq!(prelude_state.last_event_title(), None);
+    assert_eq!(prelude_state.last_event_description(), None);
+    assert_eq!(prelude_state.last_event_priority(), None);
+    assert_eq!(prelude_state.last_event_start_offset_seconds(), None);
+    assert_eq!(prelude_state.last_event_duration(), None);
+    assert_eq!(prelude_state.last_event_clip_priority(), None);
     assert_eq!(prelude_state.event_count(), 0);
 }
 
