@@ -4076,6 +4076,30 @@ fn matchmaking_servers_api_is_exported_from_root_and_prelude() {
         Option<SteamworksServerRule>,
         Option<SteamworksServerRules>,
     ) = (None, None, None, query_info, None, None);
+    let state = bevy_steamworks::SteamworksMatchmakingServersState::default();
+    assert_eq!(state.server_query_target(query), None);
+    assert_eq!(state.server_query_kind(query), None);
+    assert_eq!(state.server_ping_target(query), None);
+    assert_eq!(state.server_ping_server(query), None);
+    assert_eq!(state.server_ping_latency(query), None);
+    assert_eq!(state.server_ping_server_name(query), None);
+    assert_eq!(state.server_ping_map(query), None);
+    assert_eq!(state.server_ping_player_count(query), None);
+    assert_eq!(state.server_ping_max_players(query), None);
+    assert_eq!(state.server_player_details_target(query), None);
+    assert_eq!(state.server_players(query), None);
+    assert_eq!(state.server_player_count(query), None);
+    assert_eq!(state.last_server_player_count(), None);
+    assert_eq!(state.server_player(query, "Ada"), None);
+    assert_eq!(state.server_has_player(query, "Ada"), None);
+    assert_eq!(state.server_player_score(query, "Ada"), None);
+    assert_eq!(state.server_player_time_played(query, "Ada"), None);
+    assert_eq!(state.server_rules_target(query), None);
+    assert_eq!(state.server_rule_entries(query), None);
+    assert_eq!(state.server_rule_count(query), None);
+    assert_eq!(state.last_server_rule_count(), None);
+    assert_eq!(state.server_rule(query, "map"), None);
+    assert_eq!(state.server_has_rule(query, "map"), None);
     let error = SteamworksMatchmakingServersError::ClientUnavailable;
     let result = SteamworksMatchmakingServersResult::Err {
         command: command.clone(),
@@ -4118,6 +4142,30 @@ fn matchmaking_servers_api_is_exported_from_root_and_prelude() {
         Option<PreludeServerRule>,
         Option<PreludeServerRules>,
     ) = (None, None, None, query_info, None, None);
+    let state = bevy_steamworks::prelude::SteamworksMatchmakingServersState::default();
+    assert_eq!(state.server_query_target(query), None);
+    assert_eq!(state.server_query_kind(query), None);
+    assert_eq!(state.server_ping_target(query), None);
+    assert_eq!(state.server_ping_server(query), None);
+    assert_eq!(state.server_ping_latency(query), None);
+    assert_eq!(state.server_ping_server_name(query), None);
+    assert_eq!(state.server_ping_map(query), None);
+    assert_eq!(state.server_ping_player_count(query), None);
+    assert_eq!(state.server_ping_max_players(query), None);
+    assert_eq!(state.server_player_details_target(query), None);
+    assert_eq!(state.server_players(query), None);
+    assert_eq!(state.server_player_count(query), None);
+    assert_eq!(state.last_server_player_count(), None);
+    assert_eq!(state.server_player(query, "Ada"), None);
+    assert_eq!(state.server_has_player(query, "Ada"), None);
+    assert_eq!(state.server_player_score(query, "Ada"), None);
+    assert_eq!(state.server_player_time_played(query, "Ada"), None);
+    assert_eq!(state.server_rules_target(query), None);
+    assert_eq!(state.server_rule_entries(query), None);
+    assert_eq!(state.server_rule_count(query), None);
+    assert_eq!(state.last_server_rule_count(), None);
+    assert_eq!(state.server_rule(query, "map"), None);
+    assert_eq!(state.server_has_rule(query, "map"), None);
     let error = PreludeMatchmakingServersError::ClientUnavailable;
     let result = PreludeMatchmakingServersResult::Err {
         command: command.clone(),

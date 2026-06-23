@@ -1,10 +1,13 @@
+use std::time::Duration;
+
 use super::SteamworksMatchmakingServersState;
 use crate::matchmaking_servers::{
     SteamworksGameServerItem, SteamworksMatchmakingServersError, SteamworksServerListCount,
     SteamworksServerListRefreshing, SteamworksServerListRequestId, SteamworksServerListRequestInfo,
     SteamworksServerListResponse, SteamworksServerListServerIndex, SteamworksServerPing,
-    SteamworksServerPlayerDetails, SteamworksServerQueryId, SteamworksServerQueryInfo,
-    SteamworksServerRules,
+    SteamworksServerPlayerDetails, SteamworksServerPlayerInfo, SteamworksServerQueryId,
+    SteamworksServerQueryInfo, SteamworksServerQueryKind, SteamworksServerQueryTarget,
+    SteamworksServerRule, SteamworksServerRules,
 };
 
 impl SteamworksMatchmakingServersState {
@@ -134,6 +137,22 @@ impl SteamworksMatchmakingServersState {
             .copied()
     }
 
+    /// Returns the target endpoint for a cached direct server query.
+    pub fn server_query_target(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryTarget> {
+        self.server_query(query).map(|info| info.target)
+    }
+
+    /// Returns the kind of a cached direct server query.
+    pub fn server_query_kind(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryKind> {
+        self.server_query(query).map(|info| info.kind)
+    }
+
     /// Returns the most recent direct server ping response.
     pub fn last_server_ping(&self) -> Option<&SteamworksServerPing> {
         self.last_server_ping.as_ref()
@@ -142,6 +161,50 @@ impl SteamworksMatchmakingServersState {
     /// Returns a cached direct server ping response by query ID.
     pub fn server_ping(&self, query: SteamworksServerQueryId) -> Option<&SteamworksServerPing> {
         self.server_pings.iter().find(|ping| ping.query == query)
+    }
+
+    /// Returns the target endpoint from a cached direct ping response.
+    pub fn server_ping_target(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryTarget> {
+        self.server_ping(query).map(|ping| ping.target)
+    }
+
+    /// Returns the server item from a cached direct ping response.
+    pub fn server_ping_server(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<&SteamworksGameServerItem> {
+        self.server_ping(query).map(|ping| &ping.server)
+    }
+
+    /// Returns the ping duration from a cached direct ping response.
+    pub fn server_ping_latency(&self, query: SteamworksServerQueryId) -> Option<Duration> {
+        self.server_ping_server(query).map(|server| server.ping)
+    }
+
+    /// Returns the server name from a cached direct ping response.
+    pub fn server_ping_server_name(&self, query: SteamworksServerQueryId) -> Option<&str> {
+        self.server_ping_server(query)
+            .map(|server| server.server_name.as_str())
+    }
+
+    /// Returns the map name from a cached direct ping response.
+    pub fn server_ping_map(&self, query: SteamworksServerQueryId) -> Option<&str> {
+        self.server_ping_server(query)
+            .map(|server| server.map.as_str())
+    }
+
+    /// Returns the current player count from a cached direct ping response.
+    pub fn server_ping_player_count(&self, query: SteamworksServerQueryId) -> Option<i32> {
+        self.server_ping_server(query).map(|server| server.players)
+    }
+
+    /// Returns the maximum player count from a cached direct ping response.
+    pub fn server_ping_max_players(&self, query: SteamworksServerQueryId) -> Option<i32> {
+        self.server_ping_server(query)
+            .map(|server| server.max_players)
     }
 
     /// Returns the most recent direct server ping query that failed.
@@ -169,6 +232,67 @@ impl SteamworksMatchmakingServersState {
             .find(|details| details.query == query)
     }
 
+    /// Returns the target endpoint from cached direct player details.
+    pub fn server_player_details_target(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryTarget> {
+        self.server_player_details(query)
+            .map(|details| details.target)
+    }
+
+    /// Returns cached direct player rows for one query.
+    pub fn server_players(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<&[SteamworksServerPlayerInfo]> {
+        self.server_player_details(query)
+            .map(|details| details.players.as_slice())
+    }
+
+    /// Returns the number of cached direct player rows for one query.
+    pub fn server_player_count(&self, query: SteamworksServerQueryId) -> Option<usize> {
+        self.server_players(query).map(|players| players.len())
+    }
+
+    /// Returns the number of player rows in the most recent direct player-details response.
+    pub fn last_server_player_count(&self) -> Option<usize> {
+        self.last_server_player_details
+            .as_ref()
+            .map(|details| details.players.len())
+    }
+
+    /// Returns a cached direct player row by player name.
+    pub fn server_player(
+        &self,
+        query: SteamworksServerQueryId,
+        name: &str,
+    ) -> Option<&SteamworksServerPlayerInfo> {
+        self.server_players(query)
+            .and_then(|players| players.iter().find(|player| player.name == name))
+    }
+
+    /// Returns whether cached direct player details contain a player name.
+    pub fn server_has_player(&self, query: SteamworksServerQueryId, name: &str) -> Option<bool> {
+        self.server_players(query)
+            .map(|players| players.iter().any(|player| player.name == name))
+    }
+
+    /// Returns a cached direct player score by player name.
+    pub fn server_player_score(&self, query: SteamworksServerQueryId, name: &str) -> Option<i32> {
+        self.server_player(query, name).map(|player| player.score)
+    }
+
+    /// Returns cached direct player time-played by player name.
+    pub fn server_player_time_played(
+        &self,
+        query: SteamworksServerQueryId,
+        name: &str,
+    ) -> Option<Duration> {
+        self.server_player(query, name)
+            .map(|player| player.time_played)
+    }
+
     /// Returns the most recent direct server player-details query that failed.
     pub fn last_failed_server_player_details(&self) -> Option<SteamworksServerQueryId> {
         self.last_failed_server_player_details
@@ -187,6 +311,50 @@ impl SteamworksMatchmakingServersState {
     /// Returns cached direct server rules by query ID.
     pub fn server_rules(&self, query: SteamworksServerQueryId) -> Option<&SteamworksServerRules> {
         self.server_rules.iter().find(|rules| rules.query == query)
+    }
+
+    /// Returns the target endpoint from cached direct server rules.
+    pub fn server_rules_target(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<SteamworksServerQueryTarget> {
+        self.server_rules(query).map(|rules| rules.target)
+    }
+
+    /// Returns cached direct server rule rows for one query.
+    pub fn server_rule_entries(
+        &self,
+        query: SteamworksServerQueryId,
+    ) -> Option<&[SteamworksServerRule]> {
+        self.server_rules(query).map(|rules| rules.rules.as_slice())
+    }
+
+    /// Returns the number of cached direct server rule rows for one query.
+    pub fn server_rule_count(&self, query: SteamworksServerQueryId) -> Option<usize> {
+        self.server_rule_entries(query).map(|rules| rules.len())
+    }
+
+    /// Returns the number of rule rows in the most recent direct server-rules response.
+    pub fn last_server_rule_count(&self) -> Option<usize> {
+        self.last_server_rules
+            .as_ref()
+            .map(|rules| rules.rules.len())
+    }
+
+    /// Returns one cached direct server rule, preserving a cached query without that key as `Some(None)`.
+    pub fn server_rule(&self, query: SteamworksServerQueryId, key: &str) -> Option<Option<&str>> {
+        self.server_rule_entries(query).map(|rules| {
+            rules
+                .iter()
+                .find(|rule| rule.key == key)
+                .map(|rule| rule.value.as_str())
+        })
+    }
+
+    /// Returns whether cached direct server rules contain a key.
+    pub fn server_has_rule(&self, query: SteamworksServerQueryId, key: &str) -> Option<bool> {
+        self.server_rule_entries(query)
+            .map(|rules| rules.iter().any(|rule| rule.key == key))
     }
 
     /// Returns the most recent direct server-rules query that failed.

@@ -274,11 +274,55 @@ fn state_records_callback_operations_without_unbounded_history() {
             target,
         })
     );
+    assert_eq!(state.server_query_target(query), Some(target));
+    assert_eq!(
+        state.server_query_kind(query),
+        Some(SteamworksServerQueryKind::Ping)
+    );
     assert_eq!(state.server_ping(query), Some(&ping));
+    assert_eq!(state.server_ping_target(query), Some(target));
+    assert_eq!(state.server_ping_server(query), Some(&server));
+    assert_eq!(
+        state.server_ping_latency(query),
+        Some(Duration::from_millis(42))
+    );
+    assert_eq!(state.server_ping_server_name(query), Some("Local"));
+    assert_eq!(state.server_ping_map(query), Some("arena"));
+    assert_eq!(state.server_ping_player_count(query), Some(2));
+    assert_eq!(state.server_ping_max_players(query), Some(8));
     assert!(state.server_ping_failed(query));
     assert_eq!(state.server_player_details(query), Some(&player_details));
+    assert_eq!(state.server_player_details_target(query), Some(target));
+    assert_eq!(
+        state.server_players(query),
+        Some(player_details.players.as_slice())
+    );
+    assert_eq!(state.server_player_count(query), Some(1));
+    assert_eq!(state.last_server_player_count(), Some(1));
+    assert_eq!(
+        state.server_player(query, "Ada"),
+        Some(&player_details.players[0])
+    );
+    assert_eq!(state.server_has_player(query, "Ada"), Some(true));
+    assert_eq!(state.server_has_player(query, "Grace"), Some(false));
+    assert_eq!(state.server_player_score(query, "Ada"), Some(10));
+    assert_eq!(
+        state.server_player_time_played(query, "Ada"),
+        Some(Duration::from_secs(60))
+    );
     assert!(state.server_player_details_failed(query));
     assert_eq!(state.server_rules(query), Some(&rules));
+    assert_eq!(state.server_rules_target(query), Some(target));
+    assert_eq!(
+        state.server_rule_entries(query),
+        Some(rules.rules.as_slice())
+    );
+    assert_eq!(state.server_rule_count(query), Some(1));
+    assert_eq!(state.last_server_rule_count(), Some(1));
+    assert_eq!(state.server_rule(query, "map"), Some(Some("arena")));
+    assert_eq!(state.server_rule(query, "mode"), Some(None));
+    assert_eq!(state.server_has_rule(query, "map"), Some(true));
+    assert_eq!(state.server_has_rule(query, "mode"), Some(false));
     assert!(state.server_rules_failed(query));
     assert_eq!(
         state.server_list_request(request),
@@ -384,6 +428,9 @@ fn state_records_callback_operations_without_unbounded_history() {
     assert_eq!(state.server_list_refreshing(request), None);
     assert_eq!(state.server(request, 0), None);
     assert!(state.server_query(query).is_some());
+    assert_eq!(state.server_query_target(query), Some(target));
+    assert_eq!(state.server_player_count(query), Some(1));
+    assert_eq!(state.server_rule_count(query), Some(1));
     assert_eq!(state.server_list_release_count(), 1);
     assert_eq!(state.server_response_count(), 1);
     assert_eq!(state.server_failure_count(), 1);
