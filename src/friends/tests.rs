@@ -221,7 +221,13 @@ fn state_records_friend_operations() {
         name: "Alex Updated".to_owned(),
         nickname: Some("A".to_owned()),
         state: steamworks::FriendState::Busy,
-        game: None,
+        game: Some(SteamworksFriendGameInfo {
+            game: steamworks::GameId::from_raw(480),
+            game_address: std::net::Ipv4Addr::LOCALHOST,
+            game_port: 27015,
+            query_port: 27016,
+            lobby,
+        }),
     };
     let coplay_friend = SteamworksCoplayFriendInfo {
         friend: SteamworksFriendInfo {
@@ -318,6 +324,14 @@ fn state_records_friend_operations() {
         state.friend_avatar(friend, SteamworksAvatarSize::Small),
         Some(None)
     );
+    assert_eq!(
+        state.friend_avatar_dimensions(friend, SteamworksAvatarSize::Small),
+        Some(None)
+    );
+    assert_eq!(
+        state.friend_avatar_rgba(friend, SteamworksAvatarSize::Small),
+        Some(None)
+    );
     state.record_operation(&SteamworksFriendsOperation::FriendAvatarRead {
         steam_id: friend,
         size: SteamworksAvatarSize::Small,
@@ -327,9 +341,25 @@ fn state_records_friend_operations() {
     assert_eq!(state.last_persona_name(), Some("Current User"));
     assert_eq!(state.friends(), &[initial_friend]);
     assert_eq!(state.friend(friend), Some(&updated_friend));
+    assert!(state.has_known_friend(friend));
+    assert!(!state.has_known_friend(steamworks::SteamId::from_raw(999)));
+    assert_eq!(state.friend_name(friend), Some("Alex Updated"));
+    assert_eq!(state.friend_nickname(friend), Some(Some("A")));
+    assert_eq!(
+        state.friend_state(friend),
+        Some(steamworks::FriendState::Busy)
+    );
+    assert_eq!(
+        state.friend_game(friend),
+        Some(updated_friend.game.as_ref())
+    );
+    assert_eq!(state.friend_game(steamworks::SteamId::from_raw(999)), None);
     assert_eq!(state.known_friends().len(), 2);
     assert_eq!(state.coplay_friends(), std::slice::from_ref(&coplay_friend));
     assert_eq!(state.coplay_friend(user), Some(&coplay_friend));
+    assert_eq!(state.coplay_app_id(user), Some(app_id));
+    assert_eq!(state.coplay_time(user), Some(123));
+    assert_eq!(state.coplay_app_id(friend), None);
     assert_eq!(
         state.last_user_information_request(),
         Some(&SteamworksUserInformationRequest {
@@ -378,6 +408,14 @@ fn state_records_friend_operations() {
     assert_eq!(
         state.friend_avatar(friend, SteamworksAvatarSize::Small),
         Some(Some(&avatar))
+    );
+    assert_eq!(
+        state.friend_avatar_dimensions(friend, SteamworksAvatarSize::Small),
+        Some(Some((32, 32)))
+    );
+    assert_eq!(
+        state.friend_avatar_rgba(friend, SteamworksAvatarSize::Small),
+        Some(Some(avatar.rgba.as_slice()))
     );
     assert_eq!(state.friend_avatars().len(), 1);
 }

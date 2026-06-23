@@ -1,8 +1,8 @@
 use super::{
     SteamworksAvatar, SteamworksAvatarSize, SteamworksCoplayFriendInfo, SteamworksFriendAvatar,
-    SteamworksFriendInfo, SteamworksFriendRichPresenceValue, SteamworksFriendsError,
-    SteamworksFriendsState, SteamworksHasFriendResult, SteamworksLobbyJoinRequest,
-    SteamworksOverlayStoreActivation, SteamworksOverlayUserActivation,
+    SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendRichPresenceValue,
+    SteamworksFriendsError, SteamworksFriendsState, SteamworksHasFriendResult,
+    SteamworksLobbyJoinRequest, SteamworksOverlayStoreActivation, SteamworksOverlayUserActivation,
     SteamworksPersonaStateChange, SteamworksRichPresenceChange, SteamworksRichPresenceJoinRequest,
     SteamworksUserGameInvite, SteamworksUserInformationRequest,
 };
@@ -32,6 +32,41 @@ impl SteamworksFriendsState {
             .find(|friend| friend.steam_id == steam_id)
     }
 
+    /// Returns whether any friend snapshot is cached for a Steam user.
+    pub fn has_known_friend(&self, steam_id: steamworks::SteamId) -> bool {
+        self.friend(steam_id).is_some()
+    }
+
+    /// Returns the latest known display name for a Steam user.
+    pub fn friend_name(&self, steam_id: steamworks::SteamId) -> Option<&str> {
+        self.friend(steam_id).map(|friend| friend.name.as_str())
+    }
+
+    /// Returns the latest known nickname for a Steam user.
+    ///
+    /// The outer `Option` distinguishes an unknown user from a known user. The
+    /// inner `Option` is `None` when the current user has no nickname set.
+    pub fn friend_nickname(&self, steam_id: steamworks::SteamId) -> Option<Option<&str>> {
+        self.friend(steam_id)
+            .map(|friend| friend.nickname.as_deref())
+    }
+
+    /// Returns the latest known persona state for a Steam user.
+    pub fn friend_state(&self, steam_id: steamworks::SteamId) -> Option<steamworks::FriendState> {
+        self.friend(steam_id).map(|friend| friend.state)
+    }
+
+    /// Returns the latest known in-game snapshot for a Steam user.
+    ///
+    /// The outer `Option` distinguishes an unknown user from a known user. The
+    /// inner `Option` is `None` when the user is known but not in a game.
+    pub fn friend_game(
+        &self,
+        steam_id: steamworks::SteamId,
+    ) -> Option<Option<&SteamworksFriendGameInfo>> {
+        self.friend(steam_id).map(|friend| friend.game.as_ref())
+    }
+
     /// Returns all latest known friend snapshots cached by this plugin.
     pub fn known_friends(&self) -> &[SteamworksFriendInfo] {
         &self.known_friends
@@ -50,6 +85,18 @@ impl SteamworksFriendsState {
         self.coplay_friends
             .iter()
             .find(|friend| friend.friend.steam_id == steam_id)
+    }
+
+    /// Returns the latest known app ID for a recently-played-with Steam user.
+    pub fn coplay_app_id(&self, steam_id: steamworks::SteamId) -> Option<steamworks::AppId> {
+        self.coplay_friend(steam_id)
+            .map(|friend| friend.coplay_app_id)
+    }
+
+    /// Returns the latest known Unix timestamp for a recently-played-with Steam user.
+    pub fn coplay_time(&self, steam_id: steamworks::SteamId) -> Option<i32> {
+        self.coplay_friend(steam_id)
+            .map(|friend| friend.coplay_time)
     }
 
     /// Returns the most recent user information refresh request submitted through this plugin.
@@ -151,6 +198,32 @@ impl SteamworksFriendsState {
             .iter()
             .find(|avatar| avatar.steam_id == steam_id && avatar.size == size)
             .map(|avatar| avatar.avatar.as_ref())
+    }
+
+    /// Returns avatar dimensions for a user and size.
+    ///
+    /// The outer `Option` distinguishes an unread avatar from a completed read.
+    /// The inner `Option` is `None` when Steam had no image available yet.
+    pub fn friend_avatar_dimensions(
+        &self,
+        steam_id: steamworks::SteamId,
+        size: SteamworksAvatarSize,
+    ) -> Option<Option<(u32, u32)>> {
+        self.friend_avatar(steam_id, size)
+            .map(|avatar| avatar.map(|avatar| (avatar.width, avatar.height)))
+    }
+
+    /// Returns RGBA avatar bytes for a user and size.
+    ///
+    /// The outer `Option` distinguishes an unread avatar from a completed read.
+    /// The inner `Option` is `None` when Steam had no image available yet.
+    pub fn friend_avatar_rgba(
+        &self,
+        steam_id: steamworks::SteamId,
+        size: SteamworksAvatarSize,
+    ) -> Option<Option<&[u8]>> {
+        self.friend_avatar(steam_id, size)
+            .map(|avatar| avatar.map(|avatar| avatar.rgba.as_slice()))
     }
 
     /// Returns all friend avatar reads cached by this plugin.

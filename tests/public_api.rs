@@ -4,6 +4,7 @@ use bevy_steamworks::{
         SteamAPIInitError as PreludeInitError, SteamworksAppsCommand as PreludeAppsCommand,
         SteamworksAppsError as PreludeAppsError, SteamworksAppsOperation as PreludeAppsOperation,
         SteamworksAppsPlugin as PreludeAppsPlugin, SteamworksAppsResult as PreludeAppsResult,
+        SteamworksAvatarSize as PreludeAvatarSize,
         SteamworksCallbackRegistry as PreludeCallbackRegistry, SteamworksClient as PreludeClient,
         SteamworksClientPlugins as PreludeClientPlugins,
         SteamworksCommandError as PreludeCommandError,
@@ -18,6 +19,7 @@ use bevy_steamworks::{
         SteamworksFriendsOperation as PreludeFriendsOperation,
         SteamworksFriendsPlugin as PreludeFriendsPlugin,
         SteamworksFriendsResult as PreludeFriendsResult,
+        SteamworksFriendsState as PreludeFriendsState,
         SteamworksGamepadTextInputDismissed as PreludeGamepadTextInputDismissed,
         SteamworksGamepadTextInputLineMode as PreludeGamepadTextInputLineMode,
         SteamworksGamepadTextInputMode as PreludeGamepadTextInputMode,
@@ -168,12 +170,13 @@ use bevy_steamworks::{
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
-    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksCallbackRegistry, SteamworksClient,
-    SteamworksClientPlugins, SteamworksCommandError, SteamworksConnectionRequestPolicy,
-    SteamworksEvent, SteamworksFailurePolicy, SteamworksFloatingGamepadTextInputDismissed,
-    SteamworksFloatingGamepadTextInputMode, SteamworksFloatingGamepadTextInputRequest,
-    SteamworksFloatingGamepadTextInputShown, SteamworksFriendsCommand, SteamworksFriendsError,
-    SteamworksFriendsOperation, SteamworksFriendsPlugin, SteamworksFriendsResult,
+    SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAvatarSize, SteamworksCallbackRegistry,
+    SteamworksClient, SteamworksClientPlugins, SteamworksCommandError,
+    SteamworksConnectionRequestPolicy, SteamworksEvent, SteamworksFailurePolicy,
+    SteamworksFloatingGamepadTextInputDismissed, SteamworksFloatingGamepadTextInputMode,
+    SteamworksFloatingGamepadTextInputRequest, SteamworksFloatingGamepadTextInputShown,
+    SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
+    SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksFriendsState,
     SteamworksGamepadTextInputDismissed, SteamworksGamepadTextInputLineMode,
     SteamworksGamepadTextInputMode, SteamworksGamepadTextInputRequest,
     SteamworksGamepadTextInputShown, SteamworksGamepadTextInputSubmitted, SteamworksInitMode,
@@ -567,6 +570,23 @@ fn friends_api_is_exported_from_root_and_prelude() {
         result,
         error,
     );
+    let friend = steamworks::SteamId::from_raw(11);
+    let root_state = SteamworksFriendsState::default();
+    assert!(!root_state.has_known_friend(friend));
+    assert_eq!(root_state.friend_name(friend), None);
+    assert_eq!(root_state.friend_nickname(friend), None);
+    assert_eq!(root_state.friend_state(friend), None);
+    assert_eq!(root_state.friend_game(friend), None);
+    assert_eq!(root_state.coplay_app_id(friend), None);
+    assert_eq!(root_state.coplay_time(friend), None);
+    assert_eq!(
+        root_state.friend_avatar_dimensions(friend, SteamworksAvatarSize::Small),
+        None
+    );
+    assert_eq!(
+        root_state.friend_avatar_rgba(friend, SteamworksAvatarSize::Small),
+        None
+    );
 
     let command = PreludeFriendsCommand::get_persona_name();
     let operation = PreludeFriendsOperation::PersonaNameRead {
@@ -588,6 +608,22 @@ fn friends_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+    );
+    let prelude_state = PreludeFriendsState::default();
+    assert!(!prelude_state.has_known_friend(friend));
+    assert_eq!(prelude_state.friend_name(friend), None);
+    assert_eq!(prelude_state.friend_nickname(friend), None);
+    assert_eq!(prelude_state.friend_state(friend), None);
+    assert_eq!(prelude_state.friend_game(friend), None);
+    assert_eq!(prelude_state.coplay_app_id(friend), None);
+    assert_eq!(prelude_state.coplay_time(friend), None);
+    assert_eq!(
+        prelude_state.friend_avatar_dimensions(friend, PreludeAvatarSize::Small),
+        None
+    );
+    assert_eq!(
+        prelude_state.friend_avatar_rgba(friend, PreludeAvatarSize::Small),
+        None
     );
 }
 

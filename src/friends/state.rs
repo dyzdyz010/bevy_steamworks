@@ -4,8 +4,8 @@ use super::{
     messages::{SteamworksFriendsError, SteamworksFriendsOperation},
     types::{
         SteamworksAvatar, SteamworksAvatarSize, SteamworksCoplayFriendInfo, SteamworksFriendAvatar,
-        SteamworksFriendInfo, SteamworksFriendRichPresenceValue, SteamworksHasFriendResult,
-        SteamworksLobbyJoinRequest, SteamworksOverlayStoreActivation,
+        SteamworksFriendGameInfo, SteamworksFriendInfo, SteamworksFriendRichPresenceValue,
+        SteamworksHasFriendResult, SteamworksLobbyJoinRequest, SteamworksOverlayStoreActivation,
         SteamworksOverlayUserActivation, SteamworksPersonaStateChange,
         SteamworksRichPresenceChange, SteamworksRichPresenceJoinRequest, SteamworksUserGameInvite,
         SteamworksUserInformationRequest,
