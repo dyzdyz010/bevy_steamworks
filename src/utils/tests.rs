@@ -463,11 +463,26 @@ fn state_records_utility_operations() {
     );
     assert_eq!(state.last_gamepad_text_input_shown(), Some(&gamepad_shown));
     assert_eq!(
+        state.last_gamepad_text_input_request(),
+        Some(&gamepad_shown.request)
+    );
+    assert_eq!(state.gamepad_text_input_shown(), Some(true));
+    assert_eq!(
         state.last_floating_gamepad_text_input_shown(),
         Some(&floating_shown)
     );
+    assert_eq!(
+        state.last_floating_gamepad_text_input_request(),
+        Some(&floating_shown.request)
+    );
+    assert_eq!(state.floating_gamepad_text_input_shown(), Some(true));
     assert_eq!(state.last_gamepad_text_input_submitted(), Some(&submitted));
+    assert_eq!(state.last_submitted_gamepad_text(), Some("Name"));
+    assert_eq!(state.last_submitted_gamepad_text_len(), Some(4));
     assert_eq!(state.last_gamepad_text_input_dismissed(), Some(&dismissed));
+    assert_eq!(state.gamepad_text_input_was_submitted(), Some(true));
+    assert_eq!(state.last_dismissed_gamepad_text(), Some(Some("Name")));
+    assert_eq!(state.last_dismissed_gamepad_text_len(), Some(Some(4)));
     assert_eq!(
         state.last_floating_gamepad_text_input_dismissed(),
         Some(&floating_dismissed)

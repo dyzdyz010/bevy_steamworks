@@ -168,6 +168,7 @@ use bevy_steamworks::{
         SteamworksUtilsError as PreludeUtilsError,
         SteamworksUtilsOperation as PreludeUtilsOperation,
         SteamworksUtilsPlugin as PreludeUtilsPlugin, SteamworksUtilsResult as PreludeUtilsResult,
+        SteamworksUtilsState as PreludeUtilsState,
     },
     SteamAPIInitError, SteamworksAppsCommand, SteamworksAppsError, SteamworksAppsOperation,
     SteamworksAppsPlugin, SteamworksAppsResult, SteamworksAvatarSize, SteamworksCallbackRegistry,
@@ -238,7 +239,7 @@ use bevy_steamworks::{
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
     SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
     SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
-    SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksUtilsPlugin, SteamworksUtilsResult, SteamworksUtilsState,
 };
 use std::error::Error;
 
@@ -3469,6 +3470,16 @@ fn utils_api_is_exported_from_root_and_prelude() {
             height: 1,
         },
     );
+    let root_state = SteamworksUtilsState::default();
+    assert_eq!(root_state.last_gamepad_text_input_request(), None);
+    assert_eq!(root_state.gamepad_text_input_shown(), None);
+    assert_eq!(root_state.last_floating_gamepad_text_input_request(), None);
+    assert_eq!(root_state.floating_gamepad_text_input_shown(), None);
+    assert_eq!(root_state.last_submitted_gamepad_text(), None);
+    assert_eq!(root_state.last_submitted_gamepad_text_len(), None);
+    assert_eq!(root_state.gamepad_text_input_was_submitted(), None);
+    assert_eq!(root_state.last_dismissed_gamepad_text(), None);
+    assert_eq!(root_state.last_dismissed_gamepad_text_len(), None);
 
     let gamepad_request = PreludeGamepadTextInputRequest::new("Name", 32)
         .with_input_mode(PreludeGamepadTextInputMode::Normal)
@@ -3592,6 +3603,19 @@ fn utils_api_is_exported_from_root_and_prelude() {
             height: 1,
         },
     );
+    let prelude_state = PreludeUtilsState::default();
+    assert_eq!(prelude_state.last_gamepad_text_input_request(), None);
+    assert_eq!(prelude_state.gamepad_text_input_shown(), None);
+    assert_eq!(
+        prelude_state.last_floating_gamepad_text_input_request(),
+        None
+    );
+    assert_eq!(prelude_state.floating_gamepad_text_input_shown(), None);
+    assert_eq!(prelude_state.last_submitted_gamepad_text(), None);
+    assert_eq!(prelude_state.last_submitted_gamepad_text_len(), None);
+    assert_eq!(prelude_state.gamepad_text_input_was_submitted(), None);
+    assert_eq!(prelude_state.last_dismissed_gamepad_text(), None);
+    assert_eq!(prelude_state.last_dismissed_gamepad_text_len(), None);
 }
 
 #[test]
