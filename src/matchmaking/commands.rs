@@ -45,7 +45,20 @@ pub(super) fn process_matchmaking_commands(
     };
 
     for command in commands.drain() {
-        let request_id = async_command_request_id(&command, &mut state);
+        let request_id = match async_command_request_id_after_validation(&command, &mut state) {
+            Ok(request_id) => request_id,
+            Err(error) => {
+                state.record_error(error.clone());
+                tracing::error!(
+                    target: "bevy_steamworks",
+                    command = ?command,
+                    error = %error,
+                    "Steamworks matchmaking command failed"
+                );
+                results.write(SteamworksMatchmakingResult::Err { command, error });
+                continue;
+            }
+        };
         match handle_matchmaking_command(&client, &async_results, command.clone(), request_id) {
             Ok(operation) => {
                 state.record_operation(&operation);
@@ -80,17 +93,18 @@ fn record_matchmaking_result(
     }
 }
 
-fn async_command_request_id(
+fn async_command_request_id_after_validation(
     command: &SteamworksMatchmakingCommand,
     state: &mut SteamworksMatchmakingState,
-) -> Option<u64> {
-    matches!(
+) -> Result<Option<u64>, SteamworksMatchmakingError> {
+    validate_command(command)?;
+    Ok(matches!(
         command,
         SteamworksMatchmakingCommand::RequestLobbyList { .. }
             | SteamworksMatchmakingCommand::CreateLobby { .. }
             | SteamworksMatchmakingCommand::JoinLobby { .. }
     )
-    .then(|| state.next_request_id())
+    .then(|| state.next_request_id()))
 }
 
 fn handle_matchmaking_command(
@@ -200,7 +214,7 @@ fn handle_matchmaking_command(
 
 #[cfg(test)]
 mod tests {
-    use super::super::SteamworksLobbyListFilter;
+    use super::super::{SteamworksLobbyListFilter, MAX_LOBBY_LIST_RESULTS};
     use super::*;
 
     #[test]
@@ -209,16 +223,39 @@ mod tests {
         let command =
             SteamworksMatchmakingCommand::request_lobby_list(SteamworksLobbyListFilter::new());
 
-        assert_eq!(async_command_request_id(&command, &mut state), Some(0));
-        assert_eq!(async_command_request_id(&command, &mut state), Some(1));
         assert_eq!(
-            async_command_request_id(
+            async_command_request_id_after_validation(&command, &mut state),
+            Ok(Some(0))
+        );
+        assert_eq!(
+            async_command_request_id_after_validation(&command, &mut state),
+            Ok(Some(1))
+        );
+        assert_eq!(
+            async_command_request_id_after_validation(
                 &SteamworksMatchmakingCommand::GetLobbyDataCount {
                     lobby: steamworks::LobbyId::from_raw(1),
                 },
                 &mut state,
             ),
-            None
+            Ok(None)
         );
+    }
+
+    #[test]
+    fn invalid_async_commands_do_not_consume_request_ids() {
+        let mut state = SteamworksMatchmakingState::default();
+        let command = SteamworksMatchmakingCommand::request_lobby_list(
+            SteamworksLobbyListFilter::new().with_max_results(MAX_LOBBY_LIST_RESULTS + 1),
+        );
+
+        assert_eq!(
+            async_command_request_id_after_validation(&command, &mut state),
+            Err(SteamworksMatchmakingError::MaxLobbyListResultsExceeded {
+                requested: MAX_LOBBY_LIST_RESULTS + 1,
+                max_supported: MAX_LOBBY_LIST_RESULTS,
+            })
+        );
+        assert_eq!(state.next_request_id(), 0);
     }
 }
