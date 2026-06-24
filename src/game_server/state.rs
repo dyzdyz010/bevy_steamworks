@@ -66,6 +66,7 @@ pub struct SteamworksServerState {
     last_incoming_packet: Option<SteamworksServerIncomingPacket>,
     incoming_packet_count: u64,
     last_outgoing_packets: Vec<SteamworksServerOutgoingPacket>,
+    outgoing_packet_count: u64,
     outgoing_packet_drain_count: u64,
 }
 

@@ -643,6 +643,10 @@ fn state_records_server_operations() {
         addr: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 27015),
         data: vec![1, 2, 3],
     };
+    let second_packet = SteamworksServerOutgoingPacket {
+        addr: SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 2), 27016),
+        data: vec![4, 5],
+    };
 
     state.record_operation(&SteamworksServerOperation::SteamIdRead { steam_id });
     state.record_operation(&SteamworksServerOperation::AuthenticationSessionStarted { user });
@@ -690,7 +694,7 @@ fn state_records_server_operations() {
         accepted: true,
     });
     state.record_operation(&SteamworksServerOperation::OutgoingPacketsDrained {
-        packets: vec![packet.clone()],
+        packets: vec![packet.clone(), second_packet.clone()],
     });
 
     assert_eq!(state.steam_id(), Some(steam_id));
@@ -738,7 +742,14 @@ fn state_records_server_operations() {
         })
     );
     assert_eq!(state.incoming_packet_count(), 1);
-    assert_eq!(state.last_outgoing_packets(), &[packet]);
+    assert_eq!(
+        state.last_outgoing_packets(),
+        &[packet.clone(), second_packet.clone()]
+    );
+    assert_eq!(state.last_outgoing_packet(), Some(&second_packet));
+    assert_eq!(state.last_outgoing_packet_addr(), Some(second_packet.addr));
+    assert_eq!(state.last_outgoing_packet_bytes(), Some(2));
+    assert_eq!(state.outgoing_packet_count(), 2);
     assert_eq!(state.outgoing_packet_drain_count(), 1);
 
     state.record_operation(&SteamworksServerOperation::AuthenticationSessionEnded { user });

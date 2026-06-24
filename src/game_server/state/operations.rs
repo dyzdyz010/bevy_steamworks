@@ -219,6 +219,9 @@ impl SteamworksServerState {
             }
             SteamworksServerOperation::OutgoingPacketsDrained { packets } => {
                 self.last_outgoing_packets = packets.clone();
+                self.outgoing_packet_count = self
+                    .outgoing_packet_count
+                    .saturating_add(packets.len().try_into().unwrap_or(u64::MAX));
                 self.outgoing_packet_drain_count =
                     self.outgoing_packet_drain_count.saturating_add(1);
             }
