@@ -157,6 +157,43 @@ pub struct SteamworksOverlayStoreActivation {
     pub action: SteamworksOverlayToStoreAction,
 }
 
+/// Built-in Steam overlay dialogs for the current user.
+///
+/// These map to the `pchDialog` values accepted by Steam's
+/// `ISteamFriends::ActivateGameOverlay` API.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksGameOverlayDialog {
+    /// Open the friends list.
+    Friends,
+    /// Open the Steam community overlay.
+    Community,
+    /// Open the players dialog.
+    Players,
+    /// Open the Steam settings dialog.
+    Settings,
+    /// Open the official game group or community hub.
+    OfficialGameGroup,
+    /// Open the current user's stats.
+    Stats,
+    /// Open the current user's achievements.
+    Achievements,
+}
+
+impl SteamworksGameOverlayDialog {
+    /// Returns the Steam dialog string for this overlay target.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Friends => "friends",
+            Self::Community => "community",
+            Self::Players => "players",
+            Self::Settings => "settings",
+            Self::OfficialGameGroup => "officialgamegroup",
+            Self::Stats => "stats",
+            Self::Achievements => "achievements",
+        }
+    }
+}
+
 /// Steam overlay user-dialog activation snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SteamworksOverlayUserActivation {
@@ -164,6 +201,49 @@ pub struct SteamworksOverlayUserActivation {
     pub dialog: String,
     /// Target user Steam ID.
     pub steam_id: steamworks::SteamId,
+}
+
+/// Built-in Steam overlay dialogs scoped to another Steam user or group.
+///
+/// These map to the `pchDialog` values accepted by Steam's
+/// `ISteamFriends::ActivateGameOverlayToUser` API.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SteamworksUserOverlayDialog {
+    /// Open the target user's or group's profile.
+    Profile,
+    /// Open chat with the target user or group.
+    Chat,
+    /// Open a Steam Trading session window.
+    JoinTrade,
+    /// Open the target user's stats.
+    Stats,
+    /// Open the target user's achievements.
+    Achievements,
+    /// Prompt to add the target user as a friend.
+    FriendAdd,
+    /// Prompt to remove the target friend.
+    FriendRemove,
+    /// Prompt to accept an incoming friend request.
+    FriendRequestAccept,
+    /// Prompt to ignore an incoming friend request.
+    FriendRequestIgnore,
+}
+
+impl SteamworksUserOverlayDialog {
+    /// Returns the Steam dialog string for this user-scoped overlay target.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Profile => "steamid",
+            Self::Chat => "chat",
+            Self::JoinTrade => "jointrade",
+            Self::Stats => "stats",
+            Self::Achievements => "achievements",
+            Self::FriendAdd => "friendadd",
+            Self::FriendRemove => "friendremove",
+            Self::FriendRequestAccept => "friendrequestaccept",
+            Self::FriendRequestIgnore => "friendrequestignore",
+        }
+    }
 }
 
 /// Game invite submitted to a Steam user.

@@ -138,6 +138,19 @@ fn constructors_preserve_inputs() {
         }
     );
     assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_dialog(
+            SteamworksGameOverlayDialog::Achievements
+        ),
+        SteamworksFriendsCommand::ActivateGameOverlay {
+            dialog: "achievements".to_owned(),
+        }
+    );
+    assert_eq!(SteamworksGameOverlayDialog::Friends.as_str(), "friends");
+    assert_eq!(
+        SteamworksGameOverlayDialog::OfficialGameGroup.as_str(),
+        "officialgamegroup"
+    );
+    assert_eq!(
         SteamworksFriendsCommand::activate_game_overlay_to_web_page("https://steamcommunity.com"),
         SteamworksFriendsCommand::ActivateGameOverlayToWebPage {
             url: "https://steamcommunity.com".to_owned(),
@@ -164,6 +177,18 @@ fn constructors_preserve_inputs() {
             steam_id: friend,
         }
     );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_to_user_dialog(
+            SteamworksUserOverlayDialog::FriendRequestAccept,
+            friend,
+        ),
+        SteamworksFriendsCommand::ActivateGameOverlayToUser {
+            dialog: "friendrequestaccept".to_owned(),
+            steam_id: friend,
+        }
+    );
+    assert_eq!(SteamworksUserOverlayDialog::Profile.as_str(), "steamid");
+    assert_eq!(SteamworksUserOverlayDialog::JoinTrade.as_str(), "jointrade");
     assert_eq!(
         SteamworksFriendsCommand::activate_invite_dialog(lobby),
         SteamworksFriendsCommand::ActivateInviteDialog { lobby }

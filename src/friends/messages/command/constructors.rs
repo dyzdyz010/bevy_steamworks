@@ -1,4 +1,7 @@
-use super::super::super::{SteamworksAvatarSize, SteamworksOverlayToStoreAction};
+use super::super::super::{
+    SteamworksAvatarSize, SteamworksGameOverlayDialog, SteamworksOverlayToStoreAction,
+    SteamworksUserOverlayDialog,
+};
 use super::SteamworksFriendsCommand;
 
 impl SteamworksFriendsCommand {
@@ -66,6 +69,14 @@ impl SteamworksFriendsCommand {
         }
     }
 
+    /// Creates a [`SteamworksFriendsCommand::ActivateGameOverlay`] command from
+    /// one of Steam's built-in overlay dialog targets.
+    pub fn activate_game_overlay_dialog(dialog: SteamworksGameOverlayDialog) -> Self {
+        Self::ActivateGameOverlay {
+            dialog: dialog.as_str().to_owned(),
+        }
+    }
+
     /// Creates a [`SteamworksFriendsCommand::ActivateGameOverlayToWebPage`] command.
     pub fn activate_game_overlay_to_web_page(url: impl Into<String>) -> Self {
         Self::ActivateGameOverlayToWebPage { url: url.into() }
@@ -89,6 +100,18 @@ impl SteamworksFriendsCommand {
     ) -> Self {
         Self::ActivateGameOverlayToUser {
             dialog: dialog.into(),
+            steam_id,
+        }
+    }
+
+    /// Creates a [`SteamworksFriendsCommand::ActivateGameOverlayToUser`] command
+    /// from one of Steam's built-in user-scoped overlay dialog targets.
+    pub fn activate_game_overlay_to_user_dialog(
+        dialog: SteamworksUserOverlayDialog,
+        steam_id: steamworks::SteamId,
+    ) -> Self {
+        Self::ActivateGameOverlayToUser {
+            dialog: dialog.as_str().to_owned(),
             steam_id,
         }
     }

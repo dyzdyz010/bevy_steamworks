@@ -20,6 +20,7 @@ use bevy_steamworks::{
         SteamworksFriendsPlugin as PreludeFriendsPlugin,
         SteamworksFriendsResult as PreludeFriendsResult,
         SteamworksFriendsState as PreludeFriendsState,
+        SteamworksGameOverlayDialog as PreludeGameOverlayDialog,
         SteamworksGamepadTextInputDismissed as PreludeGamepadTextInputDismissed,
         SteamworksGamepadTextInputLineMode as PreludeGamepadTextInputLineMode,
         SteamworksGamepadTextInputMode as PreludeGamepadTextInputMode,
@@ -167,6 +168,7 @@ use bevy_steamworks::{
         SteamworksUgcWorkshopDepotId as PreludeUgcWorkshopDepotId,
         SteamworksUnavailable as PreludeUnavailable, SteamworksUserCommand as PreludeUserCommand,
         SteamworksUserError as PreludeUserError, SteamworksUserOperation as PreludeUserOperation,
+        SteamworksUserOverlayDialog as PreludeUserOverlayDialog,
         SteamworksUserPlugin as PreludeUserPlugin, SteamworksUserResult as PreludeUserResult,
         SteamworksUserState as PreludeUserState, SteamworksUtilsCommand as PreludeUtilsCommand,
         SteamworksUtilsError as PreludeUtilsError,
@@ -182,11 +184,12 @@ use bevy_steamworks::{
     SteamworksFloatingGamepadTextInputRequest, SteamworksFloatingGamepadTextInputShown,
     SteamworksFriendsCommand, SteamworksFriendsError, SteamworksFriendsOperation,
     SteamworksFriendsPlugin, SteamworksFriendsResult, SteamworksFriendsState,
-    SteamworksGamepadTextInputDismissed, SteamworksGamepadTextInputLineMode,
-    SteamworksGamepadTextInputMode, SteamworksGamepadTextInputRequest,
-    SteamworksGamepadTextInputShown, SteamworksGamepadTextInputSubmitted, SteamworksInitMode,
-    SteamworksInputCommand, SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin,
-    SteamworksInputResult, SteamworksIssuedAuthSessionTicketForIdentity, SteamworksLobbyListFilter,
+    SteamworksGameOverlayDialog, SteamworksGamepadTextInputDismissed,
+    SteamworksGamepadTextInputLineMode, SteamworksGamepadTextInputMode,
+    SteamworksGamepadTextInputRequest, SteamworksGamepadTextInputShown,
+    SteamworksGamepadTextInputSubmitted, SteamworksInitMode, SteamworksInputCommand,
+    SteamworksInputError, SteamworksInputOperation, SteamworksInputPlugin, SteamworksInputResult,
+    SteamworksIssuedAuthSessionTicketForIdentity, SteamworksLobbyListFilter,
     SteamworksLobbyListResult, SteamworksMatchmakingCommand, SteamworksMatchmakingError,
     SteamworksMatchmakingOperation, SteamworksMatchmakingPlugin, SteamworksMatchmakingResult,
     SteamworksMatchmakingServersCommand, SteamworksMatchmakingServersError,
@@ -242,9 +245,10 @@ use bevy_steamworks::{
     SteamworksUgcQueryResult, SteamworksUgcQueryResults, SteamworksUgcQueryTotal,
     SteamworksUgcQueryTotalResult, SteamworksUgcResult, SteamworksUgcState, SteamworksUgcStatistic,
     SteamworksUgcWorkshopDepotId, SteamworksUnavailable, SteamworksUserCommand,
-    SteamworksUserError, SteamworksUserOperation, SteamworksUserPlugin, SteamworksUserResult,
-    SteamworksUserState, SteamworksUtilsCommand, SteamworksUtilsError, SteamworksUtilsOperation,
-    SteamworksUtilsPlugin, SteamworksUtilsResult, SteamworksUtilsState,
+    SteamworksUserError, SteamworksUserOperation, SteamworksUserOverlayDialog,
+    SteamworksUserPlugin, SteamworksUserResult, SteamworksUserState, SteamworksUtilsCommand,
+    SteamworksUtilsError, SteamworksUtilsOperation, SteamworksUtilsPlugin, SteamworksUtilsResult,
+    SteamworksUtilsState,
 };
 use std::error::Error;
 
@@ -576,6 +580,8 @@ fn friends_api_is_exported_from_root_and_prelude() {
         _operation: SteamworksFriendsOperation,
         _result: SteamworksFriendsResult,
         _error: SteamworksFriendsError,
+        _game_overlay_dialog: SteamworksGameOverlayDialog,
+        _user_overlay_dialog: SteamworksUserOverlayDialog,
     ) {
     }
 
@@ -585,6 +591,8 @@ fn friends_api_is_exported_from_root_and_prelude() {
         _operation: PreludeFriendsOperation,
         _result: PreludeFriendsResult,
         _error: PreludeFriendsError,
+        _game_overlay_dialog: PreludeGameOverlayDialog,
+        _user_overlay_dialog: PreludeUserOverlayDialog,
     ) {
     }
 
@@ -601,6 +609,26 @@ fn friends_api_is_exported_from_root_and_prelude() {
         steamworks::OverlayToStoreFlag::from(SteamworksOverlayToStoreAction::AddToCart),
         steamworks::OverlayToStoreFlag::AddToCart
     ));
+    assert_eq!(SteamworksGameOverlayDialog::Friends.as_str(), "friends");
+    assert_eq!(SteamworksUserOverlayDialog::FriendAdd.as_str(), "friendadd");
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_dialog(
+            SteamworksGameOverlayDialog::Community
+        ),
+        SteamworksFriendsCommand::ActivateGameOverlay {
+            dialog: "community".to_owned(),
+        }
+    );
+    assert_eq!(
+        SteamworksFriendsCommand::activate_game_overlay_to_user_dialog(
+            SteamworksUserOverlayDialog::Chat,
+            steamworks::SteamId::from_raw(11),
+        ),
+        SteamworksFriendsCommand::ActivateGameOverlayToUser {
+            dialog: "chat".to_owned(),
+            steam_id: steamworks::SteamId::from_raw(11),
+        }
+    );
 
     accepts_root_exports(
         SteamworksFriendsPlugin::new(),
@@ -608,6 +636,8 @@ fn friends_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+        SteamworksGameOverlayDialog::Friends,
+        SteamworksUserOverlayDialog::Profile,
     );
     let friend = steamworks::SteamId::from_raw(11);
     let lobby = steamworks::LobbyId::from_raw(12);
@@ -651,6 +681,27 @@ fn friends_api_is_exported_from_root_and_prelude() {
         steamworks::OverlayToStoreFlag::from(PreludeOverlayToStoreAction::AddToCartAndShow),
         steamworks::OverlayToStoreFlag::AddToCartAndShow
     ));
+    assert_eq!(PreludeGameOverlayDialog::Settings.as_str(), "settings");
+    assert_eq!(
+        PreludeUserOverlayDialog::FriendRemove.as_str(),
+        "friendremove"
+    );
+    assert_eq!(
+        PreludeFriendsCommand::activate_game_overlay_dialog(PreludeGameOverlayDialog::Players),
+        PreludeFriendsCommand::ActivateGameOverlay {
+            dialog: "players".to_owned(),
+        }
+    );
+    assert_eq!(
+        PreludeFriendsCommand::activate_game_overlay_to_user_dialog(
+            PreludeUserOverlayDialog::Achievements,
+            steamworks::SteamId::from_raw(11),
+        ),
+        PreludeFriendsCommand::ActivateGameOverlayToUser {
+            dialog: "achievements".to_owned(),
+            steam_id: steamworks::SteamId::from_raw(11),
+        }
+    );
 
     accepts_prelude_exports(
         PreludeFriendsPlugin::new(),
@@ -658,6 +709,8 @@ fn friends_api_is_exported_from_root_and_prelude() {
         operation,
         result,
         error,
+        PreludeGameOverlayDialog::Friends,
+        PreludeUserOverlayDialog::Profile,
     );
     let prelude_state = PreludeFriendsState::default();
     assert_eq!(prelude_state.friend_count(), 0);
