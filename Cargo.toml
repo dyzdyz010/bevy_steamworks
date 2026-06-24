@@ -14,7 +14,7 @@ serde = ["steamworks/serde"]
 
 [dependencies]
 bevy_app = { version = "0.18", default-features = false }
-bevy_ecs = { version = "0.18", default-features = false }
+bevy_ecs = { version = "0.19", default-features = false }
 steamworks = { version = "0.13.1", default-features = false }
 thiserror = "2.0"
 tracing = "0.1"
