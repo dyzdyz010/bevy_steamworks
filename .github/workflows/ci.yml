@@ -67,6 +67,9 @@ jobs:
       - name: Check examples
         run: cargo check --examples
 
+      - name: Check all features
+        run: cargo check --all-features --all-targets
+
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
 
